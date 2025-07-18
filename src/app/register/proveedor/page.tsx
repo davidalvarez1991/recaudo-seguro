@@ -1,8 +1,10 @@
+
 import { AuthCard } from "@/components/auth/auth-card";
 import { RegistrationForm } from "@/components/auth/registration-form";
 import Link from "next/link";
+import { Suspense } from 'react';
 
-export default function ProveedorRegisterPage() {
+function ProveedorRegisterPageContent() {
   return (
     <AuthCard
       title="Registro de Proveedor"
@@ -17,4 +19,12 @@ export default function ProveedorRegisterPage() {
       </div>
     </AuthCard>
   );
+}
+
+export default function ProveedorRegisterPage() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <ProveedorRegisterPageContent />
+        </Suspense>
+    );
 }

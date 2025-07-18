@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -18,10 +19,10 @@ import { register } from "@/lib/actions";
 import { useTransition } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type RegistrationFormProps = {
-  role: "cliente" | "proveedor" | "cobrador";
+  role: "cliente" | "proveedor";
   showSuccessToast?: boolean;
 };
 
@@ -29,11 +30,12 @@ export function RegistrationForm({ role, showSuccessToast = false }: Registratio
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const form = useForm<z.infer<typeof RegisterSchema>>({
     resolver: zodResolver(RegisterSchema),
     defaultValues: {
-      idNumber: "",
+      idNumber: searchParams.get("idNumber") || "",
       whatsappNumber: "",
       email: "",
       password: "",
@@ -51,6 +53,8 @@ export function RegistrationForm({ role, showSuccessToast = false }: Registratio
              description: result.error,
              variant: "destructive",
            });
+        } else if (result?.successUrl) {
+            router.push(result.successUrl);
         } else if (result?.success) {
           if (showSuccessToast) {
             toast({
@@ -60,8 +64,6 @@ export function RegistrationForm({ role, showSuccessToast = false }: Registratio
               className: "bg-accent text-accent-foreground border-accent",
             });
             form.reset();
-          } else if (result?.successUrl) {
-            router.push(result.successUrl);
           }
         }
       } catch (error) {

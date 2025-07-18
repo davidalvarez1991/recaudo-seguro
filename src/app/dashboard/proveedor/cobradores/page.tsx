@@ -26,46 +26,58 @@ type Cobrador = {
   name: string;
   idNumber: string;
   status: string;
+  providerId: string;
 };
 
 export default function GestionCobradoresPage() {
   const [cobradores, setCobradores] = useState<Cobrador[]>([]);
+  const [providerId, setProviderId] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const fetchCobradores = () => {
-    const storedCobradoresRaw = localStorage.getItem('cobradores');
-    if (storedCobradoresRaw) {
-      setCobradores(JSON.parse(storedCobradoresRaw));
-    } else {
-      setCobradores([]);
-    }
-  };
-
   useEffect(() => {
+    // Function to get a cookie by name
+    const getCookie = (name: string): string | null => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+      return null;
+    };
+    const currentProviderId = getCookie('loggedInUser');
+    setProviderId(currentProviderId);
+
+    const fetchCobradores = () => {
+        if (!currentProviderId) return;
+        const cobradoresKey = `cobradores_${currentProviderId}`;
+        const storedCobradoresRaw = localStorage.getItem(cobradoresKey);
+        if (storedCobradoresRaw) {
+            setCobradores(JSON.parse(storedCobradoresRaw));
+        } else {
+            setCobradores([]);
+        }
+    };
+
     const handleCobradoresUpdate = () => fetchCobradores();
     
-    fetchCobradores(); // Initial fetch
+    fetchCobradores();
     
     window.addEventListener('cobradores-updated', handleCobradoresUpdate);
     
-    // Cleanup listener on component unmount
     return () => {
       window.removeEventListener('cobradores-updated', handleCobradoresUpdate);
     };
   }, []);
 
   const handleDelete = async (idNumber: string) => {
+    if (!providerId) return;
     const serverResult = await deleteCobrador(idNumber);
 
     if (serverResult.success) {
-      // Also delete from localStorage on the client
-      const storedCobradoresRaw = localStorage.getItem('cobradores');
+      const cobradoresKey = `cobradores_${providerId}`;
+      const storedCobradoresRaw = localStorage.getItem(cobradoresKey);
       if (storedCobradoresRaw) {
           let storedCobradores: Cobrador[] = JSON.parse(storedCobradoresRaw);
           const updatedCobradores = storedCobradores.filter(c => c.idNumber !== idNumber);
-          localStorage.setItem('cobradores', JSON.stringify(updatedCobradores));
-          
-          // Dispatch event to trigger UI refresh in this and other components
+          localStorage.setItem(cobradoresKey, JSON.stringify(updatedCobradores));
           window.dispatchEvent(new CustomEvent('cobradores-updated'));
       }
 

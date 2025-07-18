@@ -23,23 +23,50 @@ import { useTransition, useState, useEffect } from "react";
 export function UserNav() {
   const [isPending, startTransition] = useTransition();
   const [logo, setLogo] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState("usuario@recaudo.seguro");
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
+    const getCookie = (name: string): string | null => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+      return null;
+    };
+    const currentUserId = getCookie('loggedInUser');
+    setUserId(currentUserId);
+    if(currentUserId) {
+        // In a real app, you'd fetch user details from an API
+        setUserEmail(`${currentUserId}@recaudo.seguro`);
+    }
+
     const updateLogo = () => {
-      const savedLogo = localStorage.getItem('company-logo');
-      setLogo(savedLogo);
+      if (currentUserId) {
+        const savedLogo = localStorage.getItem(`company-logo_${currentUserId}`);
+        setLogo(savedLogo);
+      } else {
+        setLogo(null);
+      }
     };
 
-    updateLogo(); // Initial load
+    updateLogo();
 
     window.addEventListener('logo-updated', updateLogo);
-    window.addEventListener('storage', updateLogo); // Listen for changes from other tabs
+    
+    // Listen for storage changes in other tabs, which might indicate login/logout
+    const handleStorageChange = () => {
+        const updatedUserId = getCookie('loggedInUser');
+        if (updatedUserId !== userId) {
+            window.location.reload(); // Reload if user session changes
+        }
+    };
+    window.addEventListener('storage', handleStorageChange);
 
     return () => {
       window.removeEventListener('logo-updated', updateLogo);
-      window.removeEventListener('storage', updateLogo);
+      window.removeEventListener('storage', handleStorageChange);
     };
-  }, []);
+  }, [userId]);
 
   const handleLogout = () => {
     startTransition(() => {
@@ -62,7 +89,7 @@ export function UserNav() {
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">Usuario</p>
             <p className="text-xs leading-none text-muted-foreground">
-              usuario@recaudo.seguro
+              {userEmail}
             </p>
           </div>
         </DropdownMenuLabel>

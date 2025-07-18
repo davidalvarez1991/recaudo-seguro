@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CobradorRegisterSchema } from "@/lib/schemas";
 import { registerCobrador } from "@/lib/actions";
-import { useTransition } from "react";
+import { useTransition, useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
@@ -26,7 +26,19 @@ type CobradorRegistrationFormProps = {
 
 export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationFormProps) {
   const [isPending, startTransition] = useTransition();
+  const [providerId, setProviderId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    // Function to get a cookie by name
+    const getCookie = (name: string): string | null => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+      return null;
+    };
+    setProviderId(getCookie('loggedInUser'));
+  }, []);
 
   const form = useForm<z.infer<typeof CobradorRegisterSchema>>({
     resolver: zodResolver(CobradorRegisterSchema),
@@ -39,6 +51,15 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
 
   const onSubmit = (values: z.infer<typeof CobradorRegisterSchema>) => {
     startTransition(async () => {
+       if (!providerId) {
+            toast({
+                title: "Error",
+                description: "No se pudo identificar al proveedor. Por favor, inicie sesión de nuevo.",
+                variant: "destructive",
+            });
+            return;
+        }
+
        try {
         const result = await registerCobrador(values);
         if (result?.error) {
@@ -48,14 +69,14 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
              variant: "destructive",
            });
         } else if (result?.success) {
-            const storedCobradoresRaw = localStorage.getItem('cobradores');
+            const cobradoresKey = `cobradores_${providerId}`;
+            const storedCobradoresRaw = localStorage.getItem(cobradoresKey);
             const storedCobradores = storedCobradoresRaw ? JSON.parse(storedCobradoresRaw) : [];
             
-            // Check if cobrador already exists in localStorage (client-side safety)
             if (storedCobradores.some((c: any) => c.idNumber === values.idNumber)) {
                 toast({
                     title: "Error",
-                    description: "Este cobrador ya existe en la lista local.",
+                    description: "Este cobrador ya existe.",
                     variant: "destructive",
                 });
                 return;
@@ -65,10 +86,11 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
                 id: (storedCobradores.length + 1).toString(),
                 name: values.name,
                 idNumber: values.idNumber,
-                status: "Activo"
+                status: "Activo",
+                providerId: providerId,
             };
             const updatedCobradores = [...storedCobradores, newCobrador];
-            localStorage.setItem('cobradores', JSON.stringify(updatedCobradores));
+            localStorage.setItem(cobradoresKey, JSON.stringify(updatedCobradores));
             window.dispatchEvent(new CustomEvent('cobradores-updated'));
 
             toast({
@@ -138,7 +160,7 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isPending}>
+        <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isPending || !providerId}>
           {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Crear cuenta de cobrador
         </Button>

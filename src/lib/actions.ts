@@ -4,16 +4,17 @@
 import { z } from "zod";
 import { LoginSchema, RegisterSchema, CobradorRegisterSchema } from "./schemas";
 import { redirect } from "next/navigation";
+import { cookies } from 'next/headers';
 
 // Mock user roles and passwords for demonstration purposes
-const users: Record<string, string> = {
+let users: Record<string, string> = {
   "10000001": "admin",
   "20000002": "proveedor",
   "40000004": "cliente",
   "30000003": "cobrador", // Initial cobrador for testing
 };
 
-const userPasswords: Record<string, string> = {
+let userPasswords: Record<string, string> = {
     "10000001": "password123",
     "20000002": "password123",
     "40000004": "password123",
@@ -33,7 +34,8 @@ export async function login(values: z.infer<typeof LoginSchema>) {
   const storedPassword = userPasswords[idNumber];
 
   if (role && password === storedPassword) {
-    // In a real application, you would set a session cookie here.
+    // Simulate session by setting a cookie with the user's ID
+    cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
     redirect(`/dashboard/${role}`);
   }
 
@@ -49,10 +51,18 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
   
   const { idNumber, email, password } = validatedFields.data;
 
+  // Check if user already exists
+  if (users[idNumber]) {
+    return { error: "El número de cédula ya está registrado." };
+  }
+
   // In a real application, you would create the user in the database here.
   console.log(`New ${role} registration:`, idNumber, email);
   users[idNumber] = role;
   userPasswords[idNumber] = password;
+  
+  // Directly log in the new user by setting the cookie
+  cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
   
   if (role === "proveedor") {
     // Return a success URL for the component to handle redirection.
@@ -93,15 +103,19 @@ export async function deleteCobrador(idNumber: string): Promise<{ error?: string
   delete users[idNumber];
   delete userPasswords[idNumber];
   
-  // We'll also need a way to signal the client to update localStorage.
-  // The client will handle localStorage deletion upon success.
   console.log(`Cobrador with ID ${idNumber} has been deleted.`);
   
   return { success: true };
 }
 
+export async function getLoggedInUser() {
+    const cookieStore = cookies();
+    const loggedInUser = cookieStore.get('loggedInUser');
+    return loggedInUser ? { id: loggedInUser.value } : null;
+}
 
 export async function logout() {
-    // In a real application, you would clear the session cookie here.
+    // Clear the session cookie
+    cookies().set('loggedInUser', '', { expires: new Date(0), path: '/' });
     redirect('/login');
 }

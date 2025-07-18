@@ -17,26 +17,49 @@ type Credito = {
   fecha: string;
   estado: string;
   formattedDate?: string;
+  cobradorId: string;
 };
 
 export default function CreditosPage() {
   const [creditos, setCreditos] = useState<Credito[]>([]);
+  const [cobradorId, setCobradorId] = useState<string | null>(null);
 
   useEffect(() => {
-    // This code runs only on the client
-    const storedCreditosRaw = localStorage.getItem('creditos');
-    let allCreditos: Credito[] = [];
+     const getCookie = (name: string): string | null => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+      return null;
+    };
+    const currentCobradorId = getCookie('loggedInUser');
+    setCobradorId(currentCobradorId);
 
-    if (storedCreditosRaw) {
-      allCreditos = JSON.parse(storedCreditosRaw);
+    const fetchCreditos = () => {
+        if (!currentCobradorId) return;
+        const creditosKey = `creditos_${currentCobradorId}`;
+        const storedCreditosRaw = localStorage.getItem(creditosKey);
+        let allCreditos: Credito[] = [];
+
+        if (storedCreditosRaw) {
+        allCreditos = JSON.parse(storedCreditosRaw);
+        }
+
+        const formattedCreditos = allCreditos.map(c => ({
+        ...c,
+        formattedDate: new Date(c.fecha).toLocaleDateString(),
+        }));
+        
+        setCreditos(formattedCreditos);
     }
-
-    const formattedCreditos = allCreditos.map(c => ({
-      ...c,
-      formattedDate: new Date(c.fecha).toLocaleDateString(),
-    }));
     
-    setCreditos(formattedCreditos);
+    fetchCreditos();
+
+    const handleCreditosUpdate = () => fetchCreditos();
+    window.addEventListener('creditos-updated', handleCreditosUpdate);
+
+    return () => {
+        window.removeEventListener('creditos-updated', handleCreditosUpdate);
+    };
   }, []);
 
   return (

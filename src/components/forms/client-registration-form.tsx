@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useTransition } from "react";
+import { useTransition, useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -35,7 +35,19 @@ type ClientRegistrationFormProps = {
 
 export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormProps) {
   const [isPending, startTransition] = useTransition();
+  const [cobradorId, setCobradorId] = useState<string | null>(null);
   const { toast } = useToast();
+
+   useEffect(() => {
+    // Function to get a cookie by name
+    const getCookie = (name: string): string | null => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+      return null;
+    };
+    setCobradorId(getCookie('loggedInUser'));
+  }, []);
 
   const form = useForm<z.infer<typeof ClientCreditSchema>>({
     resolver: zodResolver(ClientCreditSchema),
@@ -52,11 +64,19 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
 
   const onSubmit = (values: z.infer<typeof ClientCreditSchema>) => {
     startTransition(() => {
-      // Get existing credits from localStorage
-      const storedCreditosRaw = localStorage.getItem('creditos');
+       if (!cobradorId) {
+            toast({
+                title: "Error",
+                description: "No se pudo identificar al cobrador. Por favor, inicie sesión de nuevo.",
+                variant: "destructive",
+            });
+            return;
+        }
+        
+      const creditosKey = `creditos_${cobradorId}`;
+      const storedCreditosRaw = localStorage.getItem(creditosKey);
       const storedCreditos = storedCreditosRaw ? JSON.parse(storedCreditosRaw) : [];
 
-      // Create new credit object
       const newCredit = {
         id: (storedCreditos.length + 1).toString(),
         clienteId: values.idNumber,
@@ -64,11 +84,12 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         cuotas: values.installments,
         fecha: new Date().toISOString(),
         estado: "Activo",
+        cobradorId: cobradorId,
       };
 
-      // Add new credit and save back to localStorage
       const updatedCreditos = [...storedCreditos, newCredit];
-      localStorage.setItem('creditos', JSON.stringify(updatedCreditos));
+      localStorage.setItem(creditosKey, JSON.stringify(updatedCreditos));
+      window.dispatchEvent(new CustomEvent('creditos-updated'));
       
       toast({
         title: "Registro Exitoso",
@@ -187,7 +208,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 />
             </div>
         </ScrollArea>
-        <Button type="submit" className="w-full" disabled={isPending}>
+        <Button type="submit" className="w-full" disabled={isPending || !cobradorId}>
           {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Crear Cliente y Crédito
         </Button>

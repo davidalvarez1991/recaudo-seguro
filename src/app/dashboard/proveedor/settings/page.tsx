@@ -20,16 +20,29 @@ export default function SettingsPage() {
   const [commissionPercentage, setCommissionPercentage] = useState("20%");
   const [lateInterestRate, setLateInterestRate] = useState("2%");
   const [isLateInterestActive, setIsLateInterestActive] = useState(false);
+  const [providerId, setProviderId] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    const savedLogo = localStorage.getItem('company-logo');
-    if (savedLogo) {
-      setLogo(savedLogo);
+    const getCookie = (name: string): string | null => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+      return null;
+    };
+    const currentProviderId = getCookie('loggedInUser');
+    setProviderId(currentProviderId);
+
+    if (currentProviderId) {
+      const savedLogo = localStorage.getItem(`company-logo_${currentProviderId}`);
+      if (savedLogo) {
+        setLogo(savedLogo);
+      }
     }
   }, []);
 
   const handleLogoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    if (!providerId) return;
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -37,8 +50,7 @@ export default function SettingsPage() {
       reader.onloadend = () => {
         const result = reader.result as string;
         setLogo(result);
-        localStorage.setItem('company-logo', result);
-        // Dispatch a custom event to notify other components of the change
+        localStorage.setItem(`company-logo_${providerId}`, result);
         window.dispatchEvent(new CustomEvent('logo-updated'));
         setIsUploading(false);
         toast({
@@ -112,9 +124,9 @@ export default function SettingsPage() {
                     onChange={handleLogoChange}
                     className="hidden"
                     accept="image/png, image/jpeg, image/gif"
-                    disabled={isUploading}
+                    disabled={isUploading || !providerId}
                   />
-                <Button onClick={handleUploadClick} disabled={isUploading} className="w-full sm:w-auto">
+                <Button onClick={handleUploadClick} disabled={isUploading || !providerId} className="w-full sm:w-auto">
                   <Upload className="mr-2 h-4 w-4" />
                   {isUploading ? "Cargando..." : "Subir Logo"}
                 </Button>
