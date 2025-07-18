@@ -2,11 +2,10 @@
 "use client";
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, UserCircle } from "lucide-react";
 import Link from "next/link";
-
+import { Badge } from "@/components/ui/badge";
 
 const cobradores = [
   { id: "1", name: "Carlos Ramirez", idNumber: "987654321", status: "Activo" },
@@ -18,45 +17,45 @@ const cobradores = [
 export default function GestionCobradoresPage() {
 
   return (
-    <div className="grid gap-8">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                    <CardTitle className="text-3xl">Gestión de Cobradores</CardTitle>
-                    <CardDescription>
-                    Visualiza y administra las cuentas de tus cobradores.
-                    </CardDescription>
+    <div className="flex flex-col gap-8">
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="space-y-1">
+              <h1 className="text-3xl font-bold tracking-tight">Gestión de Cobradores</h1>
+              <p className="text-muted-foreground">
+              Visualiza y administra las cuentas de tus cobradores.
+              </p>
+          </div>
+          <Button asChild variant="outline">
+              <Link href="/dashboard/proveedor">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Volver al Panel
+              </Link>
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {cobradores.map((cobrador) => (
+          <Card key={cobrador.id} className="flex flex-col">
+            <CardHeader className="flex flex-row items-center gap-4">
+                <UserCircle className="w-12 h-12 text-muted-foreground" />
+                <div className="grid gap-1">
+                    <CardTitle>{cobrador.name}</CardTitle>
+                    <CardDescription>ID: {cobrador.idNumber}</CardDescription>
                 </div>
-                <Button asChild variant="outline">
-                    <Link href="/dashboard/proveedor">
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Volver
-                    </Link>
-                </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nombre del Cobrador</TableHead>
-                    <TableHead>Número de Identificación</TableHead>
-                    <TableHead>Estado</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {cobradores.map((cobrador) => (
-                    <TableRow key={cobrador.id}>
-                      <TableCell>{cobrador.name}</TableCell>
-                      <TableCell>{cobrador.idNumber}</TableCell>
-                      <TableCell>{cobrador.status}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="flex items-center justify-between mt-auto pt-4">
+              <div>
+                <span className="text-sm text-muted-foreground">Estado</span>
+                <Badge variant={cobrador.status === 'Activo' ? 'default' : 'secondary'} className="ml-2">
+                  {cobrador.status}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }
