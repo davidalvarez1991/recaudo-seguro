@@ -21,7 +21,8 @@ type Cobrador = {
   idNumber: string;
   role: string;
   providerId: string;
-  createdAt: string; // Changed to string
+  createdAt: string;
+  updatedAt?: string;
 };
 
 export default function GestionCobradoresPage() {
@@ -100,14 +101,14 @@ export default function GestionCobradoresPage() {
     <>
       <div className="flex flex-col gap-8">
         <div>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-4">
             <div className="space-y-1">
                 <h1 className="text-3xl font-bold tracking-tight">Gestión de Cobradores</h1>
                 <p className="text-muted-foreground">
                 Visualiza y administra las cuentas de tus cobradores.
                 </p>
             </div>
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" className="w-full sm:w-auto">
                 <Link href="/dashboard/proveedor">
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Volver al Panel
@@ -162,7 +163,7 @@ export default function GestionCobradoresPage() {
         ) : (
           <Card>
               <CardContent className="pt-6">
-                  <div className="text-center text-muted-foreground py-8">
+                  <div className="text-center text-muted-foreground py-8 px-4">
                       <UserCircle className="w-16 h-16 mx-auto mb-4 text-gray-300" />
                       <h3 className="text-lg font-semibold">No hay cobradores registrados</h3>
                       <p className="text-sm">Crea un nuevo cobrador desde tu panel de proveedor para empezar.</p>

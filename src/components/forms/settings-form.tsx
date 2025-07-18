@@ -92,7 +92,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
             <AvatarImage src={logo || "https://placehold.co/200x200.png"} data-ai-hint="company logo" alt="Logo de la empresa" />
             <AvatarFallback>LOGO</AvatarFallback>
           </Avatar>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 w-full sm:w-auto">
              <Input
                 type="file"
                 ref={fileInputRef}
@@ -129,7 +129,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
                 disabled
             />
           </div>
-          <div className="pb-2">
+          <div className="pb-2 hidden sm:block">
             <Asterisk className="h-5 w-5 text-muted-foreground" />
           </div>
           <div className="w-full sm:w-40 space-y-2">

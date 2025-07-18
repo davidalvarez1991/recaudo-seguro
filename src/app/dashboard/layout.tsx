@@ -1,6 +1,6 @@
 
 import { UserNav } from "@/components/dashboard/user-nav";
-import { SidebarProvider, Sidebar, SidebarInset } from "@/components/ui/sidebar";
+import { SidebarProvider, Sidebar, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { cookies } from "next/headers";
@@ -35,13 +35,14 @@ export default async function DashboardLayout({
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen w-full flex-col bg-background">
         <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-card px-4 md:px-6 z-50">
-          <div className="flex items-center gap-2">
+           <div className="flex items-center gap-2">
+            <SidebarTrigger className="md:hidden" />
             <Link
               href="/dashboard/proveedor"
               className="flex items-center gap-2 font-semibold text-primary"
             >
               <ShieldCheck className="h-6 w-6" />
-              <span className="text-lg">Recaudo Seguro</span>
+              <span className="text-lg hidden sm:inline-block">Recaudo Seguro</span>
             </Link>
           </div>
           <div className="ml-auto flex items-center gap-4">
