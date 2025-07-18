@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Upload, ArrowLeft, Save } from "lucide-react";
+import { Upload, ArrowLeft, Save, Asterisk } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
@@ -14,7 +14,7 @@ export default function SettingsPage() {
   const [logo, setLogo] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [commissionFormula, setCommissionFormula] = useState("0");
+  const [commissionPercentage, setCommissionPercentage] = useState("20%");
   const { toast } = useToast();
 
   const handleLogoChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -35,11 +35,11 @@ export default function SettingsPage() {
   };
   
   const handleSaveCommission = () => {
-    // In a real application, you would save this formula to your backend.
-    console.log("Saving commission formula:", commissionFormula);
+    // In a real application, you would save this percentage to your backend.
+    console.log("Saving commission percentage:", commissionPercentage);
     toast({
-      title: "Fórmula Guardada",
-      description: `La nueva fórmula de comisión (${commissionFormula}) ha sido guardada.`,
+      title: "Porcentaje Guardado",
+      description: `El nuevo porcentaje de comisión (${commissionPercentage}) ha sido guardado.`,
       variant: "default",
       className: "bg-accent text-accent-foreground border-accent",
     });
@@ -100,24 +100,34 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Fórmula de Comisión</CardTitle>
-            <CardDescription>Define la fórmula para calcular la comisión de los cobradores.</CardDescription>
+            <CardDescription>Define el porcentaje de comisión para tus cobradores.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-             <div className="space-y-2">
-                <Label htmlFor="commission-formula">Fórmula</Label>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="credit-value">Valor del Crédito</Label>
                 <Input 
-                    id="commission-formula"
-                    placeholder="Ej: 500000*20%"
-                    value={commissionFormula}
-                    onChange={(e) => setCommissionFormula(e.target.value)}
+                    id="credit-value"
+                    value="Valor registrado por el cobrador"
+                    disabled
                 />
-                <p className="text-sm text-muted-foreground">
-                    Esta fórmula se aplicará al "valor del crédito" que registren tus cobradores.
-                </p>
-             </div>
+              </div>
+              <div className="self-end pb-2">
+                <Asterisk className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="w-32 space-y-2">
+                <Label htmlFor="commission-percentage">Porcentaje</Label>
+                <Input 
+                    id="commission-percentage"
+                    placeholder="20%"
+                    value={commissionPercentage}
+                    onChange={(e) => setCommissionPercentage(e.target.value)}
+                />
+              </div>
+            </div>
              <Button onClick={handleSaveCommission}>
                 <Save className="mr-2 h-4 w-4" />
-                Guardar Fórmula
+                Guardar Porcentaje
              </Button>
           </CardContent>
         </Card>
