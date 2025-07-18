@@ -23,11 +23,7 @@ export function SidebarContent({ role }: SidebarContentProps) {
     case 'cliente':
       return <SidebarContentClient role="cliente" />;
     default:
-      // Fallback for unknown roles, redirect to login
-      // Note: This logic might be better handled server-side,
-      // but as a fallback it's useful here.
       if (typeof window !== 'undefined') {
-        // Clear cookie if possible, though httpOnly makes it tricky on client
         router.push('/login');
       }
       return null;

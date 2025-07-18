@@ -17,13 +17,16 @@ export function SidebarContentProveedor() {
   const role = "proveedor";
   const { setOpenMobile } = useSidebar();
 
+  const isActive = (path: string) => pathname.includes(path);
+  const isHome = pathname === `/dashboard/${role}`;
+
   return (
     <SidebarContent>
       <SidebarMenu>
         <SidebarMenuItem>
            <SidebarMenuButton
             asChild
-            isActive={pathname === `/dashboard/${role}`}
+            isActive={isHome}
             tooltip="Inicio"
             onClick={() => setOpenMobile(false)}
           >
@@ -37,7 +40,7 @@ export function SidebarContentProveedor() {
         <SidebarMenuItem>
            <SidebarMenuButton 
             asChild 
-            isActive={pathname.includes('cobradores')} 
+            isActive={isActive('cobradores')} 
             tooltip="Gestión de Cobradores"
             onClick={() => setOpenMobile(false)}
             >
@@ -51,7 +54,7 @@ export function SidebarContentProveedor() {
         <SidebarMenuItem>
            <SidebarMenuButton 
             asChild 
-            isActive={pathname.includes('registros')} 
+            isActive={isActive('registros')} 
             tooltip="Registro de Actividad"
             onClick={() => setOpenMobile(false)}
             >
@@ -65,7 +68,7 @@ export function SidebarContentProveedor() {
         <SidebarMenuItem>
            <SidebarMenuButton 
             asChild 
-            isActive={pathname.includes('settings')} 
+            isActive={isActive('settings')} 
             tooltip="Configuración"
             onClick={() => setOpenMobile(false)}
             >
