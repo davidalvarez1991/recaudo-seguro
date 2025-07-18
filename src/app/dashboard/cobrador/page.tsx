@@ -1,13 +1,8 @@
 
-import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { UserPlus } from "lucide-react";
-import { ClientRegistrationForm } from "@/components/forms/client-registration-form";
+import { CobradorDashboardClient } from "@/components/dashboard/cobrador-dashboard-client";
 import { getUserData } from "@/lib/actions";
 import { cookies } from "next/headers";
-import { CobradorDashboardClient } from "@/components/dashboard/cobrador-dashboard-client";
 
 type UserData = {
     name: string;
