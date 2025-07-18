@@ -36,14 +36,14 @@ export default async function RegistrosPage() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="space-y-1">
                 <CardTitle className="text-3xl">Registro de Actividad</CardTitle>
                 <CardDescription>
                 Visualiza todas las acciones registradas por tus cobradores.
                 </CardDescription>
             </div>
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" className="w-full sm:w-auto">
                 <Link href="/dashboard/proveedor">
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Volver al Panel

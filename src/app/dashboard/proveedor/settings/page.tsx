@@ -13,14 +13,14 @@ export default function SettingsPage() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="space-y-1">
             <CardTitle className="text-3xl">Configuración</CardTitle>
             <CardDescription>
               Gestiona la configuración general de tu perfil de proveedor.
             </CardDescription>
           </div>
-          <Button asChild variant="outline" className="w-full md:w-auto">
+          <Button asChild variant="outline" className="w-full sm:w-auto">
             <Link href="/dashboard/proveedor">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Volver al Panel

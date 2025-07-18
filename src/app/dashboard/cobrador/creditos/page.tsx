@@ -30,14 +30,14 @@ export default async function CreditosPage() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="space-y-1">
                 <CardTitle className="text-3xl">Listado de Créditos</CardTitle>
                 <CardDescription>
                 Visualiza todos los créditos que has registrado.
                 </CardDescription>
             </div>
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" className="w-full sm:w-auto">
                 <Link href="/dashboard/cobrador">
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Volver al Panel
