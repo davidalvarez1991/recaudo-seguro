@@ -38,6 +38,7 @@ export function EditCobradorForm({ cobrador, onFormSubmit }: EditCobradorFormPro
   const form = useForm<z.infer<typeof EditCobradorSchema>>({
     resolver: zodResolver(EditCobradorSchema),
     defaultValues: {
+      originalIdNumber: cobrador.idNumber,
       idNumber: cobrador.idNumber,
       name: cobrador.name,
       password: "",
@@ -82,6 +83,19 @@ export function EditCobradorForm({ cobrador, onFormSubmit }: EditCobradorFormPro
           render={({ field }) => (
             <FormItem>
               <FormLabel>Nombre del Cobrador</FormLabel>
+              <FormControl>
+                <Input {...field} disabled={isPending} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="idNumber"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Número de Identificación</FormLabel>
               <FormControl>
                 <Input {...field} disabled={isPending} />
               </FormControl>

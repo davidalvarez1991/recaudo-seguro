@@ -10,7 +10,7 @@ export const LoginSchema = z.object({
 });
 
 export const RegisterSchema = z.object({
-  companyName: z.string().optional(),
+  companyName: z.string().min(3, { message: "El nombre de la empresa debe tener al menos 3 caracteres."}).optional(),
   idNumber: z.string().min(6, {
     message: "El número de identificación debe tener al menos 6 caracteres.",
   }),
@@ -56,7 +56,10 @@ export const ClientCreditSchema = z.object({
 });
 
 export const EditCobradorSchema = z.object({
-  idNumber: z.string(),
+  originalIdNumber: z.string(),
+  idNumber: z.string().min(6, {
+    message: "El número de identificación debe tener al menos 6 caracteres.",
+  }),
   name: z.string().min(3, {
     message: "El nombre debe tener al menos 3 caracteres.",
   }),

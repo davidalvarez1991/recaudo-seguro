@@ -318,7 +318,7 @@ export async function updateCobrador(values: z.infer<typeof EditCobradorSchema>)
     return { error: "Datos inválidos." };
   }
   
-  const { idNumber, name, password } = validatedFields.data;
+  const { originalIdNumber, idNumber, name, password } = validatedFields.data;
 
   const cookieStore = cookies();
   const providerId = cookieStore.get('loggedInUser')?.value;
@@ -326,29 +326,51 @@ export async function updateCobrador(values: z.infer<typeof EditCobradorSchema>)
     return { error: "El proveedor no está autenticado." };
   }
 
-  const userDocRef = doc(db, "users", idNumber);
-  const userDoc = await getDoc(userDocRef);
+  const oldUserDocRef = doc(db, "users", originalIdNumber);
+  const oldUserDoc = await getDoc(oldUserDocRef);
 
-  if (!userDoc.exists() || userDoc.data().providerId !== providerId) {
+  if (!oldUserDoc.exists() || oldUserDoc.data().providerId !== providerId) {
     return { error: "No se encontró el cobrador o no tienes permiso para editarlo." };
   }
-  
-  const dataToUpdate: any = {};
-  if (name) {
-    dataToUpdate.name = name;
-  }
-  if (password) {
-    dataToUpdate.password = await bcrypt.hash(password, 10);
-  }
 
-  if (Object.keys(dataToUpdate).length === 0) {
-    return { error: "No se proporcionaron datos para actualizar." };
+  // If the ID number is being changed, we need to check if the new ID is already taken.
+  if (originalIdNumber !== idNumber) {
+    const newUserDocRef = doc(db, "users", idNumber);
+    const newUserDoc = await getDoc(newUserDocRef);
+    if (newUserDoc.exists()) {
+      return { error: "El nuevo número de identificación ya está en uso." };
+    }
   }
 
   try {
-    await updateDoc(userDocRef, dataToUpdate);
+    const batch = writeBatch(db);
+    const oldData = oldUserDoc.data();
+    
+    const newData = {
+      ...oldData,
+      idNumber: idNumber,
+      name: name,
+      updatedAt: new Date(),
+    };
+
+    if (password) {
+      newData.password = await bcrypt.hash(password, 10);
+    }
+
+    if (originalIdNumber !== idNumber) {
+      // Create new document and delete old one
+      const newUserDocRef = doc(db, "users", idNumber);
+      batch.set(newUserDocRef, newData);
+      batch.delete(oldUserDocRef);
+    } else {
+      // Just update the existing document
+      batch.update(oldUserDocRef, newData);
+    }
+    
+    await batch.commit();
     return { success: "El perfil del cobrador ha sido actualizado." };
   } catch (error) {
+    console.error("Error updating cobrador:", error);
     return { error: "No se pudo actualizar el perfil del cobrador." };
   }
 }
