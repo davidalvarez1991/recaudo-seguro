@@ -254,20 +254,17 @@ export async function getCobradoresByProvider() {
         const querySnapshot = await getDocs(q);
         const cobradores = querySnapshot.docs.map(doc => {
             const data = doc.data();
-            const { createdAt, updatedAt, ...rest } = data;
             
-            const plainObject = {
+            const plainObject: {[key: string]: any} = {
                 id: doc.id,
-                ...rest,
-                createdAt: '',
-                updatedAt: '',
+                ...data,
             };
 
-            if (createdAt && typeof createdAt.toDate === 'function') {
-                plainObject.createdAt = createdAt.toDate().toISOString();
+            if (data.createdAt && typeof data.createdAt.toDate === 'function') {
+                plainObject.createdAt = data.createdAt.toDate().toISOString();
             }
-            if (updatedAt && typeof updatedAt.toDate === 'function') {
-                plainObject.updatedAt = updatedAt.toDate().toISOString();
+            if (data.updatedAt && typeof data.updatedAt.toDate === 'function') {
+                plainObject.updatedAt = data.updatedAt.toDate().toISOString();
             }
 
             return plainObject;
@@ -390,19 +387,24 @@ export async function getLoggedInUser() {
     return loggedInUser ? { id: loggedInUser.value } : null;
 }
 
-export async function getUserRole(userId: string): Promise<string | null> {
+export async function getUserData(userId: string) {
     if (!userId) return null;
     try {
       const userDocRef = doc(db, "users", userId);
       const userDoc = await getDoc(userDocRef);
       if (userDoc.exists()) {
-          return userDoc.data().role;
+          return userDoc.data();
       }
       return null;
     } catch (error) {
-      console.error("Error fetching user role:", error);
+      console.error("Error fetching user data:", error);
       return null;
     }
+}
+
+export async function getUserRole(userId: string): Promise<string | null> {
+    const userData = await getUserData(userId);
+    return userData ? userData.role : null;
 }
 
 
