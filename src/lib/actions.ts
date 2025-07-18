@@ -65,7 +65,7 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
   
   cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
   
-  return { successUrl: `/dashboard/${role}` };
+  return { success: true, successUrl: `/dashboard/${role}` };
 }
 
 
