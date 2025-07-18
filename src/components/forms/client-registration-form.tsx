@@ -37,8 +37,8 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       contactPhone: "",
       guarantorPhone: "",
       idCardPhoto: undefined,
-      creditAmount: 0,
-      installments: 0,
+      creditAmount: undefined,
+      installments: undefined,
     },
   });
 
@@ -152,7 +152,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     <FormItem>
                       <FormLabel>Valor del Crédito</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" placeholder="500000" disabled={isPending} onChange={e => field.onChange(e.target.valueAsNumber)} />
+                        <Input {...field} type="number" placeholder="500000" disabled={isPending} onChange={e => field.onChange(e.target.valueAsNumber)} value={field.value ?? ""} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -166,7 +166,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     <FormItem>
                       <FormLabel>Cuotas a Diferir</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" placeholder="12" disabled={isPending} onChange={e => field.onChange(e.target.valueAsNumber)} />
+                        <Input {...field} type="number" placeholder="12" disabled={isPending} onChange={e => field.onChange(e.target.valueAsNumber)} value={field.value ?? ""} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
