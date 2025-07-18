@@ -53,5 +53,3 @@ export const ClientCreditSchema = z.object({
   creditAmount: z.coerce.number().min(1, "El valor del crédito es obligatorio."),
   installments: z.coerce.number().min(1, "El número de cuotas es obligatorio."),
 });
-
-    

@@ -199,6 +199,34 @@ export async function getCobradoresByProvider(providerId: string) {
     }
 }
 
+export async function getCreditsByProvider() {
+    const cookieStore = cookies();
+    const providerId = cookieStore.get('loggedInUser')?.value;
+    if (!providerId) return [];
+
+    // 1. Get all cobradores for the current provider
+    const cobradores = await getCobradoresByProvider(providerId);
+    if (cobradores.length === 0) return [];
+
+    const cobradorIds = cobradores.map(c => c.idNumber);
+
+    // 2. Get all credits where the cobradorId is one of the provider's cobradores
+    const creditsRef = collection(db, "credits");
+    const q = query(creditsRef, where("cobradorId", "in", cobradorIds));
+    
+    try {
+        const querySnapshot = await getDocs(q);
+        const credits = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        })) as any[]; // TODO: Add proper typing
+        return credits;
+    } catch (error) {
+        console.error("Error fetching provider credits:", error);
+        return [];
+    }
+}
+
 
 export async function deleteCobrador(idNumber: string): Promise<{ error?: string; success?: boolean; }> {
   const userDocRef = doc(db, "users", idNumber);

@@ -32,7 +32,6 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
     resolver: zodResolver(CobradorRegisterSchema),
     defaultValues: {
       name: "",
-      idNumber: "",
       password: "",
     },
   });
@@ -52,7 +51,7 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
 
             toast({
               title: "Registro Exitoso",
-              description: `El perfil de cobrador ha sido creado.`,
+              description: `El perfil de cobrador para ${values.name} ha sido creado.`,
               variant: "default",
               className: "bg-accent text-accent-foreground border-accent",
             });
