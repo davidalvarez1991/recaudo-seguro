@@ -54,3 +54,13 @@ export const ClientCreditSchema = z.object({
   creditAmount: z.coerce.number().min(1, "El valor del crédito es obligatorio."),
   installments: z.coerce.number().min(1, "El número de cuotas es obligatorio."),
 });
+
+export const EditCobradorSchema = z.object({
+  idNumber: z.string(),
+  name: z.string().min(3, {
+    message: "El nombre debe tener al menos 3 caracteres.",
+  }),
+  password: z.string().min(6, {
+    message: "La nueva contraseña debe tener al menos 6 caracteres.",
+  }).optional().or(z.literal('')),
+});

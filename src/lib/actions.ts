@@ -2,10 +2,10 @@
 "use server";
 
 import { z } from "zod";
-import { LoginSchema, RegisterSchema, CobradorRegisterSchema, ClientCreditSchema } from "./schemas";
+import { LoginSchema, RegisterSchema, CobradorRegisterSchema, ClientCreditSchema, EditCobradorSchema } from "./schemas";
 import { cookies } from 'next/headers';
 import { db } from "./firebase";
-import { doc, setDoc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch, getCountFromServer } from "firebase/firestore";
+import { doc, setDoc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch, getCountFromServer, updateDoc } from "firebase/firestore";
 import bcrypt from 'bcryptjs';
 
 export async function login(values: z.infer<typeof LoginSchema>) {
@@ -286,16 +286,64 @@ export async function getCreditsByProvider() {
 
 
 export async function deleteCobrador(idNumber: string) {
+  const cookieStore = cookies();
+  const providerId = cookieStore.get('loggedInUser')?.value;
+  if (!providerId) {
+    return { error: "El proveedor no está autenticado." };
+  }
+
   const userDocRef = doc(db, "users", idNumber);
   const userDoc = await getDoc(userDocRef);
 
-  if (!userDoc.exists() || userDoc.data().role !== 'cobrador') {
-    return { error: "El cobrador no existe o no se puede eliminar." };
+  if (!userDoc.exists() || userDoc.data().role !== 'cobrador' || userDoc.data().providerId !== providerId) {
+    return { error: "El cobrador no existe o no tienes permiso para eliminarlo." };
   }
 
   await deleteDoc(userDocRef);
   
   return { success: true };
+}
+
+export async function updateCobrador(values: z.infer<typeof EditCobradorSchema>) {
+  const validatedFields = EditCobradorSchema.safeParse(values);
+
+  if (!validatedFields.success) {
+    return { error: "Datos inválidos." };
+  }
+  
+  const { idNumber, name, password } = validatedFields.data;
+
+  const cookieStore = cookies();
+  const providerId = cookieStore.get('loggedInUser')?.value;
+  if (!providerId) {
+    return { error: "El proveedor no está autenticado." };
+  }
+
+  const userDocRef = doc(db, "users", idNumber);
+  const userDoc = await getDoc(userDocRef);
+
+  if (!userDoc.exists() || userDoc.data().providerId !== providerId) {
+    return { error: "No se encontró el cobrador o no tienes permiso para editarlo." };
+  }
+  
+  const dataToUpdate: any = {};
+  if (name) {
+    dataToUpdate.name = name;
+  }
+  if (password) {
+    dataToUpdate.password = await bcrypt.hash(password, 10);
+  }
+
+  if (Object.keys(dataToUpdate).length === 0) {
+    return { error: "No se proporcionaron datos para actualizar." };
+  }
+
+  try {
+    await updateDoc(userDocRef, dataToUpdate);
+    return { success: "El perfil del cobrador ha sido actualizado." };
+  } catch (error) {
+    return { error: "No se pudo actualizar el perfil del cobrador." };
+  }
 }
 
 export async function getLoggedInUser() {
