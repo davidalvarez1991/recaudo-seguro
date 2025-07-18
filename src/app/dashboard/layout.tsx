@@ -24,8 +24,9 @@ export default async function DashboardLayout({
       case 'admin':
         return <SidebarContentAdmin />;
       case 'cobrador':
+        return <SidebarContentClient role="cobrador" />;
       case 'cliente':
-        return <SidebarContentClient role={role} />;
+        return <SidebarContentClient role="cliente" />;
       default:
         // Render a default or loading state sidebar
         return <SidebarContentClient role="cliente" />;
@@ -33,7 +34,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <SidebarProvider defaultOpen={false}>
+    <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen w-full flex-col bg-background">
         <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-card px-4 md:px-6 z-50">
           <div className="flex items-center gap-2">

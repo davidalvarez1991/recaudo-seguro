@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useTransition, useState, useEffect } from "react";
+import { useTransition } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -27,19 +27,7 @@ type ClientRegistrationFormProps = {
 
 export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormProps) {
   const [isPending, startTransition] = useTransition();
-  const [cobradorId, setCobradorId] = useState<string | null>(null);
   const { toast } = useToast();
-
-   useEffect(() => {
-    // Function to get a cookie by name
-    const getCookie = (name: string): string | null => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
-      return null;
-    };
-    setCobradorId(getCookie('loggedInUser'));
-  }, []);
 
   const form = useForm<z.infer<typeof ClientCreditSchema>>({
     resolver: zodResolver(ClientCreditSchema),
@@ -56,15 +44,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
 
   const onSubmit = (values: z.infer<typeof ClientCreditSchema>) => {
     startTransition(async () => {
-       if (!cobradorId) {
-            toast({
-                title: "Error",
-                description: "No se pudo identificar al cobrador. Por favor, inicie sesión de nuevo.",
-                variant: "destructive",
-            });
-            return;
-        }
-
         const result = await createClientAndCredit(values);
 
         if (result.success) {
@@ -74,7 +53,9 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
             variant: "default",
             className: "bg-accent text-accent-foreground border-accent",
           });
-          window.dispatchEvent(new CustomEvent('creditos-updated'));
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('creditos-updated'));
+          }
           form.reset();
           onFormSubmit?.();
         } else {
@@ -171,7 +152,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     <FormItem>
                       <FormLabel>Valor del Crédito</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" placeholder="500000" disabled={isPending} />
+                        <Input {...field} type="number" placeholder="500000" disabled={isPending} onChange={e => field.onChange(e.target.valueAsNumber)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -185,7 +166,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     <FormItem>
                       <FormLabel>Cuotas a Diferir</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" placeholder="12" disabled={isPending} />
+                        <Input {...field} type="number" placeholder="12" disabled={isPending} onChange={e => field.onChange(e.target.valueAsNumber)} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -193,7 +174,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 />
             </div>
         </ScrollArea>
-        <Button type="submit" className="w-full" disabled={isPending || !cobradorId}>
+        <Button type="submit" className="w-full" disabled={isPending}>
           {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Crear Cliente y Crédito
         </Button>
@@ -201,5 +182,3 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
-
-    

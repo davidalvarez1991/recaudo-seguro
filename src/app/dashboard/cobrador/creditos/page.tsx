@@ -1,13 +1,10 @@
 
-"use client";
-
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect, useCallback } from "react";
 import { getCreditsByCobrador } from "@/lib/actions";
 
 type Credito = {
@@ -17,51 +14,18 @@ type Credito = {
   cuotas: number;
   fecha: string;
   estado: string;
-  formattedDate?: string;
   cobradorId: string;
 };
 
-export default function CreditosPage() {
-  const [creditos, setCreditos] = useState<Credito[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [cobradorId, setCobradorId] = useState<string | null>(null);
+export default async function CreditosPage() {
+  const creditos: Credito[] = await getCreditsByCobrador();
 
-  const fetchCreditos = useCallback(async (id: string) => {
-    setIsLoading(true);
-    const fetchedCreditos = await getCreditsByCobrador(id);
-    const formattedCreditos = fetchedCreditos.map((c: Credito) => ({
-      ...c,
-      formattedDate: new Date(c.fecha).toLocaleDateString(),
-    }));
-    setCreditos(formattedCreditos);
-    setIsLoading(false);
-  }, []);
-
-  useEffect(() => {
-     const getCookie = (name: string): string | null => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
-      return null;
-    };
-    const currentCobradorId = getCookie('loggedInUser');
-    setCobradorId(currentCobradorId);
-
-    if (currentCobradorId) {
-        fetchCreditos(currentCobradorId);
-    } else {
-        setIsLoading(false);
-    }
-
-    const handleCreditosUpdate = () => {
-        if (currentCobradorId) fetchCreditos(currentCobradorId);
-    }
-    window.addEventListener('creditos-updated', handleCreditosUpdate);
-
-    return () => {
-        window.removeEventListener('creditos-updated', handleCreditosUpdate);
-    };
-  }, [fetchCreditos]);
+  const formattedCreditos = creditos.map((c) => ({
+    ...c,
+    formattedDate: new Date(c.fecha).toLocaleDateString('es-CO', {
+        year: 'numeric', month: 'long', day: 'numeric'
+    }),
+  }));
 
   return (
     <Card>
@@ -82,12 +46,7 @@ export default function CreditosPage() {
         </div>
       </CardHeader>
       <CardContent className="pt-6">
-        {isLoading ? (
-            <div className="flex justify-center items-center py-10">
-                <Loader2 className="mr-2 h-8 w-8 animate-spin text-primary" />
-                <span className="text-muted-foreground">Cargando créditos...</span>
-            </div>
-        ) : (
+        {formattedCreditos.length > 0 ? (
             <Table>
                 <TableHeader>
                   <TableRow>
@@ -99,35 +58,31 @@ export default function CreditosPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {creditos.length > 0 ? (
-                    creditos.map((credito) => (
-                      <TableRow key={credito.id}>
-                        <TableCell>{credito.formattedDate}</TableCell>
-                        <TableCell>{credito.clienteId}</TableCell>
-                        <TableCell className="text-right">
-                          {`$${credito.valor.toLocaleString('es-CO')}`}
-                        </TableCell>
-                        <TableCell className="text-center">{credito.cuotas}</TableCell>
-                        <TableCell>
-                          <Badge variant={credito.estado === 'Activo' ? 'default' : 'secondary'}>
-                            {credito.estado}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground">
-                        No hay créditos registrados todavía.
+                  {formattedCreditos.map((credito) => (
+                    <TableRow key={credito.id}>
+                      <TableCell>{credito.formattedDate}</TableCell>
+                      <TableCell>{credito.clienteId}</TableCell>
+                      <TableCell className="text-right">
+                        {`$${credito.valor.toLocaleString('es-CO')}`}
+                      </TableCell>
+                      <TableCell className="text-center">{credito.cuotas}</TableCell>
+                      <TableCell>
+                        <Badge variant={credito.estado === 'Activo' ? 'default' : 'secondary'}>
+                          {credito.estado}
+                        </Badge>
                       </TableCell>
                     </TableRow>
-                  )}
+                  ))}
                 </TableBody>
               </Table>
+        ) : (
+          <div className="text-center text-muted-foreground py-8">
+              <ClipboardList className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+              <h3 className="text-lg font-semibold">No hay créditos registrados</h3>
+              <p className="text-sm">Cuando crees tu primer crédito, aparecerá aquí.</p>
+          </div>
         )}
       </CardContent>
     </Card>
   );
 }
-
-    

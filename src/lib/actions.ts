@@ -36,7 +36,7 @@ export async function login(values: z.infer<typeof LoginSchema>) {
   }
 }
 
-export async function register(values: z.infer<typeof RegisterSchema>, role: "cliente" | "proveedor"): Promise<{ error?: string; successUrl?: string; }> {
+export async function register(values: z.infer<typeof RegisterSchema>, role: "cliente" | "proveedor") {
   const validatedFields = RegisterSchema.safeParse(values);
 
   if (!validatedFields.success) {
@@ -69,7 +69,7 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
 }
 
 
-export async function registerCobrador(values: z.infer<typeof CobradorRegisterSchema>): Promise<{ error?: string; success?: boolean; }> {
+export async function registerCobrador(values: z.infer<typeof CobradorRegisterSchema>) {
   try {
     const validatedFields = CobradorRegisterSchema.safeParse(values);
 
@@ -107,12 +107,16 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
     return { success: true };
   } catch (error) {
     console.error("Error al registrar cobrador:", error);
-    return { error: "No se pudo crear la cuenta del cobrador. Inténtalo de nuevo." };
+    let errorMessage = "No se pudo crear la cuenta del cobrador.";
+    if (error instanceof Error) {
+        errorMessage = error.message;
+    }
+    return { error: errorMessage };
   }
 }
 
 
-export async function createClientAndCredit(values: z.infer<typeof ClientCreditSchema>): Promise<{ error?: string; success?: boolean; }> {
+export async function createClientAndCredit(values: z.infer<typeof ClientCreditSchema>) {
   const validatedFields = ClientCreditSchema.safeParse(values);
 
   if (!validatedFields.success) {
@@ -126,6 +130,13 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
 
   if (!cobradorId) {
     return { error: "El cobrador no está autenticado." };
+  }
+  
+  const cobradorDocRef = doc(db, "users", cobradorId);
+  const cobradorDoc = await getDoc(cobradorDocRef);
+
+  if (!cobradorDoc.exists() || !cobradorDoc.data()?.providerId) {
+      return { error: "No se pudo encontrar el proveedor asociado al cobrador." };
   }
 
   const batch = writeBatch(db);
@@ -148,6 +159,7 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     fecha: new Date().toISOString(),
     estado: "Activo",
     cobradorId: cobradorId,
+    providerId: cobradorDoc.data()?.providerId,
   });
 
   try {
@@ -160,7 +172,9 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
 }
 
 
-export async function getCreditsByCobrador(cobradorId: string) {
+export async function getCreditsByCobrador() {
+    const cookieStore = cookies();
+    const cobradorId = cookieStore.get('loggedInUser')?.value;
     if (!cobradorId) return [];
 
     const creditsRef = collection(db, "credits");
@@ -206,13 +220,8 @@ export async function getCreditsByProvider() {
     const providerId = cookieStore.get('loggedInUser')?.value;
     if (!providerId) return [];
 
-    const cobradores = await getCobradoresByProvider();
-    if (cobradores.length === 0) return [];
-
-    const cobradorIds = cobradores.map(c => c.idNumber);
-
     const creditsRef = collection(db, "credits");
-    const q = query(creditsRef, where("cobradorId", "in", cobradorIds));
+    const q = query(creditsRef, where("providerId", "==", providerId));
     
     try {
         const querySnapshot = await getDocs(q);
@@ -228,7 +237,7 @@ export async function getCreditsByProvider() {
 }
 
 
-export async function deleteCobrador(idNumber: string): Promise<{ error?: string; success?: boolean; }> {
+export async function deleteCobrador(idNumber: string) {
   const userDocRef = doc(db, "users", idNumber);
   const userDoc = await getDoc(userDocRef);
 
