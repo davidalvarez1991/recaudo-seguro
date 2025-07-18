@@ -19,23 +19,21 @@ import { register } from "@/lib/actions";
 import { useTransition } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 type RegistrationFormProps = {
   role: "cliente" | "proveedor";
-  showSuccessToast?: boolean;
 };
 
-export function RegistrationForm({ role, showSuccessToast = false }: RegistrationFormProps) {
+export function RegistrationForm({ role }: RegistrationFormProps) {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const form = useForm<z.infer<typeof RegisterSchema>>({
     resolver: zodResolver(RegisterSchema),
     defaultValues: {
-      idNumber: searchParams.get("idNumber") || "",
+      idNumber: "",
       whatsappNumber: "",
       email: "",
       password: "",
@@ -55,16 +53,6 @@ export function RegistrationForm({ role, showSuccessToast = false }: Registratio
            });
         } else if (result?.successUrl) {
             router.push(result.successUrl);
-        } else if (result?.success) {
-          if (showSuccessToast) {
-            toast({
-              title: "Registro Exitoso",
-              description: `El perfil de ${role} ha sido creado.`,
-              variant: "default",
-              className: "bg-accent text-accent-foreground border-accent",
-            });
-            form.reset();
-          }
         }
       } catch (error) {
          let errorMessage = "Algo salió mal. Por favor, inténtalo de nuevo.";

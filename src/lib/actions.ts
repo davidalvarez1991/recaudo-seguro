@@ -36,7 +36,7 @@ export async function login(values: z.infer<typeof LoginSchema>) {
   }
 }
 
-export async function register(values: z.infer<typeof RegisterSchema>, role: "cliente" | "proveedor"): Promise<{ error?: string; successUrl?: string; success?: boolean; }> {
+export async function register(values: z.infer<typeof RegisterSchema>, role: "cliente" | "proveedor"): Promise<{ error?: string; successUrl?: string; }> {
   const validatedFields = RegisterSchema.safeParse(values);
 
   if (!validatedFields.success) {
@@ -65,7 +65,7 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
   
   cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
   
-  return { success: true, successUrl: `/dashboard/${role}` };
+  return { successUrl: `/dashboard/${role}` };
 }
 
 export async function registerCobrador(values: z.infer<typeof CobradorRegisterSchema>): Promise<{ error?: string; success?: boolean; }> {
