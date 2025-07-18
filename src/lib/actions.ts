@@ -72,12 +72,15 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
   }
 }
 
-export async function registerCobrador(values: z.infer<typeof CobradorRegisterSchema>, providerId: string): Promise<{ error?: string; success?: boolean; }> {
+export async function registerCobrador(values: z.infer<typeof CobradorRegisterSchema>): Promise<{ error?: string; success?: boolean; }> {
   const validatedFields = CobradorRegisterSchema.safeParse(values);
 
   if (!validatedFields.success) {
     return { error: "Campos inválidos. Por favor, revisa los datos." };
   }
+
+  const cookieStore = cookies();
+  const providerId = cookieStore.get('loggedInUser')?.value;
 
   if (!providerId) {
       return { error: "El proveedor no está autenticado." };

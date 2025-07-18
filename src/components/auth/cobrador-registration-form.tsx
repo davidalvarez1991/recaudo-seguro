@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CobradorRegisterSchema } from "@/lib/schemas";
 import { registerCobrador } from "@/lib/actions";
-import { useTransition, useState, useEffect } from "react";
+import { useTransition } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
@@ -26,19 +26,7 @@ type CobradorRegistrationFormProps = {
 
 export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationFormProps) {
   const [isPending, startTransition] = useTransition();
-  const [providerId, setProviderId] = useState<string | null>(null);
   const { toast } = useToast();
-
-  useEffect(() => {
-    // Function to get a cookie by name
-    const getCookie = (name: string): string | null => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
-      return null;
-    };
-    setProviderId(getCookie('loggedInUser'));
-  }, []);
 
   const form = useForm<z.infer<typeof CobradorRegisterSchema>>({
     resolver: zodResolver(CobradorRegisterSchema),
@@ -51,17 +39,8 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
 
   const onSubmit = (values: z.infer<typeof CobradorRegisterSchema>) => {
     startTransition(async () => {
-       if (!providerId) {
-            toast({
-                title: "Error",
-                description: "No se pudo identificar al proveedor. Por favor, inicie sesión de nuevo.",
-                variant: "destructive",
-            });
-            return;
-        }
-
        try {
-        const result = await registerCobrador(values, providerId);
+        const result = await registerCobrador(values);
         if (result?.error) {
            toast({
              title: "Error de registro",
@@ -137,7 +116,7 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isPending || !providerId}>
+        <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isPending}>
           {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Crear cuenta de cobrador
         </Button>
