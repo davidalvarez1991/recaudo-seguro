@@ -28,6 +28,8 @@ export default async function DashboardLayout({
      // This case might happen if user document is deleted but cookie remains.
      // Or if there's a delay in DB replication.
      // Logging out is a safe default.
+     // We remove the cookie and redirect to login
+    cookies().set('loggedInUser', '', { expires: new Date(0), path: '/' });
     redirect('/login');
   }
 
@@ -43,6 +45,7 @@ export default async function DashboardLayout({
         return <SidebarContentClient role="cliente" />;
       default:
         // Fallback for unknown roles, redirect to login
+        cookies().set('loggedInUser', '', { expires: new Date(0), path: '/' });
         return redirect('/login');
     }
   }
@@ -53,7 +56,7 @@ export default async function DashboardLayout({
         <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-card px-4 md:px-6 z-50">
           <div className="flex items-center gap-2">
             <Link
-              href="#"
+              href="/dashboard/proveedor"
               className="flex items-center gap-2 font-semibold text-primary"
             >
               <ShieldCheck className="h-6 w-6" />
