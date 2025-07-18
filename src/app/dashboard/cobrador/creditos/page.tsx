@@ -9,22 +9,43 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
 
-const initialCreditos = [
-  { id: "1", clienteId: "111222333", valor: 500000, cuotas: 12, fecha: "2024-07-29", estado: "Activo" },
-  { id: "2", clienteId: "444555666", valor: 1200000, cuotas: 24, fecha: "2024-07-28", estado: "Activo" },
-  { id: "3", clienteId: "777888999", valor: 800000, cuotas: 18, fecha: "2024-07-27", estado: "Pagado" },
+type Credito = {
+  id: string;
+  clienteId: string;
+  valor: number;
+  cuotas: number;
+  fecha: string;
+  estado: string;
+  formattedDate?: string;
+};
+
+const initialCreditos: Credito[] = [
+  { id: "1", clienteId: "111222333", valor: 500000, cuotas: 12, fecha: new Date().toISOString(), estado: "Activo" },
+  { id: "2", clienteId: "444555666", valor: 1200000, cuotas: 24, fecha: new Date(Date.now() - 86400000).toISOString(), estado: "Activo" },
+  { id: "3", clienteId: "777888999", valor: 800000, cuotas: 18, fecha: new Date(Date.now() - 2 * 86400000).toISOString(), estado: "Pagado" },
 ];
 
 export default function CreditosPage() {
-  const [creditos, setCreditos] = useState(initialCreditos.map(c => ({...c, formattedDate: ''})));
+  const [creditos, setCreditos] = useState<Credito[]>([]);
 
   useEffect(() => {
-    setCreditos(
-      initialCreditos.map(c => ({
-        ...c,
-        formattedDate: new Date(c.fecha).toLocaleDateString(),
-      }))
-    );
+    // This code runs only on the client
+    const storedCreditosRaw = localStorage.getItem('creditos');
+    let allCreditos: Credito[];
+
+    if (storedCreditosRaw) {
+      allCreditos = JSON.parse(storedCreditosRaw);
+    } else {
+      allCreditos = initialCreditos;
+      localStorage.setItem('creditos', JSON.stringify(initialCreditos));
+    }
+
+    const formattedCreditos = allCreditos.map(c => ({
+      ...c,
+      formattedDate: new Date(c.fecha).toLocaleDateString(),
+    }));
+    
+    setCreditos(formattedCreditos);
   }, []);
 
   return (

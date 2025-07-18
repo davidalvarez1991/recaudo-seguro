@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useTransition } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Upload } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 const ClientCreditSchema = z.object({
@@ -52,8 +52,23 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
 
   const onSubmit = (values: z.infer<typeof ClientCreditSchema>) => {
     startTransition(() => {
-      // Mock API call
-      console.log("Submitting new client and credit:", values);
+      // Get existing credits from localStorage
+      const storedCreditosRaw = localStorage.getItem('creditos');
+      const storedCreditos = storedCreditosRaw ? JSON.parse(storedCreditosRaw) : [];
+
+      // Create new credit object
+      const newCredit = {
+        id: (storedCreditos.length + 1).toString(),
+        clienteId: values.idNumber,
+        valor: values.creditAmount,
+        cuotas: values.installments,
+        fecha: new Date().toISOString(),
+        estado: "Activo",
+      };
+
+      // Add new credit and save back to localStorage
+      const updatedCreditos = [...storedCreditos, newCredit];
+      localStorage.setItem('creditos', JSON.stringify(updatedCreditos));
       
       toast({
         title: "Registro Exitoso",
@@ -180,4 +195,3 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
-
