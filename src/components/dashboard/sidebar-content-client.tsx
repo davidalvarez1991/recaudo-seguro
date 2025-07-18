@@ -29,8 +29,9 @@ export function SidebarContentClient() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // A simple way to guess the role from the URL
-  const role = pathname.split('/')[2]; 
-  
+  const segments = pathname.split('/');
+  const role = segments.length > 2 ? segments[2] : null;
+
   const isProveedor = role === 'proveedor';
 
   return (
