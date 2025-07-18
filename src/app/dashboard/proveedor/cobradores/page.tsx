@@ -2,6 +2,10 @@
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft } from "lucide-react";
+import Link from "next/link";
+
 
 const cobradores = [
   { id: "1", idNumber: "987654321", status: "Activo" },
@@ -15,14 +19,23 @@ export default function GestionCobradoresPage() {
     <div className="grid gap-8">
         <Card>
           <CardHeader>
-            <CardTitle className="text-3xl">Gestión de Cobradores</CardTitle>
-            <CardDescription>
-              Visualiza y administra las cuentas de tus cobradores.
-            </CardDescription>
+            <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                    <CardTitle className="text-3xl">Gestión de Cobradores</CardTitle>
+                    <CardDescription>
+                    Visualiza y administra las cuentas de tus cobradores.
+                    </CardDescription>
+                </div>
+                <Button asChild variant="outline">
+                    <Link href="/dashboard/proveedor">
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Volver
+                    </Link>
+                </Button>
+            </div>
           </CardHeader>
           <CardContent className="pt-6">
-            <Card>
-              <Table>
+            <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>#</TableHead>
@@ -40,7 +53,6 @@ export default function GestionCobradoresPage() {
                   ))}
                 </TableBody>
               </Table>
-            </Card>
           </CardContent>
         </Card>
     </div>
