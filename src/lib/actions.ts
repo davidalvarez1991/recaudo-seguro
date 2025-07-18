@@ -68,41 +68,47 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
   return { successUrl: `/dashboard/${role}` };
 }
 
+
 export async function registerCobrador(values: z.infer<typeof CobradorRegisterSchema>): Promise<{ error?: string; success?: boolean; }> {
-  const validatedFields = CobradorRegisterSchema.safeParse(values);
+  try {
+    const validatedFields = CobradorRegisterSchema.safeParse(values);
 
-  if (!validatedFields.success) {
-    return { error: "Campos inválidos. Por favor, revisa los datos." };
+    if (!validatedFields.success) {
+      return { error: "Campos inválidos. Por favor, revisa los datos." };
+    }
+
+    const cookieStore = cookies();
+    const providerId = cookieStore.get('loggedInUser')?.value;
+
+    if (!providerId) {
+        return { error: "El proveedor no está autenticado." };
+    }
+
+    const { idNumber, password, name } = validatedFields.data;
+    
+    const userDocRef = doc(db, "users", idNumber);
+    const userDoc = await getDoc(userDocRef);
+
+    if (userDoc.exists()) {
+      return { error: "El número de cédula ya está registrado." };
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    await setDoc(userDocRef, {
+        idNumber,
+        name: name,
+        password: hashedPassword,
+        role: 'cobrador',
+        providerId: providerId,
+        createdAt: new Date(),
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error al registrar cobrador:", error);
+    return { error: "No se pudo crear la cuenta del cobrador. Inténtalo de nuevo." };
   }
-
-  const cookieStore = cookies();
-  const providerId = cookieStore.get('loggedInUser')?.value;
-
-  if (!providerId) {
-      return { error: "El proveedor no está autenticado." };
-  }
-
-  const { idNumber, password, name } = validatedFields.data;
-  
-  const userDocRef = doc(db, "users", idNumber);
-  const userDoc = await getDoc(userDocRef);
-
-  if (userDoc.exists()) {
-    return { error: "El número de cédula ya está registrado." };
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-  
-  await setDoc(userDocRef, {
-      idNumber,
-      name: name,
-      password: hashedPassword,
-      role: 'cobrador',
-      providerId: providerId,
-      createdAt: new Date(),
-  });
-
-  return { success: true };
 }
 
 
