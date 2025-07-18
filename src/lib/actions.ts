@@ -28,12 +28,12 @@ export async function login(values: z.infer<typeof LoginSchema>) {
   const userData = userDoc.data();
   const isPasswordValid = await bcrypt.compare(password, userData.password);
 
-  if (isPasswordValid) {
-    cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
-    redirect(`/dashboard/${userData.role}`);
-  } else {
+  if (!isPasswordValid) {
     return { error: "Credenciales inválidas." };
   }
+    
+  cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
+  redirect(`/dashboard/${userData.role}`);
 }
 
 export async function register(values: z.infer<typeof RegisterSchema>, role: "cliente" | "proveedor") {

@@ -48,7 +48,9 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
              variant: "destructive",
            });
         } else if (result?.success) {
-            window.dispatchEvent(new CustomEvent('cobradores-updated'));
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('cobradores-updated'));
+            }
 
             toast({
               title: "Registro Exitoso",
