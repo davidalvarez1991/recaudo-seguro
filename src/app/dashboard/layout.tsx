@@ -4,16 +4,18 @@ import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { SidebarContentProveedor } from "@/components/dashboard/sidebar-content-proveedor";
 import { SidebarContentClient } from "@/components/dashboard/sidebar-content-client";
-import { headers } from "next/headers";
+import { cookies } from "next/headers";
 import { SidebarContentAdmin } from "@/components/dashboard/sidebar-content-admin";
+import { getUserRole } from "@/lib/actions";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = headers().get('x-next-pathname') || '';
-  const role = pathname.split('/')[2];
+  const cookieStore = cookies();
+  const userId = cookieStore.get('loggedInUser')?.value;
+  const role = userId ? await getUserRole(userId) : null;
 
   const renderSidebarContent = () => {
     switch(role) {
@@ -21,8 +23,12 @@ export default function DashboardLayout({
         return <SidebarContentProveedor />;
       case 'admin':
         return <SidebarContentAdmin />;
+      case 'cobrador':
+      case 'cliente':
+        return <SidebarContentClient role={role} />;
       default:
-        return <SidebarContentClient />;
+        // Render a default or loading state sidebar
+        return <SidebarContentClient role="cliente" />;
     }
   }
 

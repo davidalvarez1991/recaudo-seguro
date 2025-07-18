@@ -65,11 +65,7 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
   
   cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
   
-  if (role === "proveedor") {
-    return { success: true, successUrl: `/dashboard/proveedor` };
-  } else {
-    return { success: true, successUrl: '/login?registered=true' };
-  }
+  return { success: true, successUrl: `/dashboard/${role}` };
 }
 
 export async function registerCobrador(values: z.infer<typeof CobradorRegisterSchema>): Promise<{ error?: string; success?: boolean; }> {
@@ -246,6 +242,17 @@ export async function getLoggedInUser() {
     const loggedInUser = cookieStore.get('loggedInUser');
     return loggedInUser ? { id: loggedInUser.value } : null;
 }
+
+export async function getUserRole(userId: string): Promise<string | null> {
+    if (!userId) return null;
+    const userDocRef = doc(db, "users", userId);
+    const userDoc = await getDoc(userDocRef);
+    if (userDoc.exists()) {
+        return userDoc.data().role;
+    }
+    return null;
+}
+
 
 export async function logout() {
     cookies().set('loggedInUser', '', { expires: new Date(0), path: '/' });

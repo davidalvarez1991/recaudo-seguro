@@ -15,26 +15,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { LoginSchema } from "@/lib/schemas";
 import { login } from "@/lib/actions";
-import { useTransition, useEffect } from "react";
+import { useTransition } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { useSearchParams } from "next/navigation";
 
 export function LoginForm() {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    if (searchParams.get("registered") === "true") {
-      toast({
-        title: "Registro exitoso",
-        description: "Ahora puedes iniciar sesión con tus credenciales.",
-        variant: "default",
-        className: "bg-accent text-accent-foreground border-accent",
-      });
-    }
-  }, [searchParams, toast]);
 
   const form = useForm<z.infer<typeof LoginSchema>>({
     resolver: zodResolver(LoginSchema),
