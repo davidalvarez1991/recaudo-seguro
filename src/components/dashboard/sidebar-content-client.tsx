@@ -1,14 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import {
   SidebarContent,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
-import { Home, Users, Settings } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Home, Users, Settings, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { CobradorRegistrationForm } from "@/components/auth/cobrador-registration-form";
 
 // In a real app, you would fetch user data to determine the role
 // and dynamically render the sidebar content based on that role.
@@ -16,6 +26,7 @@ import { usePathname } from "next/navigation";
 
 export function SidebarContentClient() {
   const pathname = usePathname();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // A simple way to guess the role from the URL
   const role = pathname.split('/')[2]; 
@@ -28,7 +39,7 @@ export function SidebarContentClient() {
         <SidebarMenuItem>
            <SidebarMenuButton
             asChild
-            isActive={pathname === `/dashboard/${role}`}
+            isActive={pathname === `/dashboard/${role}` && !pathname.includes('cobradores')}
             tooltip="Inicio"
           >
             <Link href={`/dashboard/${role}`}>
@@ -39,14 +50,35 @@ export function SidebarContentClient() {
         </SidebarMenuItem>
         
         {isProveedor && (
+          <>
+            <SidebarMenuItem>
+              <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                <DialogTrigger asChild>
+                   <SidebarMenuButton tooltip="Crear Cobrador">
+                      <UserPlus />
+                      <span>Crear Cobrador</span>
+                    </SidebarMenuButton>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>Registrar Nuevo Cobrador</DialogTitle>
+                    <DialogDescription>
+                      Completa los datos para crear una nueva cuenta de cobrador.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <CobradorRegistrationForm onFormSubmit={() => setIsModalOpen(false)} />
+                </DialogContent>
+              </Dialog>
+            </SidebarMenuItem>
             <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={pathname.includes('/cobradores')} tooltip="Gestión de Cobradores">
                     <Link href="/dashboard/proveedor/cobradores">
                     <Users />
-                    <span>Gestión de Cobradores</span>
+                    <span>Ver Cobradores</span>
                     </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>
+          </>
         )}
 
         <SidebarMenuItem>
