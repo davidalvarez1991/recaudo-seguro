@@ -65,7 +65,7 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
   
   cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
   
-  return { successUrl: `/dashboard/${role}` };
+  redirect(`/dashboard/${role}`);
 }
 
 
@@ -77,9 +77,9 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
     }
     
     const cookieStore = cookies();
-    const providerIdNumber = cookieStore.get('loggedInUser')?.value;
+    const providerId = cookieStore.get('loggedInUser')?.value;
 
-    if (!providerIdNumber) {
+    if (!providerId) {
         return { error: "El proveedor no está autenticado. Por favor inicie sesión de nuevo." };
     }
 
@@ -100,7 +100,7 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
             name: name,
             password: hashedPassword,
             role: 'cobrador',
-            providerId: providerIdNumber,
+            providerId: providerId,
             createdAt: new Date(),
         });
 
