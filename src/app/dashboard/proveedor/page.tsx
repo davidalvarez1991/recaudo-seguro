@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Upload } from "lucide-react";
-import { RegistrationForm } from "@/components/auth/registration-form";
+import { CobradorRegistrationForm } from "@/components/auth/cobrador-registration-form";
 
 export default function ProveedorDashboard() {
   const [logo, setLogo] = useState<string | null>(null);
@@ -81,7 +81,7 @@ export default function ProveedorDashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <RegistrationForm role="cobrador" showSuccessToast />
+            <CobradorRegistrationForm />
           </CardContent>
         </Card>
       </div>

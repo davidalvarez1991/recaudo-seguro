@@ -27,5 +27,15 @@ export const RegisterSchema = z.object({
   }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Las contraseñas no coinciden.",
-  path: ["confirmPassword"], // Sets the error on the confirmPassword field
+  path: ["confirmPassword"],
+});
+
+
+export const CobradorRegisterSchema = z.object({
+  idNumber: z.string().min(6, {
+    message: "El número de identificación debe tener al menos 6 caracteres.",
+  }),
+  password: z.string().min(6, {
+    message: "La contraseña debe tener al menos 6 caracteres.",
+  }),
 });

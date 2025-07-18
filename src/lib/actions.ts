@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { LoginSchema, RegisterSchema } from "./schemas";
+import { LoginSchema, RegisterSchema, CobradorRegisterSchema } from "./schemas";
 import { redirect } from "next/navigation";
 
 // Mock user roles for demonstration purposes
@@ -31,28 +31,16 @@ export async function login(values: z.infer<typeof LoginSchema>) {
   return { error: "Credenciales inválidas." };
 }
 
-export async function register(values: z.infer<typeof RegisterSchema>, role: "cliente" | "proveedor" | "cobrador"): Promise<{ error?: string; successUrl?: string; success?: boolean; }> {
+export async function register(values: z.infer<typeof RegisterSchema>, role: "cliente" | "proveedor"): Promise<{ error?: string; successUrl?: string; success?: boolean; }> {
   const validatedFields = RegisterSchema.safeParse(values);
 
   if (!validatedFields.success) {
     return { error: "Campos inválidos. Por favor, revisa los datos." };
   }
 
-  if (role === 'cobrador') {
-    const cobradoresCount = Object.values(users).filter(userRole => userRole === 'cobrador').length;
-    if (cobradoresCount >= 5) {
-      return { error: "Se ha alcanzado el límite máximo de perfiles de cobrador." };
-    }
-  }
-
   // In a real application, you would create the user in the database here.
-  // For now, we'll just log it. We should also add new users to our mock `users` object.
   console.log(`New ${role} registration:`, validatedFields.data.idNumber, validatedFields.data.email);
   users[validatedFields.data.idNumber] = role;
-
-  if (role === 'cobrador') {
-    return { success: true };
-  }
   
   if (role === "proveedor") {
     // Return a success URL for the component to handle redirection.
@@ -61,6 +49,30 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
     // Return a success URL for other roles.
     return { success: true, successUrl: '/login?registered=true' };
   }
+}
+
+export async function registerCobrador(values: z.infer<typeof CobradorRegisterSchema>): Promise<{ error?: string; success?: boolean; }> {
+  const validatedFields = CobradorRegisterSchema.safeParse(values);
+
+  if (!validatedFields.success) {
+    return { error: "Campos inválidos. Por favor, revisa los datos." };
+  }
+
+  const cobradoresCount = Object.values(users).filter(userRole => userRole === 'cobrador').length;
+  if (cobradoresCount >= 5) {
+    return { error: "Se ha alcanzado el límite máximo de perfiles de cobrador." };
+  }
+  
+  const { idNumber } = validatedFields.data;
+  if (users[idNumber]) {
+    return { error: "El número de cédula ya está registrado." };
+  }
+
+  // In a real application, you would create the user in the database here.
+  console.log(`New cobrador registration:`, validatedFields.data.idNumber);
+  users[idNumber] = 'cobrador';
+
+  return { success: true };
 }
 
 
