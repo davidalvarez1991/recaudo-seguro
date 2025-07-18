@@ -82,7 +82,7 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
       createdAt: new Date(),
   };
   
-  if (role === 'proveedor') {
+  if (role === 'proveedor' && companyName) {
       userData.companyName = companyName;
   }
 
@@ -252,10 +252,17 @@ export async function getCobradoresByProvider() {
 
     try {
         const querySnapshot = await getDocs(q);
-        const cobradores = querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        })) as any[]; 
+        const cobradores = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            const createdAt = data.createdAt;
+            return {
+                id: doc.id,
+                ...data,
+                createdAt: createdAt && typeof createdAt.toDate === 'function' 
+                    ? createdAt.toDate().toISOString() 
+                    : createdAt,
+            };
+        });
         return cobradores;
     } catch (error) {
         console.error("Error fetching cobradores:", error);

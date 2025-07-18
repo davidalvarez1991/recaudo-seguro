@@ -21,7 +21,7 @@ type Cobrador = {
   idNumber: string;
   role: string;
   providerId: string;
-  createdAt: any;
+  createdAt: string; // Changed to string
 };
 
 export default function GestionCobradoresPage() {
@@ -34,20 +34,24 @@ export default function GestionCobradoresPage() {
   const { toast } = useToast();
   const router = useRouter();
 
-  useEffect(() => {
-    async function fetchCobradores() {
-      setLoading(true);
+  const fetchCobradores = async () => {
+    setLoading(true);
+    try {
       const data = await getCobradoresByProvider();
-      // Ensure data is serializable
-      const serializableData = data.map((cobrador: any) => {
-        if (cobrador.createdAt && typeof cobrador.createdAt.toDate === 'function') {
-          return { ...cobrador, createdAt: cobrador.createdAt.toDate().toISOString() };
-        }
-        return cobrador;
+      setCobradores(data as Cobrador[]);
+    } catch (error) {
+      console.error("Failed to fetch cobradores", error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los cobradores.",
+        variant: "destructive",
       });
-      setCobradores(serializableData);
+    } finally {
       setLoading(false);
     }
+  };
+
+  useEffect(() => {
     fetchCobradores();
   }, []);
   
@@ -72,7 +76,7 @@ export default function GestionCobradoresPage() {
         variant: "default",
         className: "bg-accent text-accent-foreground border-accent",
       });
-      setCobradores(cobradores.filter(c => c.id !== selectedCobrador.id));
+      fetchCobradores(); // Refetch data
       router.refresh();
     } else {
       toast({
@@ -88,18 +92,7 @@ export default function GestionCobradoresPage() {
   
   const handleFormSubmit = () => {
     setIsEditModalOpen(false);
-    // Refetch data
-    async function refetchCobradores() {
-        const data = await getCobradoresByProvider();
-        const serializableData = data.map((cobrador: any) => {
-            if (cobrador.createdAt && typeof cobrador.createdAt.toDate === 'function') {
-            return { ...cobrador, createdAt: cobrador.createdAt.toDate().toISOString() };
-            }
-            return cobrador;
-        });
-        setCobradores(serializableData);
-    }
-    refetchCobradores();
+    fetchCobradores(); // Refetch data
     router.refresh();
   }
 
