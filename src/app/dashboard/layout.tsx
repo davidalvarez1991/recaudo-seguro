@@ -3,12 +3,10 @@ import { UserNav } from "@/components/dashboard/user-nav";
 import { SidebarProvider, Sidebar, SidebarInset } from "@/components/ui/sidebar";
 import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
-import { SidebarContentProveedor } from "@/components/dashboard/sidebar-content-proveedor";
-import { SidebarContentClient } from "@/components/dashboard/sidebar-content-client";
 import { cookies } from "next/headers";
-import { SidebarContentAdmin } from "@/components/dashboard/sidebar-content-admin";
 import { getUserRole } from "@/lib/actions";
 import { redirect } from "next/navigation";
+import { SidebarContent } from "@/components/dashboard/sidebar-content";
 
 export default async function DashboardLayout({
   children,
@@ -32,24 +30,7 @@ export default async function DashboardLayout({
     cookies().set('loggedInUser', '', { expires: new Date(0), path: '/' });
     redirect('/login');
   }
-
-  const renderSidebarContent = () => {
-    switch(role) {
-      case 'proveedor':
-        return <SidebarContentProveedor />;
-      case 'admin':
-        return <SidebarContentAdmin />;
-      case 'cobrador':
-        return <SidebarContentClient role="cobrador" />;
-      case 'cliente':
-        return <SidebarContentClient role="cliente" />;
-      default:
-        // Fallback for unknown roles, redirect to login
-        cookies().set('loggedInUser', '', { expires: new Date(0), path: '/' });
-        return redirect('/login');
-    }
-  }
-
+  
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="flex min-h-screen w-full flex-col bg-background">
@@ -69,7 +50,7 @@ export default async function DashboardLayout({
         </header>
         <div className="flex">
           <Sidebar collapsible="icon">
-            {renderSidebarContent()}
+            <SidebarContent role={role} />
           </Sidebar>
           <SidebarInset>
             <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
