@@ -5,21 +5,11 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Upload, UserPlus } from "lucide-react";
-import { CobradorRegistrationForm } from "@/components/auth/cobrador-registration-form";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Upload } from "lucide-react";
 
 export default function ProveedorDashboard() {
   const [logo, setLogo] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleLogoChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -51,7 +41,7 @@ export default function ProveedorDashboard() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1">
         <Card>
           <CardHeader>
             <CardTitle>Logo de la Empresa</CardTitle>
@@ -79,34 +69,6 @@ export default function ProveedorDashboard() {
                 Se recomienda un archivo PNG, JPG o GIF de 200x200px.
               </p>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Gestión de Cobradores</CardTitle>
-            <CardDescription>
-              Crea cuentas para tus cobradores. Puedes registrar hasta 5.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex items-center justify-center pt-6">
-            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Registrar Nuevo Cobrador
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Registrar Nuevo Cobrador</DialogTitle>
-                  <DialogDescription>
-                    Completa los datos para crear una nueva cuenta de cobrador.
-                  </DialogDescription>
-                </DialogHeader>
-                <CobradorRegistrationForm onFormSubmit={() => setIsModalOpen(false)} />
-              </DialogContent>
-            </Dialog>
           </CardContent>
         </Card>
       </div>
