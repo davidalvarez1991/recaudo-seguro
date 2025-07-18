@@ -28,9 +28,9 @@ export function SidebarContentClient() {
   const pathname = usePathname();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // A simple way to guess the role from the URL
-  const segments = pathname.split('/');
-  const role = segments.length > 2 ? segments[2] : null;
+  // A more reliable way to determine the role from the URL.
+  // This assumes the role is always the first segment after /dashboard.
+  const role = pathname.split('/')[2];
 
   const isProveedor = role === 'proveedor';
 
@@ -40,7 +40,7 @@ export function SidebarContentClient() {
         <SidebarMenuItem>
            <SidebarMenuButton
             asChild
-            isActive={pathname === `/dashboard/${role}` && !pathname.includes('cobradores')}
+            isActive={pathname === `/dashboard/${role}`}
             tooltip="Inicio"
           >
             <Link href={`/dashboard/${role}`}>
