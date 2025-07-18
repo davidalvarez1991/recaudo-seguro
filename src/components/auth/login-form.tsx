@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -18,10 +19,12 @@ import { login } from "@/lib/actions";
 import { useTransition } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export function LoginForm() {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof LoginSchema>>({
     resolver: zodResolver(LoginSchema),
@@ -41,6 +44,8 @@ export function LoginForm() {
             description: result.error,
             variant: "destructive",
           });
+        } else if (result?.successUrl) {
+          router.push(result.successUrl);
         }
       } catch (error) {
          toast({

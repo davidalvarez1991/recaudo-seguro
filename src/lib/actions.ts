@@ -33,7 +33,7 @@ export async function login(values: z.infer<typeof LoginSchema>) {
   }
     
   cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
-  redirect(`/dashboard/${userData.role}`);
+  return { successUrl: `/dashboard/${userData.role}` };
 }
 
 export async function register(values: z.infer<typeof RegisterSchema>, role: "cliente" | "proveedor") {
