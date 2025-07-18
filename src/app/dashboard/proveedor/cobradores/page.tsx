@@ -1,4 +1,5 @@
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, UserCircle } from "lucide-react";
 import Link from "next/link";
@@ -55,10 +56,6 @@ export default async function GestionCobradoresPage() {
                   </Badge>
                 </div>
               </CardContent>
-              {/* Footer can be added back if actions like delete are needed */}
-              {/* <CardFooter className="pt-4 border-t mt-auto">
-                 <p>Acciones</p>
-              </CardFooter> */}
             </Card>
           ))}
         </div>

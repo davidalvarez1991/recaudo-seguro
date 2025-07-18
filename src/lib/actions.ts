@@ -73,18 +73,14 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
     const validatedFields = CobradorRegisterSchema.safeParse(values);
 
     if (!validatedFields.success) {
-      let errorMessage = "Campos inválidos: ";
-      validatedFields.error.issues.forEach((issue) => {
-        errorMessage += `${issue.path.join('.')} - ${issue.message}. `;
-      });
-      return { error: errorMessage };
+      return { error: "Datos inválidos. Por favor revise el formulario." };
     }
     
     const cookieStore = cookies();
     const providerId = cookieStore.get('loggedInUser')?.value;
 
     if (!providerId) {
-        return { error: "El proveedor no está autenticado." };
+        return { error: "El proveedor no está autenticado. Por favor inicie sesión de nuevo." };
     }
 
     const { idNumber, password, name } = validatedFields.data;
@@ -134,8 +130,9 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
   
   const cobradorDocRef = doc(db, "users", cobradorId);
   const cobradorDoc = await getDoc(cobradorDocRef);
+  const providerId = cobradorDoc.exists() ? cobradorDoc.data().providerId : null;
 
-  if (!cobradorDoc.exists() || !cobradorDoc.data()?.providerId) {
+  if (!providerId) {
       return { error: "No se pudo encontrar el proveedor asociado al cobrador." };
   }
 
@@ -147,6 +144,7 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     address,
     contactPhone,
     guarantorPhone,
+    providerId: providerId,
     updatedAt: new Date(),
   }, { merge: true });
 
@@ -159,7 +157,7 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     fecha: new Date().toISOString(),
     estado: "Activo",
     cobradorId: cobradorId,
-    providerId: cobradorDoc.data()?.providerId,
+    providerId: providerId,
   });
 
   try {
@@ -258,12 +256,17 @@ export async function getLoggedInUser() {
 
 export async function getUserRole(userId: string): Promise<string | null> {
     if (!userId) return null;
-    const userDocRef = doc(db, "users", userId);
-    const userDoc = await getDoc(userDocRef);
-    if (userDoc.exists()) {
-        return userDoc.data().role;
+    try {
+      const userDocRef = doc(db, "users", userId);
+      const userDoc = await getDoc(userDocRef);
+      if (userDoc.exists()) {
+          return userDoc.data().role;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error fetching user role:", error);
+      return null;
     }
-    return null;
 }
 
 

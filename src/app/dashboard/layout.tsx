@@ -1,3 +1,4 @@
+
 import { UserNav } from "@/components/dashboard/user-nav";
 import { SidebarProvider, Sidebar, SidebarInset } from "@/components/ui/sidebar";
 import { ShieldCheck } from "lucide-react";
@@ -7,6 +8,7 @@ import { SidebarContentClient } from "@/components/dashboard/sidebar-content-cli
 import { cookies } from "next/headers";
 import { SidebarContentAdmin } from "@/components/dashboard/sidebar-content-admin";
 import { getUserRole } from "@/lib/actions";
+import { redirect } from "next/navigation";
 
 export default async function DashboardLayout({
   children,
@@ -15,7 +17,19 @@ export default async function DashboardLayout({
 }) {
   const cookieStore = cookies();
   const userId = cookieStore.get('loggedInUser')?.value;
-  const role = userId ? await getUserRole(userId) : null;
+
+  if (!userId) {
+    redirect('/login');
+  }
+
+  const role = await getUserRole(userId);
+
+  if (!role) {
+     // This case might happen if user document is deleted but cookie remains.
+     // Or if there's a delay in DB replication.
+     // Logging out is a safe default.
+    redirect('/login');
+  }
 
   const renderSidebarContent = () => {
     switch(role) {
@@ -28,8 +42,8 @@ export default async function DashboardLayout({
       case 'cliente':
         return <SidebarContentClient role="cliente" />;
       default:
-        // Render a default or loading state sidebar
-        return <SidebarContentClient role="cliente" />;
+        // Fallback for unknown roles, redirect to login
+        return redirect('/login');
     }
   }
 
