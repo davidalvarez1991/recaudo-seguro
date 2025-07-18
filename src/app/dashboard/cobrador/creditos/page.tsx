@@ -19,25 +19,16 @@ type Credito = {
   formattedDate?: string;
 };
 
-const initialCreditos: Credito[] = [
-  { id: "1", clienteId: "111222333", valor: 500000, cuotas: 12, fecha: new Date().toISOString(), estado: "Activo" },
-  { id: "2", clienteId: "444555666", valor: 1200000, cuotas: 24, fecha: new Date(Date.now() - 86400000).toISOString(), estado: "Activo" },
-  { id: "3", clienteId: "777888999", valor: 800000, cuotas: 18, fecha: new Date(Date.now() - 2 * 86400000).toISOString(), estado: "Pagado" },
-];
-
 export default function CreditosPage() {
   const [creditos, setCreditos] = useState<Credito[]>([]);
 
   useEffect(() => {
     // This code runs only on the client
     const storedCreditosRaw = localStorage.getItem('creditos');
-    let allCreditos: Credito[];
+    let allCreditos: Credito[] = [];
 
     if (storedCreditosRaw) {
       allCreditos = JSON.parse(storedCreditosRaw);
-    } else {
-      allCreditos = initialCreditos;
-      localStorage.setItem('creditos', JSON.stringify(initialCreditos));
     }
 
     const formattedCreditos = allCreditos.map(c => ({
@@ -78,21 +69,29 @@ export default function CreditosPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {creditos.map((credito) => (
-                <TableRow key={credito.id}>
-                  <TableCell>{credito.formattedDate}</TableCell>
-                  <TableCell>{credito.clienteId}</TableCell>
-                  <TableCell className="text-right">
-                    {`$${credito.valor.toLocaleString('es-CO')}`}
-                  </TableCell>
-                   <TableCell className="text-center">{credito.cuotas}</TableCell>
-                  <TableCell>
-                    <Badge variant={credito.estado === 'Activo' ? 'default' : 'secondary'}>
-                      {credito.estado}
-                    </Badge>
+              {creditos.length > 0 ? (
+                creditos.map((credito) => (
+                  <TableRow key={credito.id}>
+                    <TableCell>{credito.formattedDate}</TableCell>
+                    <TableCell>{credito.clienteId}</TableCell>
+                    <TableCell className="text-right">
+                      {`$${credito.valor.toLocaleString('es-CO')}`}
+                    </TableCell>
+                    <TableCell className="text-center">{credito.cuotas}</TableCell>
+                    <TableCell>
+                      <Badge variant={credito.estado === 'Activo' ? 'default' : 'secondary'}>
+                        {credito.estado}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    No hay créditos registrados todavía.
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
       </CardContent>
