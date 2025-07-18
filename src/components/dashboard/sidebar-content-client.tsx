@@ -71,7 +71,7 @@ export function SidebarContentClient() {
               </Dialog>
             </SidebarMenuItem>
             <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname.includes('/cobradores')} tooltip="Gestión de Cobradores">
+                <SidebarMenuButton asChild isActive={pathname.includes('cobradores')} tooltip="Gestión de Cobradores">
                     <Link href="/dashboard/proveedor/cobradores">
                     <Users />
                     <span>Ver Cobradores</span>
