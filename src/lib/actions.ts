@@ -130,7 +130,6 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
 
   const batch = writeBatch(db);
 
-  // 1. Create or update client in a 'clients' collection
   const clientDocRef = doc(db, "clients", idNumber);
   batch.set(clientDocRef, {
     idNumber,
@@ -138,11 +137,10 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     contactPhone,
     guarantorPhone,
     updatedAt: new Date(),
-  }, { merge: true }); // Use merge to avoid overwriting existing client data if they take another credit
+  }, { merge: true });
 
 
-  // 2. Create the new credit in a 'credits' collection
-  const creditDocRef = doc(collection(db, "credits")); // Auto-generate ID
+  const creditDocRef = doc(collection(db, "credits")); 
   batch.set(creditDocRef, {
     clienteId: idNumber,
     valor: creditAmount,
@@ -173,7 +171,7 @@ export async function getCreditsByCobrador(cobradorId: string) {
         const credits = querySnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
-        })) as any[]; // TODO: Add proper typing
+        })) as any[]; 
         
         return credits;
     } catch (error) {
@@ -182,7 +180,9 @@ export async function getCreditsByCobrador(cobradorId: string) {
     }
 }
 
-export async function getCobradoresByProvider(providerId: string) {
+export async function getCobradoresByProvider() {
+    const cookieStore = cookies();
+    const providerId = cookieStore.get('loggedInUser')?.value;
     if (!providerId) return [];
 
     const usersRef = collection(db, "users");
@@ -193,7 +193,7 @@ export async function getCobradoresByProvider(providerId: string) {
         const cobradores = querySnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
-        })) as any[]; // TODO: Add proper typing
+        })) as any[]; 
         return cobradores;
     } catch (error) {
         console.error("Error fetching cobradores:", error);
@@ -206,13 +206,11 @@ export async function getCreditsByProvider() {
     const providerId = cookieStore.get('loggedInUser')?.value;
     if (!providerId) return [];
 
-    // 1. Get all cobradores for the current provider
-    const cobradores = await getCobradoresByProvider(providerId);
+    const cobradores = await getCobradoresByProvider();
     if (cobradores.length === 0) return [];
 
     const cobradorIds = cobradores.map(c => c.idNumber);
 
-    // 2. Get all credits where the cobradorId is one of the provider's cobradores
     const creditsRef = collection(db, "credits");
     const q = query(creditsRef, where("cobradorId", "in", cobradorIds));
     
@@ -221,7 +219,7 @@ export async function getCreditsByProvider() {
         const credits = querySnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
-        })) as any[]; // TODO: Add proper typing
+        })) as any[]; 
         return credits;
     } catch (error) {
         console.error("Error fetching provider credits:", error);
