@@ -38,7 +38,14 @@ export default function GestionCobradoresPage() {
     async function fetchCobradores() {
       setLoading(true);
       const data = await getCobradoresByProvider();
-      setCobradores(data);
+      // Ensure data is serializable
+      const serializableData = data.map((cobrador: any) => {
+        if (cobrador.createdAt && typeof cobrador.createdAt.toDate === 'function') {
+          return { ...cobrador, createdAt: cobrador.createdAt.toDate().toISOString() };
+        }
+        return cobrador;
+      });
+      setCobradores(serializableData);
       setLoading(false);
     }
     fetchCobradores();
@@ -82,7 +89,17 @@ export default function GestionCobradoresPage() {
   const handleFormSubmit = () => {
     setIsEditModalOpen(false);
     // Refetch data
-    getCobradoresByProvider().then(setCobradores);
+    async function refetchCobradores() {
+        const data = await getCobradoresByProvider();
+        const serializableData = data.map((cobrador: any) => {
+            if (cobrador.createdAt && typeof cobrador.createdAt.toDate === 'function') {
+            return { ...cobrador, createdAt: cobrador.createdAt.toDate().toISOString() };
+            }
+            return cobrador;
+        });
+        setCobradores(serializableData);
+    }
+    refetchCobradores();
     router.refresh();
   }
 
