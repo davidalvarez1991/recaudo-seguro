@@ -77,30 +77,30 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
     }
     
     const cookieStore = cookies();
-    const providerId = cookieStore.get('loggedInUser')?.value;
+    const providerIdNumber = cookieStore.get('loggedInUser')?.value;
 
-    if (!providerId) {
+    if (!providerIdNumber) {
         return { error: "El proveedor no está autenticado. Por favor inicie sesión de nuevo." };
     }
 
     const { idNumber, password, name } = validatedFields.data;
     
-    const userDocRef = doc(db, "users", idNumber);
-    const userDoc = await getDoc(userDocRef);
+    const cobradorDocRef = doc(db, "users", idNumber);
+    const cobradorDoc = await getDoc(cobradorDocRef);
 
-    if (userDoc.exists()) {
+    if (cobradorDoc.exists()) {
       return { error: "El número de cédula del cobrador ya está registrado." };
     }
     
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
         
-        await setDoc(userDocRef, {
+        await setDoc(cobradorDocRef, {
             idNumber,
             name: name,
             password: hashedPassword,
             role: 'cobrador',
-            providerId: providerId,
+            providerId: providerIdNumber,
             createdAt: new Date(),
         });
 
