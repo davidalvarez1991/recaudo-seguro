@@ -85,6 +85,7 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
 
     const { idNumber, password, name } = validatedFields.data;
     
+    // 1. Check if cobrador's ID number already exists
     const cobradorDocRef = doc(db, "users", idNumber);
     const cobradorDoc = await getDoc(cobradorDocRef);
 
@@ -92,8 +93,9 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
       return { error: "El número de cédula del cobrador ya está registrado." };
     }
 
+    // 2. Check if provider has reached the limit of 5 cobradores
     const cobradoresCollection = collection(db, "users");
-    const q = query(cobradoresCollection, where("providerId", "==", providerIdNumber));
+    const q = query(cobradoresCollection, where("providerId", "==", providerIdNumber), where("role", "==", "cobrador"));
     const countSnapshot = await getCountFromServer(q);
     const cobradoresCount = countSnapshot.data().count;
 
@@ -101,6 +103,7 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
       return { error: "Ha alcanzado el límite de 5 cobradores por proveedor." };
     }
     
+    // 3. If all checks pass, create the cobrador
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
         
