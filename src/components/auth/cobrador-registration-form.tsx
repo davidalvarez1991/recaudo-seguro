@@ -19,7 +19,11 @@ import { useTransition } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
-export function CobradorRegistrationForm() {
+type CobradorRegistrationFormProps = {
+  onFormSubmit?: () => void;
+};
+
+export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationFormProps) {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
 
@@ -49,6 +53,7 @@ export function CobradorRegistrationForm() {
               className: "bg-accent text-accent-foreground border-accent",
             });
             form.reset();
+            onFormSubmit?.();
         }
       } catch (error) {
          const result = error as { error?: string };
@@ -63,7 +68,7 @@ export function CobradorRegistrationForm() {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
         <FormField
           control={form.control}
           name="idNumber"
