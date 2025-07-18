@@ -14,10 +14,10 @@ export function SidebarContent({ role }: SidebarContentProps) {
   const router = useRouter();
 
   switch(role) {
-    case 'proveedor':
-      return <SidebarContentProveedor />;
     case 'admin':
       return <SidebarContentAdmin />;
+    case 'proveedor':
+      return <SidebarContentProveedor />;
     case 'cobrador':
       return <SidebarContentClient role="cobrador" />;
     case 'cliente':
