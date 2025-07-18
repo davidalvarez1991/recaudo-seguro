@@ -48,9 +48,19 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
              variant: "destructive",
            });
         } else if (result?.success) {
-            // Save to localStorage
             const storedCobradoresRaw = localStorage.getItem('cobradores');
             const storedCobradores = storedCobradoresRaw ? JSON.parse(storedCobradoresRaw) : [];
+            
+            // Check if cobrador already exists in localStorage (client-side safety)
+            if (storedCobradores.some((c: any) => c.idNumber === values.idNumber)) {
+                toast({
+                    title: "Error",
+                    description: "Este cobrador ya existe en la lista local.",
+                    variant: "destructive",
+                });
+                return;
+            }
+
             const newCobrador = {
                 id: (storedCobradores.length + 1).toString(),
                 name: values.name,
@@ -59,6 +69,7 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
             };
             const updatedCobradores = [...storedCobradores, newCobrador];
             localStorage.setItem('cobradores', JSON.stringify(updatedCobradores));
+            window.dispatchEvent(new CustomEvent('cobradores-updated'));
 
             toast({
               title: "Registro Exitoso",

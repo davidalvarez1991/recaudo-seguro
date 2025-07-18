@@ -1,12 +1,25 @@
 
 "use client";
 
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, UserCircle } from "lucide-react";
+import { ArrowLeft, UserCircle, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { deleteCobrador } from "@/lib/actions";
+import { useToast } from "@/hooks/use-toast";
 
 type Cobrador = {
   id: string;
@@ -17,15 +30,43 @@ type Cobrador = {
 
 export default function GestionCobradoresPage() {
   const [cobradores, setCobradores] = useState<Cobrador[]>([]);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    // This code runs only on the client
+  const fetchCobradores = () => {
     const storedCobradoresRaw = localStorage.getItem('cobradores');
     if (storedCobradoresRaw) {
       setCobradores(JSON.parse(storedCobradoresRaw));
+    } else {
+      setCobradores([]);
     }
+  };
+
+  useEffect(() => {
+    fetchCobradores();
+    window.addEventListener('cobradores-updated', fetchCobradores);
+    return () => {
+      window.removeEventListener('cobradores-updated', fetchCobradores);
+    };
   }, []);
 
+  const handleDelete = async (idNumber: string) => {
+    const result = await deleteCobrador(idNumber);
+    if (result.success) {
+      toast({
+        title: "Cobrador Eliminado",
+        description: "El perfil del cobrador ha sido eliminado correctamente.",
+        variant: "default",
+        className: "bg-accent text-accent-foreground border-accent",
+      });
+      // The event listener will automatically refresh the list
+    } else {
+      toast({
+        title: "Error",
+        description: result.error || "No se pudo eliminar el cobrador.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="flex flex-col gap-8">
@@ -57,7 +98,7 @@ export default function GestionCobradoresPage() {
                       <CardDescription>ID: {cobrador.idNumber}</CardDescription>
                   </div>
               </CardHeader>
-              <CardContent className="flex items-center justify-between mt-auto pt-4">
+              <CardContent className="flex items-center justify-between mt-auto">
                 <div>
                   <span className="text-sm text-muted-foreground">Estado</span>
                   <Badge variant={cobrador.status === 'Activo' ? 'default' : 'secondary'} className="ml-2">
@@ -65,6 +106,31 @@ export default function GestionCobradoresPage() {
                   </Badge>
                 </div>
               </CardContent>
+              <CardFooter className="pt-4 border-t">
+                 <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" className="w-full">
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Eliminar
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Esta acción no se puede deshacer. Se eliminará permanentemente
+                        el perfil del cobrador y todos sus datos asociados.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleDelete(cobrador.idNumber)}>
+                        Continuar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </CardFooter>
             </Card>
           ))}
         </div>

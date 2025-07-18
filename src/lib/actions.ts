@@ -84,6 +84,22 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
   return { success: true };
 }
 
+export async function deleteCobrador(idNumber: string): Promise<{ error?: string; success?: boolean; }> {
+  if (!users[idNumber] || users[idNumber] !== 'cobrador') {
+    return { error: "El cobrador no existe o no se puede eliminar." };
+  }
+
+  // In a real app, delete from DB. Here, we delete from our mock objects.
+  delete users[idNumber];
+  delete userPasswords[idNumber];
+  
+  // We'll also need a way to signal the client to update localStorage.
+  // The client will handle localStorage deletion upon success.
+  console.log(`Cobrador with ID ${idNumber} has been deleted.`);
+  
+  return { success: true };
+}
+
 
 export async function logout() {
     // In a real application, you would clear the session cookie here.
