@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useRef, ChangeEvent } from "react";
+import { useState, useRef, ChangeEvent, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -22,14 +22,31 @@ export default function SettingsPage() {
   const [isLateInterestActive, setIsLateInterestActive] = useState(false);
   const { toast } = useToast();
 
+  useEffect(() => {
+    const savedLogo = localStorage.getItem('company-logo');
+    if (savedLogo) {
+      setLogo(savedLogo);
+    }
+  }, []);
+
   const handleLogoChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadstart = () => setIsUploading(true);
       reader.onloadend = () => {
-        setLogo(reader.result as string);
+        const result = reader.result as string;
+        setLogo(result);
+        localStorage.setItem('company-logo', result);
+        // Dispatch a custom event to notify other components of the change
+        window.dispatchEvent(new CustomEvent('logo-updated'));
         setIsUploading(false);
+        toast({
+          title: "Logo Actualizado",
+          description: "El logo de tu empresa ha sido actualizado.",
+          variant: "default",
+          className: "bg-accent text-accent-foreground border-accent",
+        });
       };
       reader.readAsDataURL(file);
     }

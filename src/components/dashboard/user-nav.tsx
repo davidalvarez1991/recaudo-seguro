@@ -1,3 +1,4 @@
+
 "use client"
 
 import {
@@ -17,10 +18,28 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { logout } from "@/lib/actions";
 import { User, LogOut, Loader2 } from "lucide-react";
-import { useTransition } from "react";
+import { useTransition, useState, useEffect } from "react";
 
 export function UserNav() {
   const [isPending, startTransition] = useTransition();
+  const [logo, setLogo] = useState<string | null>(null);
+
+  useEffect(() => {
+    const updateLogo = () => {
+      const savedLogo = localStorage.getItem('company-logo');
+      setLogo(savedLogo);
+    };
+
+    updateLogo(); // Initial load
+
+    window.addEventListener('logo-updated', updateLogo);
+    window.addEventListener('storage', updateLogo); // Listen for changes from other tabs
+
+    return () => {
+      window.removeEventListener('logo-updated', updateLogo);
+      window.removeEventListener('storage', updateLogo);
+    };
+  }, []);
 
   const handleLogout = () => {
     startTransition(() => {
@@ -33,7 +52,7 @@ export function UserNav() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-9 w-9 rounded-full">
           <Avatar className="h-9 w-9">
-            <AvatarImage src="https://placehold.co/100x100.png" data-ai-hint="user avatar" alt="@user" />
+            <AvatarImage src={logo || "https://placehold.co/100x100.png"} data-ai-hint="user avatar" alt="@user" />
             <AvatarFallback>U</AvatarFallback>
           </Avatar>
         </Button>
