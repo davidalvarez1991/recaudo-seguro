@@ -50,19 +50,30 @@ export default function GestionCobradoresPage() {
   }, []);
 
   const handleDelete = async (idNumber: string) => {
-    const result = await deleteCobrador(idNumber);
-    if (result.success) {
+    const serverResult = await deleteCobrador(idNumber);
+
+    if (serverResult.success) {
+      // Also delete from localStorage on the client
+      const storedCobradoresRaw = localStorage.getItem('cobradores');
+      if (storedCobradoresRaw) {
+          let storedCobradores: Cobrador[] = JSON.parse(storedCobradoresRaw);
+          const updatedCobradores = storedCobradores.filter(c => c.idNumber !== idNumber);
+          localStorage.setItem('cobradores', JSON.stringify(updatedCobradores));
+          
+          // Dispatch event to trigger UI refresh
+          window.dispatchEvent(new CustomEvent('cobradores-updated'));
+      }
+
       toast({
         title: "Cobrador Eliminado",
         description: "El perfil del cobrador ha sido eliminado correctamente.",
         variant: "default",
         className: "bg-accent text-accent-foreground border-accent",
       });
-      // The event listener will automatically refresh the list
     } else {
       toast({
         title: "Error",
-        description: result.error || "No se pudo eliminar el cobrador.",
+        description: serverResult.error || "No se pudo eliminar el cobrador.",
         variant: "destructive",
       });
     }
