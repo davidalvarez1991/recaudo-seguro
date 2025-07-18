@@ -70,54 +70,54 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
 
 
 export async function registerCobrador(values: z.infer<typeof CobradorRegisterSchema>) {
-    const validatedFields = CobradorRegisterSchema.safeParse(values);
+  const validatedFields = CobradorRegisterSchema.safeParse(values);
 
-    if (!validatedFields.success) {
-      return { error: "Datos inválidos. Por favor revise el formulario." };
-    }
+  if (!validatedFields.success) {
+    return { error: "Datos inválidos. Por favor revise el formulario." };
+  }
+  
+  const cookieStore = cookies();
+  const providerIdNumber = cookieStore.get('loggedInUser')?.value;
+
+  if (!providerIdNumber) {
+    return { error: "El proveedor no está autenticado. Por favor inicie sesión de nuevo." };
+  }
+
+  const { idNumber, password, name } = validatedFields.data;
+  
+  const cobradorDocRef = doc(db, "users", idNumber);
+  const cobradorDoc = await getDoc(cobradorDocRef);
+
+  if (cobradorDoc.exists()) {
+    return { error: "El número de cédula del cobrador ya está registrado." };
+  }
+
+  const cobradoresCollection = collection(db, "users");
+  const q = query(cobradoresCollection, where("providerId", "==", providerIdNumber), where("role", "==", "cobrador"));
+  const countSnapshot = await getCountFromServer(q);
+  const cobradoresCount = countSnapshot.data().count;
+
+  if (cobradoresCount >= 5) {
+    return { error: "Ha alcanzado el límite de 5 cobradores por proveedor." };
+  }
+  
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
     
-    const cookieStore = cookies();
-    const providerIdNumber = cookieStore.get('loggedInUser')?.value;
+    await setDoc(cobradorDocRef, {
+        idNumber,
+        name,
+        password: hashedPassword,
+        role: 'cobrador',
+        providerId: providerIdNumber,
+        createdAt: new Date(),
+    });
 
-    if (!providerIdNumber) {
-        return { error: "El proveedor no está autenticado. Por favor inicie sesión de nuevo." };
-    }
-
-    const { idNumber, password, name } = validatedFields.data;
-    
-    const cobradorDocRef = doc(db, "users", idNumber);
-    const cobradorDoc = await getDoc(cobradorDocRef);
-
-    if (cobradorDoc.exists()) {
-      return { error: "El número de cédula del cobrador ya está registrado." };
-    }
-
-    const cobradoresCollection = collection(db, "users");
-    const q = query(cobradoresCollection, where("providerId", "==", providerIdNumber), where("role", "==", "cobrador"));
-    const countSnapshot = await getCountFromServer(q);
-    const cobradoresCount = countSnapshot.data().count;
-
-    if (cobradoresCount >= 5) {
-      return { error: "Ha alcanzado el límite de 5 cobradores por proveedor." };
-    }
-    
-    try {
-        const hashedPassword = await bcrypt.hash(password, 10);
-        
-        await setDoc(cobradorDocRef, {
-            idNumber,
-            name,
-            password: hashedPassword,
-            role: 'cobrador',
-            providerId: providerIdNumber,
-            createdAt: new Date(),
-        });
-
-        return { success: `El perfil de cobrador para ${name} ha sido creado.` };
-    } catch (error) {
-        console.error("Error al registrar cobrador:", error);
-        return { error: "No se pudo crear la cuenta del cobrador en la base de datos." };
-    }
+    return { success: `El perfil de cobrador para ${name} ha sido creado.` };
+  } catch (error) {
+    console.error("Error al registrar cobrador:", error);
+    return { error: "No se pudo crear la cuenta del cobrador en la base de datos." };
+  }
 }
 
 
