@@ -75,7 +75,7 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
   
   cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
   
-  redirect(`/dashboard/${role}`);
+  return { successUrl: `/dashboard/${role}` };
 }
 
 
