@@ -18,6 +18,7 @@ import { register } from "@/lib/actions";
 import { useTransition } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 type RegistrationFormProps = {
   role: "cliente" | "proveedor";
@@ -26,6 +27,7 @@ type RegistrationFormProps = {
 export function RegistrationForm({ role }: RegistrationFormProps) {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof RegisterSchema>>({
     resolver: zodResolver(RegisterSchema),
@@ -41,7 +43,16 @@ export function RegistrationForm({ role }: RegistrationFormProps) {
   const onSubmit = (values: z.infer<typeof RegisterSchema>) => {
     startTransition(async () => {
        try {
-        await register(values, role);
+        const result = await register(values, role);
+        if (result?.error) {
+           toast({
+             title: "Error de registro",
+             description: result.error,
+             variant: "destructive",
+           });
+        } else if (result?.successUrl) {
+            router.push(result.successUrl);
+        }
       } catch (error) {
          const result = error as { error?: string };
          if (result?.error) {

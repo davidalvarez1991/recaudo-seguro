@@ -31,7 +31,7 @@ export async function login(values: z.infer<typeof LoginSchema>) {
   return { error: "Credenciales inválidas." };
 }
 
-export async function register(values: z.infer<typeof RegisterSchema>, role: "cliente" | "proveedor") {
+export async function register(values: z.infer<typeof RegisterSchema>, role: "cliente" | "proveedor"): Promise<{ error?: string; successUrl?: string }> {
   const validatedFields = RegisterSchema.safeParse(values);
 
   if (!validatedFields.success) {
@@ -44,11 +44,11 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
   users[validatedFields.data.idNumber] = role;
 
   if (role === "proveedor") {
-    // In a real app, you'd also sign them in here.
-    redirect(`/dashboard/proveedor`);
+    // Return a success URL for the component to handle redirection.
+    return { successUrl: `/dashboard/proveedor` };
   } else {
-    // We redirect to the login page with a query param to show a toast for other roles.
-    redirect('/login?registered=true');
+    // Return a success URL for other roles.
+    return { successUrl: '/login?registered=true' };
   }
 }
 
