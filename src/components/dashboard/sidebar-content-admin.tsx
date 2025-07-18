@@ -7,13 +7,13 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
-import { Home, Settings } from "lucide-react";
+import { Home, Settings, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export function SidebarContentClient() {
+export function SidebarContentAdmin() {
   const pathname = usePathname();
-  const role = pathname.split('/')[2];
+  const role = 'admin';
 
   return (
     <SidebarContent>
@@ -28,6 +28,13 @@ export function SidebarContentClient() {
               <Home />
               <span>Inicio</span>
             </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+        
+        <SidebarMenuItem>
+           <SidebarMenuButton tooltip="Gestión de Usuarios">
+            <Users />
+            <span>Usuarios</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
         
