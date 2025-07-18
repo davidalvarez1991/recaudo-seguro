@@ -49,7 +49,7 @@ export const ClientCreditSchema = z.object({
   address: z.string().min(5, "La dirección es obligatoria."),
   contactPhone: z.string().min(10, "El teléfono debe tener 10 dígitos."),
   guarantorPhone: z.string().min(10, "El teléfono del fiador debe tener 10 dígitos."),
-  idCardPhoto: z.any().refine(files => files?.length > 0, "La foto de la cédula es obligatoria.").optional(), // Made optional for now
+  idCardPhoto: z.any().refine(files => files?.length > 0, "La foto de la cédula es obligatoria.").optional(),
   creditAmount: z.coerce.number().min(1, "El valor del crédito es obligatorio."),
   installments: z.coerce.number().min(1, "El número de cuotas es obligatorio."),
 });
