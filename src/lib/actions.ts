@@ -72,11 +72,15 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
   }
 }
 
-export async function registerCobrador(values: z.infer<typeof CobradorRegisterSchema>): Promise<{ error?: string; success?: boolean; }> {
+export async function registerCobrador(values: z.infer<typeof CobradorRegisterSchema>, providerId: string): Promise<{ error?: string; success?: boolean; }> {
   const validatedFields = CobradorRegisterSchema.safeParse(values);
 
   if (!validatedFields.success) {
     return { error: "Campos inválidos. Por favor, revisa los datos." };
+  }
+
+  if (!providerId) {
+      return { error: "El proveedor no está autenticado." };
   }
 
   const { idNumber, password, name } = validatedFields.data;
@@ -86,13 +90,6 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
 
   if (userDoc.exists()) {
     return { error: "El número de cédula ya está registrado." };
-  }
-  
-  const cookieStore = cookies();
-  const providerId = cookieStore.get('loggedInUser')?.value;
-
-  if (!providerId) {
-      return { error: "El proveedor no está autenticado." };
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -180,6 +177,25 @@ export async function getCreditsByCobrador(cobradorId: string) {
     }
 }
 
+export async function getCobradoresByProvider(providerId: string) {
+    if (!providerId) return [];
+
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("providerId", "==", providerId), where("role", "==", "cobrador"));
+
+    try {
+        const querySnapshot = await getDocs(q);
+        const cobradores = querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        })) as any[]; // TODO: Add proper typing
+        return cobradores;
+    } catch (error) {
+        console.error("Error fetching cobradores:", error);
+        return [];
+    }
+}
+
 
 export async function deleteCobrador(idNumber: string): Promise<{ error?: string; success?: boolean; }> {
   const userDocRef = doc(db, "users", idNumber);
@@ -190,8 +206,6 @@ export async function deleteCobrador(idNumber: string): Promise<{ error?: string
   }
 
   await deleteDoc(userDocRef);
-  
-  console.log(`Cobrador with ID ${idNumber} has been deleted from Firestore.`);
   
   return { success: true };
 }
@@ -206,5 +220,3 @@ export async function logout() {
     cookies().set('loggedInUser', '', { expires: new Date(0), path: '/' });
     redirect('/login');
 }
-
-    

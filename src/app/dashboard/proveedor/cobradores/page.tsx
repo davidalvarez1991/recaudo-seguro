@@ -3,10 +3,10 @@
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, UserCircle, Trash2 } from "lucide-react";
+import { ArrowLeft, UserCircle, Trash2, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,24 +18,32 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { deleteCobrador } from "@/lib/actions";
+import { deleteCobrador, getCobradoresByProvider } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
 
 type Cobrador = {
   id: string;
   name: string;
   idNumber: string;
-  status: string;
+  role: string;
   providerId: string;
+  createdAt: any;
 };
 
 export default function GestionCobradoresPage() {
   const [cobradores, setCobradores] = useState<Cobrador[]>([]);
   const [providerId, setProviderId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
+  const fetchCobradores = useCallback(async (id: string) => {
+    setIsLoading(true);
+    const fetchedCobradores = await getCobradoresByProvider(id);
+    setCobradores(fetchedCobradores);
+    setIsLoading(false);
+  }, []);
+
   useEffect(() => {
-    // Function to get a cookie by name
     const getCookie = (name: string): string | null => {
       const value = `; ${document.cookie}`;
       const parts = value.split(`; ${name}=`);
@@ -45,42 +53,28 @@ export default function GestionCobradoresPage() {
     const currentProviderId = getCookie('loggedInUser');
     setProviderId(currentProviderId);
 
-    const fetchCobradores = () => {
-        if (!currentProviderId) return;
-        const cobradoresKey = `cobradores_${currentProviderId}`;
-        const storedCobradoresRaw = localStorage.getItem(cobradoresKey);
-        if (storedCobradoresRaw) {
-            setCobradores(JSON.parse(storedCobradoresRaw));
-        } else {
-            setCobradores([]);
-        }
-    };
-
-    const handleCobradoresUpdate = () => fetchCobradores();
+    if (currentProviderId) {
+      fetchCobradores(currentProviderId);
+    } else {
+      setIsLoading(false);
+    }
     
-    fetchCobradores();
-    
+    const handleCobradoresUpdate = () => {
+        if (currentProviderId) fetchCobradores(currentProviderId);
+    }
     window.addEventListener('cobradores-updated', handleCobradoresUpdate);
     
     return () => {
       window.removeEventListener('cobradores-updated', handleCobradoresUpdate);
     };
-  }, []);
+  }, [fetchCobradores]);
 
   const handleDelete = async (idNumber: string) => {
     if (!providerId) return;
     const serverResult = await deleteCobrador(idNumber);
 
     if (serverResult.success) {
-      const cobradoresKey = `cobradores_${providerId}`;
-      const storedCobradoresRaw = localStorage.getItem(cobradoresKey);
-      if (storedCobradoresRaw) {
-          let storedCobradores: Cobrador[] = JSON.parse(storedCobradoresRaw);
-          const updatedCobradores = storedCobradores.filter(c => c.idNumber !== idNumber);
-          localStorage.setItem(cobradoresKey, JSON.stringify(updatedCobradores));
-          window.dispatchEvent(new CustomEvent('cobradores-updated'));
-      }
-
+      setCobradores(prev => prev.filter(c => c.idNumber !== idNumber));
       toast({
         title: "Cobrador Eliminado",
         description: "El perfil del cobrador ha sido eliminado correctamente.",
@@ -114,8 +108,13 @@ export default function GestionCobradoresPage() {
           </Button>
         </div>
       </div>
-
-      {cobradores.length > 0 ? (
+      
+      {isLoading ? (
+        <div className="flex justify-center items-center py-10">
+            <Loader2 className="mr-2 h-8 w-8 animate-spin text-primary" />
+            <span className="text-muted-foreground">Cargando cobradores...</span>
+        </div>
+      ) : cobradores.length > 0 ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {cobradores.map((cobrador) => (
             <Card key={cobrador.id} className="flex flex-col">
@@ -129,8 +128,8 @@ export default function GestionCobradoresPage() {
               <CardContent className="flex items-center justify-between mt-auto">
                 <div>
                   <span className="text-sm text-muted-foreground">Estado</span>
-                  <Badge variant={cobrador.status === 'Activo' ? 'default' : 'secondary'} className="ml-2">
-                    {cobrador.status}
+                  <Badge variant={'default'} className="ml-2">
+                    Activo
                   </Badge>
                 </div>
               </CardContent>

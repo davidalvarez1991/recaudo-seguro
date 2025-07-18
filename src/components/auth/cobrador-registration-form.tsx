@@ -61,7 +61,7 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
         }
 
        try {
-        const result = await registerCobrador(values);
+        const result = await registerCobrador(values, providerId);
         if (result?.error) {
            toast({
              title: "Error de registro",
@@ -69,7 +69,6 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
              variant: "destructive",
            });
         } else if (result?.success) {
-            // Dispatch a custom event to notify other components that the cobradores list has been updated.
             window.dispatchEvent(new CustomEvent('cobradores-updated'));
 
             toast({
@@ -82,10 +81,9 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
             onFormSubmit?.();
         }
       } catch (error) {
-         const result = error as { error?: string };
          toast({
             title: "Error",
-            description: result?.error || "Algo salió mal. Por favor, inténtalo de nuevo.",
+            description: "Algo salió mal. Por favor, inténtalo de nuevo.",
             variant: "destructive",
           });
        }
@@ -147,5 +145,3 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
     </Form>
   );
 }
-
-    
