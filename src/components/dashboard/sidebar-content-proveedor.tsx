@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -41,9 +40,11 @@ export function SidebarContentProveedor() {
         </SidebarMenuItem>
 
         <SidebarMenuItem>
-           <SidebarMenuButton tooltip="Configuración">
-            <Settings />
-            <span>Configuración</span>
+           <SidebarMenuButton asChild isActive={pathname.includes('settings')} tooltip="Configuración">
+            <Link href="/dashboard/proveedor/settings">
+              <Settings />
+              <span>Configuración</span>
+            </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>
