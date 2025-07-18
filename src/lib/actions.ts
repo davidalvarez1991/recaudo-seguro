@@ -1,15 +1,23 @@
+
 "use server";
 
 import { z } from "zod";
 import { LoginSchema, RegisterSchema, CobradorRegisterSchema } from "./schemas";
 import { redirect } from "next/navigation";
 
-// Mock user roles for demonstration purposes
+// Mock user roles and passwords for demonstration purposes
 const users: Record<string, string> = {
   "10000001": "admin",
   "20000002": "proveedor",
-  "30000003": "cobrador",
   "40000004": "cliente",
+  "30000003": "cobrador", // Initial cobrador for testing
+};
+
+const userPasswords: Record<string, string> = {
+    "10000001": "password123",
+    "20000002": "password123",
+    "40000004": "password123",
+    "30000003": "password123", // Password for initial cobrador
 };
 
 export async function login(values: z.infer<typeof LoginSchema>) {
@@ -19,11 +27,12 @@ export async function login(values: z.infer<typeof LoginSchema>) {
     return { error: "Campos inválidos." };
   }
   
-  const { idNumber } = validatedFields.data;
+  const { idNumber, password } = validatedFields.data;
   
   const role = users[idNumber];
+  const storedPassword = userPasswords[idNumber];
 
-  if (role) {
+  if (role && password === storedPassword) {
     // In a real application, you would set a session cookie here.
     redirect(`/dashboard/${role}`);
   }
@@ -37,10 +46,13 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
   if (!validatedFields.success) {
     return { error: "Campos inválidos. Por favor, revisa los datos." };
   }
+  
+  const { idNumber, email, password } = validatedFields.data;
 
   // In a real application, you would create the user in the database here.
-  console.log(`New ${role} registration:`, validatedFields.data.idNumber, validatedFields.data.email);
-  users[validatedFields.data.idNumber] = role;
+  console.log(`New ${role} registration:`, idNumber, email);
+  users[idNumber] = role;
+  userPasswords[idNumber] = password;
   
   if (role === "proveedor") {
     // Return a success URL for the component to handle redirection.
@@ -58,19 +70,16 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
     return { error: "Campos inválidos. Por favor, revisa los datos." };
   }
 
-  const cobradoresCount = Object.values(users).filter(userRole => userRole === 'cobrador').length;
-  if (cobradoresCount >= 5) {
-    return { error: "Se ha alcanzado el límite máximo de perfiles de cobrador." };
-  }
+  const { idNumber, password } = validatedFields.data;
   
-  const { idNumber } = validatedFields.data;
   if (users[idNumber]) {
     return { error: "El número de cédula ya está registrado." };
   }
 
   // In a real application, you would create the user in the database here.
-  console.log(`New cobrador registration:`, validatedFields.data.name, validatedFields.data.idNumber);
+  console.log(`New cobrador registration:`, validatedFields.data.name, idNumber);
   users[idNumber] = 'cobrador';
+  userPasswords[idNumber] = password;
 
   return { success: true };
 }
