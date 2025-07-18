@@ -2,14 +2,14 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
-// TODO: Reemplaza este objeto con la configuración de tu propio proyecto de Firebase.
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-  authDomain: "your-project-id.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project-id.appspot.com",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:xxxxxxxxxxxxxxxxxxxxxx"
+  apiKey: "AIzaSyC4Nmc7fs5XRFj0lE4LKhEzBagGr6Ttnyc",
+  authDomain: "recaudo-seguro.firebaseapp.com",
+  projectId: "recaudo-seguro",
+  storageBucket: "recaudo-seguro.firebasestorage.app",
+  messagingSenderId: "547595522209",
+  appId: "1:547595522209:web:57a4f2824bea39f53ba0e0"
 };
 
 // Initialize Firebase
