@@ -1,5 +1,5 @@
 import { UserNav } from "@/components/dashboard/user-nav";
-import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { SidebarProvider, Sidebar, SidebarInset } from "@/components/ui/sidebar";
 import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { SidebarContentProveedor } from "@/components/dashboard/sidebar-content-proveedor";
@@ -31,7 +31,6 @@ export default function DashboardLayout({
       <div className="flex min-h-screen w-full flex-col bg-background">
         <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-card px-4 md:px-6 z-50">
           <div className="flex items-center gap-2">
-            <SidebarTrigger />
             <Link
               href="#"
               className="flex items-center gap-2 font-semibold text-primary"
