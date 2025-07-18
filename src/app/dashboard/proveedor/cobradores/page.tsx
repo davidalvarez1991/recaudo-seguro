@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -11,6 +12,7 @@ const cobradores = [
   { id: "1", idNumber: "987654321", status: "Activo" },
   { id: "2", idNumber: "123123123", status: "Inactivo" },
   { id: "3", idNumber: "456456456", status: "Activo" },
+  { id: "4", idNumber: "789456", status: "Activo" },
 ];
 
 export default function GestionCobradoresPage() {

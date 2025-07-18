@@ -7,7 +7,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
-import { Home, Settings, ClipboardList } from "lucide-react";
+import { Home, Settings, ClipboardList, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -27,6 +27,18 @@ export function SidebarContentProveedor() {
             <Link href={`/dashboard/${role}`}>
               <Home />
               <span>Inicio</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+
+        <SidebarMenuItem>
+           <SidebarMenuButton 
+            asChild 
+            isActive={pathname.includes('cobradores')} 
+            tooltip="Gestión de Cobradores">
+            <Link href="/dashboard/proveedor/cobradores">
+              <Users />
+              <span>Cobradores</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
