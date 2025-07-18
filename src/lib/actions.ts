@@ -9,22 +9,6 @@ import { db } from "./firebase";
 import { doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
 import bcrypt from 'bcryptjs';
 
-// Mock user roles for demonstration purposes. This will be replaced by Firestore logic.
-let users: Record<string, string> = {
-  "10000001": "admin",
-  "20000002": "proveedor", // Will be created in DB on first login if not exists
-  "40000004": "cliente",
-  "30000003": "cobrador", 
-};
-
-// This will be replaced by storing hashed passwords in Firestore.
-let userPasswords: Record<string, string> = {
-    "10000001": "password123",
-    "20000002": "password123",
-    "40000004": "password123",
-    "30000003": "password123",
-};
-
 export async function login(values: z.infer<typeof LoginSchema>) {
   const validatedFields = LoginSchema.safeParse(values);
 
@@ -34,28 +18,22 @@ export async function login(values: z.infer<typeof LoginSchema>) {
   
   const { idNumber, password } = validatedFields.data;
   
-  // --- Firestore Login Logic (Future implementation) ---
-  // const userDocRef = doc(db, "users", idNumber);
-  // const userDoc = await getDoc(userDocRef);
-  // if (userDoc.exists()) {
-  //   const userData = userDoc.data();
-  //   const isPasswordValid = await bcrypt.compare(password, userData.password);
-  //   if (isPasswordValid) {
-  //     cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
-  //     cookies().set('userRole', userData.role, { httpOnly: true, path: '/' });
-  //     redirect(`/dashboard/${userData.role}`);
-  //   }
-  // }
-  
-  // --- Mock Login Logic (Current) ---
-  const role = users[idNumber];
-  const storedPassword = userPasswords[idNumber];
-  if (role && password === storedPassword) {
-    cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
-    redirect(`/dashboard/${role}`);
+  const userDocRef = doc(db, "users", idNumber);
+  const userDoc = await getDoc(userDocRef);
+
+  if (!userDoc.exists()) {
+      return { error: "Credenciales inválidas." };
   }
 
-  return { error: "Credenciales inválidas." };
+  const userData = userDoc.data();
+  const isPasswordValid = await bcrypt.compare(password, userData.password);
+
+  if (isPasswordValid) {
+    cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
+    redirect(`/dashboard/${userData.role}`);
+  } else {
+    return { error: "Credenciales inválidas." };
+  }
 }
 
 export async function register(values: z.infer<typeof RegisterSchema>, role: "cliente" | "proveedor"): Promise<{ error?: string; successUrl?: string; success?: boolean; }> {
@@ -67,7 +45,6 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
   
   const { idNumber, email, password, whatsappNumber } = validatedFields.data;
 
-  // Check if user already exists in Firestore
   const userDocRef = doc(db, "users", idNumber);
   const userDoc = await getDoc(userDocRef);
 
@@ -75,10 +52,8 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
     return { error: "El número de cédula ya está registrado." };
   }
 
-  // Hash the password before storing
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  // Create user in Firestore
   await setDoc(userDocRef, {
       email,
       whatsappNumber,
@@ -86,10 +61,6 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
       role: role,
       createdAt: new Date(),
   });
-  
-  // Also update mock data to keep login working during transition
-  users[idNumber] = role;
-  userPasswords[idNumber] = password; // Note: Storing plain text in mock, but hashed in DB
   
   cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
   
@@ -107,27 +78,38 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
     return { error: "Campos inválidos. Por favor, revisa los datos." };
   }
 
-  const { idNumber, password } = validatedFields.data;
+  const { idNumber, password, name } = validatedFields.data;
   
-  if (users[idNumber]) {
+  const userDocRef = doc(db, "users", idNumber);
+  const userDoc = await getDoc(userDocRef);
+
+  if (userDoc.exists()) {
     return { error: "El número de cédula ya está registrado." };
   }
 
-  users[idNumber] = 'cobrador';
-  userPasswords[idNumber] = password;
+  const hashedPassword = await bcrypt.hash(password, 10);
+  
+  await setDoc(userDocRef, {
+      name: name,
+      password: hashedPassword,
+      role: 'cobrador',
+      createdAt: new Date(),
+  });
 
   return { success: true };
 }
 
 export async function deleteCobrador(idNumber: string): Promise<{ error?: string; success?: boolean; }> {
-  if (!users[idNumber] || users[idNumber] !== 'cobrador') {
+  const userDocRef = doc(db, "users", idNumber);
+  const userDoc = await getDoc(userDocRef);
+
+  if (!userDoc.exists() || userDoc.data().role !== 'cobrador') {
     return { error: "El cobrador no existe o no se puede eliminar." };
   }
 
-  delete users[idNumber];
-  delete userPasswords[idNumber];
+  await deleteDoc(userDocRef);
   
-  console.log(`Cobrador with ID ${idNumber} has been deleted.`);
+  console.log(`Cobrador with ID ${idNumber} has been deleted from Firestore.`);
   
   return { success: true };
 }
