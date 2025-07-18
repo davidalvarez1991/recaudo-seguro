@@ -6,10 +6,10 @@ import { redirect } from "next/navigation";
 
 // Mock user roles for demonstration purposes
 const users: Record<string, string> = {
-  "admin@recaudo.seguro": "admin",
-  "proveedor@recaudo.seguro": "proveedor",
-  "cobrador@recaudo.seguro": "cobrador",
-  "cliente@recaudo.seguro": "cliente",
+  "10000001": "admin",
+  "20000002": "proveedor",
+  "30000003": "cobrador",
+  "40000004": "cliente",
 };
 
 export async function login(values: z.infer<typeof LoginSchema>) {
@@ -19,9 +19,9 @@ export async function login(values: z.infer<typeof LoginSchema>) {
     return { error: "Campos inválidos." };
   }
   
-  const { email } = validatedFields.data;
+  const { idNumber } = validatedFields.data;
   
-  const role = users[email];
+  const role = users[idNumber];
 
   if (role) {
     // In a real application, you would set a session cookie here.
@@ -39,7 +39,9 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
   }
 
   // In a real application, you would create the user in the database here.
-  console.log(`New ${role} registration:`, validatedFields.data.email);
+  // For now, we'll just log it. We should also add new users to our mock `users` object.
+  console.log(`New ${role} registration:`, validatedFields.data.idNumber, validatedFields.data.email);
+  users[validatedFields.data.idNumber] = role;
 
   // We redirect to the login page with a query param to show a toast.
   redirect('/login?registered=true');

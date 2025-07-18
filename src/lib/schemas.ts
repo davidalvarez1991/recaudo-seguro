@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 export const LoginSchema = z.object({
-  email: z.string().email({
-    message: "Por favor, introduce una dirección de correo electrónico válida.",
+  idNumber: z.string().min(1, {
+    message: "El número de cédula es obligatorio.",
   }),
   password: z.string().min(1, {
     message: "La contraseña es obligatoria.",
