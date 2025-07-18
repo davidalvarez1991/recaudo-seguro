@@ -56,7 +56,7 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
               variant: "default",
               className: "bg-accent text-accent-foreground border-accent",
             });
-            form.reset({ name: "", idNumber: "", password: "" });
+            form.reset();
             onFormSubmit?.();
         }
       } catch (error) {

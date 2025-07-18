@@ -70,13 +70,16 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
 
 
 export async function registerCobrador(values: z.infer<typeof CobradorRegisterSchema>) {
-  try {
     const validatedFields = CobradorRegisterSchema.safeParse(values);
 
     if (!validatedFields.success) {
-      return { error: "Campos inválidos. Por favor, revisa los datos." };
+      let errorMessage = "Campos inválidos: ";
+      validatedFields.error.issues.forEach((issue) => {
+        errorMessage += `${issue.path.join('.')} - ${issue.message}. `;
+      });
+      return { error: errorMessage };
     }
-
+    
     const cookieStore = cookies();
     const providerId = cookieStore.get('loggedInUser')?.value;
 
@@ -90,29 +93,26 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
     const userDoc = await getDoc(userDocRef);
 
     if (userDoc.exists()) {
-      return { error: "El número de cédula ya está registrado." };
+      return { error: "El número de cédula del cobrador ya está registrado." };
     }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
     
-    await setDoc(userDocRef, {
-        idNumber,
-        name: name,
-        password: hashedPassword,
-        role: 'cobrador',
-        providerId: providerId,
-        createdAt: new Date(),
-    });
+    try {
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        await setDoc(userDocRef, {
+            idNumber,
+            name: name,
+            password: hashedPassword,
+            role: 'cobrador',
+            providerId: providerId,
+            createdAt: new Date(),
+        });
 
-    return { success: true };
-  } catch (error) {
-    console.error("Error al registrar cobrador:", error);
-    let errorMessage = "No se pudo crear la cuenta del cobrador.";
-    if (error instanceof Error) {
-        errorMessage = error.message;
+        return { success: true };
+    } catch (error) {
+        console.error("Error al registrar cobrador:", error);
+        return { error: "No se pudo crear la cuenta del cobrador en la base de datos." };
     }
-    return { error: errorMessage };
-  }
 }
 
 
