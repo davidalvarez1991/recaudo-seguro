@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { useState, useEffect } from "react";
 
-const registros = [
+const initialRegistros = [
   { id: "1", cobradorId: "987654321", clienteId: "111222333", tipo: "Recaudo", valor: 50000, fecha: "2024-07-28" },
   { id: "2", cobradorId: "123123123", clienteId: "444555666", tipo: "Recaudo", valor: 75000, fecha: "2024-07-28" },
   { id: "3", cobradorId: "987654321", clienteId: "777888999", tipo: "Visita", valor: 0, fecha: "2024-07-27" },
@@ -16,6 +17,16 @@ const registros = [
 ];
 
 export default function RegistrosPage() {
+  const [registros, setRegistros] = useState(initialRegistros.map(r => ({ ...r, formattedDate: '' })));
+
+  useEffect(() => {
+    setRegistros(
+      initialRegistros.map(r => ({
+        ...r,
+        formattedDate: new Date(r.fecha).toLocaleDateString(),
+      }))
+    );
+  }, []);
 
   return (
     <Card>
@@ -49,7 +60,7 @@ export default function RegistrosPage() {
             <TableBody>
               {registros.map((registro) => (
                 <TableRow key={registro.id}>
-                  <TableCell>{new Date(registro.fecha).toLocaleDateString()}</TableCell>
+                  <TableCell>{registro.formattedDate}</TableCell>
                   <TableCell>{registro.cobradorId}</TableCell>
                   <TableCell>{registro.clienteId}</TableCell>
                   <TableCell>

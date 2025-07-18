@@ -7,14 +7,25 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { useState, useEffect } from "react";
 
-const creditos = [
+const initialCreditos = [
   { id: "1", clienteId: "111222333", valor: 500000, cuotas: 12, fecha: "2024-07-29", estado: "Activo" },
   { id: "2", clienteId: "444555666", valor: 1200000, cuotas: 24, fecha: "2024-07-28", estado: "Activo" },
   { id: "3", clienteId: "777888999", valor: 800000, cuotas: 18, fecha: "2024-07-27", estado: "Pagado" },
 ];
 
 export default function CreditosPage() {
+  const [creditos, setCreditos] = useState(initialCreditos.map(c => ({...c, formattedDate: ''})));
+
+  useEffect(() => {
+    setCreditos(
+      initialCreditos.map(c => ({
+        ...c,
+        formattedDate: new Date(c.fecha).toLocaleDateString(),
+      }))
+    );
+  }, []);
 
   return (
     <Card>
@@ -48,7 +59,7 @@ export default function CreditosPage() {
             <TableBody>
               {creditos.map((credito) => (
                 <TableRow key={credito.id}>
-                  <TableCell>{new Date(credito.fecha).toLocaleDateString()}</TableCell>
+                  <TableCell>{credito.formattedDate}</TableCell>
                   <TableCell>{credito.clienteId}</TableCell>
                   <TableCell className="text-right">
                     {`$${credito.valor.toLocaleString('es-CO')}`}
