@@ -2,17 +2,26 @@ import { UserNav } from "@/components/dashboard/user-nav";
 import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
+import { SidebarContentProveedor } from "@/components/dashboard/sidebar-content-proveedor";
 import { SidebarContentClient } from "@/components/dashboard/sidebar-content-client";
+import { headers } from "next/headers";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // In a real application, you would add logic here to check for a valid
-  // user session and fetch the user's role to display the correct sidebar.
-  // For now, we'll conditionally render the sidebar content.
-  // e.g., `if (!session) { redirect('/login'); }`
+  const pathname = headers().get('x-next-pathname') || '';
+  const role = pathname.split('/')[2];
+
+  const renderSidebarContent = () => {
+    switch(role) {
+      case 'proveedor':
+        return <SidebarContentProveedor />;
+      default:
+        return <SidebarContentClient />;
+    }
+  }
 
   return (
     <SidebarProvider>
@@ -34,7 +43,7 @@ export default function DashboardLayout({
         </header>
         <div className="flex">
           <Sidebar>
-            <SidebarContentClient />
+            {renderSidebarContent()}
           </Sidebar>
           <SidebarInset>
             <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
