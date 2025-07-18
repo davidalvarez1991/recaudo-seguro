@@ -42,10 +42,15 @@ export default function GestionCobradoresPage() {
   };
 
   useEffect(() => {
-    fetchCobradores();
-    window.addEventListener('cobradores-updated', fetchCobradores);
+    const handleCobradoresUpdate = () => fetchCobradores();
+    
+    fetchCobradores(); // Initial fetch
+    
+    window.addEventListener('cobradores-updated', handleCobradoresUpdate);
+    
+    // Cleanup listener on component unmount
     return () => {
-      window.removeEventListener('cobradores-updated', fetchCobradores);
+      window.removeEventListener('cobradores-updated', handleCobradoresUpdate);
     };
   }, []);
 
@@ -60,7 +65,7 @@ export default function GestionCobradoresPage() {
           const updatedCobradores = storedCobradores.filter(c => c.idNumber !== idNumber);
           localStorage.setItem('cobradores', JSON.stringify(updatedCobradores));
           
-          // Dispatch event to trigger UI refresh
+          // Dispatch event to trigger UI refresh in this and other components
           window.dispatchEvent(new CustomEvent('cobradores-updated'));
       }
 
