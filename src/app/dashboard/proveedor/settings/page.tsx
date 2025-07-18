@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, ChangeEvent } from "react";
@@ -5,16 +6,19 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Upload, ArrowLeft, Save, Asterisk } from "lucide-react";
+import { Upload, ArrowLeft, Save, Asterisk, Percent } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 export default function SettingsPage() {
   const [logo, setLogo] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [commissionPercentage, setCommissionPercentage] = useState("20%");
+  const [lateInterestRate, setLateInterestRate] = useState("2%");
+  const [isLateInterestActive, setIsLateInterestActive] = useState(false);
   const { toast } = useToast();
 
   const handleLogoChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -45,6 +49,17 @@ export default function SettingsPage() {
     });
   };
 
+  const handleSaveLateInterest = () => {
+    // In a real application, you would save these settings to your backend.
+    console.log("Saving late interest settings:", { rate: lateInterestRate, active: isLateInterestActive });
+    toast({
+      title: "Configuración de Mora Guardada",
+      description: `Interés por mora ${isLateInterestActive ? `activado al ${lateInterestRate}` : 'desactivado'}.`,
+      variant: "default",
+      className: "bg-accent text-accent-foreground border-accent",
+    });
+  };
+
   return (
     <div className="grid gap-8">
       <Card>
@@ -66,7 +81,7 @@ export default function SettingsPage() {
         </CardHeader>
       </Card>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         <Card>
           <CardHeader>
             <CardTitle>Logo de la Empresa</CardTitle>
@@ -129,6 +144,48 @@ export default function SettingsPage() {
                 <Save className="mr-2 h-4 w-4" />
                 Guardar Porcentaje
              </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Interés por Día de Mora</CardTitle>
+            <CardDescription>Aplica un interés diario a los pagos atrasados.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="late-interest-switch" className="text-base">Activar Interés por Mora</Label>
+                <p className="text-sm text-muted-foreground">
+                  Habilita o deshabilita el cálculo.
+                </p>
+              </div>
+              <Switch
+                id="late-interest-switch"
+                checked={isLateInterestActive}
+                onCheckedChange={setIsLateInterestActive}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="late-interest-rate">Tasa de Interés Diario (%)</Label>
+              <div className="relative">
+                <Input 
+                  id="late-interest-rate"
+                  placeholder="2%"
+                  value={lateInterestRate}
+                  onChange={(e) => setLateInterestRate(e.target.value)}
+                  disabled={!isLateInterestActive}
+                  className="pl-8"
+                />
+                <Percent className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              </div>
+            </div>
+            
+            <Button onClick={handleSaveLateInterest}>
+              <Save className="mr-2 h-4 w-4" />
+              Guardar Configuración de Mora
+            </Button>
           </CardContent>
         </Card>
       </div>
