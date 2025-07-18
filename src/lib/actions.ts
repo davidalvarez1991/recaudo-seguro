@@ -43,8 +43,13 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
   console.log(`New ${role} registration:`, validatedFields.data.idNumber, validatedFields.data.email);
   users[validatedFields.data.idNumber] = role;
 
-  // We redirect to the login page with a query param to show a toast.
-  redirect('/login?registered=true');
+  if (role === "proveedor") {
+    // In a real app, you'd also sign them in here.
+    redirect(`/dashboard/proveedor`);
+  } else {
+    // We redirect to the login page with a query param to show a toast for other roles.
+    redirect('/login?registered=true');
+  }
 }
 
 
