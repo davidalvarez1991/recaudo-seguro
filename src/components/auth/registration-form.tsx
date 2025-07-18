@@ -33,6 +33,7 @@ export function RegistrationForm({ role }: RegistrationFormProps) {
   const form = useForm<z.infer<typeof RegisterSchema>>({
     resolver: zodResolver(RegisterSchema),
     defaultValues: {
+      companyName: "",
       idNumber: "",
       whatsappNumber: "",
       email: "",
@@ -71,6 +72,21 @@ export function RegistrationForm({ role }: RegistrationFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {role === 'proveedor' && (
+            <FormField
+              control={form.control}
+              name="companyName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nombre de la Empresa</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="Mi Empresa S.A.S" disabled={isPending} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+        )}
         <FormField
           control={form.control}
           name="idNumber"

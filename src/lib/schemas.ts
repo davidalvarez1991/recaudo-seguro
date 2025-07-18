@@ -10,6 +10,7 @@ export const LoginSchema = z.object({
 });
 
 export const RegisterSchema = z.object({
+  companyName: z.string().optional(),
   idNumber: z.string().min(6, {
     message: "El número de identificación debe tener al menos 6 caracteres.",
   }),

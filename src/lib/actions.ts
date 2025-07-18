@@ -43,7 +43,11 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
     return { error: "Campos inválidos. Por favor, revisa los datos." };
   }
   
-  const { idNumber, email, password, whatsappNumber } = validatedFields.data;
+  const { idNumber, email, password, whatsappNumber, companyName } = validatedFields.data;
+  
+  if (role === 'proveedor' && (!companyName || companyName.trim() === '')) {
+      return { error: "El nombre de la empresa es obligatorio para los proveedores." };
+  }
 
   const userDocRef = doc(db, "users", idNumber);
   const userDoc = await getDoc(userDocRef);
@@ -54,14 +58,20 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  await setDoc(userDocRef, {
+  const userData: any = {
       idNumber,
       email,
       whatsappNumber,
       password: hashedPassword,
       role: role,
       createdAt: new Date(),
-  });
+  };
+  
+  if (role === 'proveedor') {
+      userData.companyName = companyName;
+  }
+
+  await setDoc(userDocRef, userData);
   
   cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
   
