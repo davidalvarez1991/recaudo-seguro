@@ -77,9 +77,9 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
     }
     
     const cookieStore = cookies();
-    const providerId = cookieStore.get('loggedInUser')?.value;
+    const providerIdNumber = cookieStore.get('loggedInUser')?.value;
 
-    if (!providerId) {
+    if (!providerIdNumber) {
         return { error: "El proveedor no está autenticado. Por favor inicie sesión de nuevo." };
     }
 
@@ -97,10 +97,10 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
         
         await setDoc(cobradorDocRef, {
             idNumber,
-            name: name,
+            name,
             password: hashedPassword,
             role: 'cobrador',
-            providerId: providerId,
+            providerId: providerIdNumber,
             createdAt: new Date(),
         });
 
