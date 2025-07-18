@@ -6,15 +6,26 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, UserCircle } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { useState, useEffect } from "react";
 
-const cobradores = [
-  { id: "1", name: "Carlos Ramirez", idNumber: "987654321", status: "Activo" },
-  { id: "2", name: "Ana Torres", idNumber: "123123123", status: "Inactivo" },
-  { id: "3", name: "Luis Guzman", idNumber: "456456456", status: "Activo" },
-  { id: "4", name: "Sofia Castro", idNumber: "789456", status: "Activo" },
-];
+type Cobrador = {
+  id: string;
+  name: string;
+  idNumber: string;
+  status: string;
+};
 
 export default function GestionCobradoresPage() {
+  const [cobradores, setCobradores] = useState<Cobrador[]>([]);
+
+  useEffect(() => {
+    // This code runs only on the client
+    const storedCobradoresRaw = localStorage.getItem('cobradores');
+    if (storedCobradoresRaw) {
+      setCobradores(JSON.parse(storedCobradoresRaw));
+    }
+  }, []);
+
 
   return (
     <div className="flex flex-col gap-8">
@@ -35,27 +46,39 @@ export default function GestionCobradoresPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {cobradores.map((cobrador) => (
-          <Card key={cobrador.id} className="flex flex-col">
-            <CardHeader className="flex flex-row items-center gap-4">
-                <UserCircle className="w-12 h-12 text-muted-foreground" />
-                <div className="grid gap-1">
-                    <CardTitle>{cobrador.name}</CardTitle>
-                    <CardDescription>ID: {cobrador.idNumber}</CardDescription>
+      {cobradores.length > 0 ? (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {cobradores.map((cobrador) => (
+            <Card key={cobrador.id} className="flex flex-col">
+              <CardHeader className="flex flex-row items-center gap-4">
+                  <UserCircle className="w-12 h-12 text-muted-foreground" />
+                  <div className="grid gap-1">
+                      <CardTitle>{cobrador.name}</CardTitle>
+                      <CardDescription>ID: {cobrador.idNumber}</CardDescription>
+                  </div>
+              </CardHeader>
+              <CardContent className="flex items-center justify-between mt-auto pt-4">
+                <div>
+                  <span className="text-sm text-muted-foreground">Estado</span>
+                  <Badge variant={cobrador.status === 'Activo' ? 'default' : 'secondary'} className="ml-2">
+                    {cobrador.status}
+                  </Badge>
                 </div>
-            </CardHeader>
-            <CardContent className="flex items-center justify-between mt-auto pt-4">
-              <div>
-                <span className="text-sm text-muted-foreground">Estado</span>
-                <Badge variant={cobrador.status === 'Activo' ? 'default' : 'secondary'} className="ml-2">
-                  {cobrador.status}
-                </Badge>
-              </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <Card>
+            <CardContent className="pt-6">
+                <div className="text-center text-muted-foreground py-8">
+                    <UserCircle className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                    <h3 className="text-lg font-semibold">No hay cobradores registrados</h3>
+                    <p className="text-sm">Crea un nuevo cobrador desde tu panel de proveedor para empezar.</p>
+                </div>
             </CardContent>
-          </Card>
-        ))}
-      </div>
+        </Card>
+      )}
     </div>
   );
 }

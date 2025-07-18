@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -47,6 +48,18 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
              variant: "destructive",
            });
         } else if (result?.success) {
+            // Save to localStorage
+            const storedCobradoresRaw = localStorage.getItem('cobradores');
+            const storedCobradores = storedCobradoresRaw ? JSON.parse(storedCobradoresRaw) : [];
+            const newCobrador = {
+                id: (storedCobradores.length + 1).toString(),
+                name: values.name,
+                idNumber: values.idNumber,
+                status: "Activo"
+            };
+            const updatedCobradores = [...storedCobradores, newCobrador];
+            localStorage.setItem('cobradores', JSON.stringify(updatedCobradores));
+
             toast({
               title: "Registro Exitoso",
               description: `El perfil de cobrador ha sido creado.`,
