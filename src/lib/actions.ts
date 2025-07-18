@@ -6,7 +6,7 @@ import { LoginSchema, RegisterSchema, CobradorRegisterSchema, ClientCreditSchema
 import { redirect } from "next/navigation";
 import { cookies } from 'next/headers';
 import { db } from "./firebase";
-import { doc, setDoc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch } from "firebase/firestore";
+import { doc, setDoc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch,getCountFromServer } from "firebase/firestore";
 import bcrypt from 'bcryptjs';
 
 export async function login(values: z.infer<typeof LoginSchema>) {
@@ -91,6 +91,15 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
     if (cobradorDoc.exists()) {
       return { error: "El número de cédula del cobrador ya está registrado." };
     }
+
+    const cobradoresCollection = collection(db, "users");
+    const q = query(cobradoresCollection, where("providerId", "==", providerIdNumber));
+    const countSnapshot = await getCountFromServer(q);
+    const cobradoresCount = countSnapshot.data().count;
+
+    if (cobradoresCount >= 5) {
+      return { error: "Ha alcanzado el límite de 5 cobradores por proveedor." };
+    }
     
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -104,7 +113,7 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
             createdAt: new Date(),
         });
 
-        return { success: true };
+        return { success: `El perfil de cobrador para ${name} ha sido creado.` };
     } catch (error) {
         console.error("Error al registrar cobrador:", error);
         return { error: "No se pudo crear la cuenta del cobrador en la base de datos." };

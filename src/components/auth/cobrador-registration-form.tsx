@@ -19,6 +19,8 @@ import { registerCobrador } from "@/lib/actions";
 import { useTransition } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+
 
 type CobradorRegistrationFormProps = {
   onFormSubmit?: () => void;
@@ -27,6 +29,7 @@ type CobradorRegistrationFormProps = {
 export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationFormProps) {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
+  const router = useRouter();
 
   const form = useForm<z.infer<typeof CobradorRegisterSchema>>({
     resolver: zodResolver(CobradorRegisterSchema),
@@ -48,18 +51,15 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
              variant: "destructive",
            });
         } else if (result?.success) {
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('cobradores-updated'));
-            }
-
             toast({
               title: "Registro Exitoso",
-              description: `El perfil de cobrador para ${values.name} ha sido creado.`,
+              description: result.success,
               variant: "default",
               className: "bg-accent text-accent-foreground border-accent",
             });
             form.reset();
             onFormSubmit?.();
+            router.refresh();
         }
       } catch (error) {
          toast({

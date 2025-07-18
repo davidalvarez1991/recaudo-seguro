@@ -1,17 +1,50 @@
 
-"use client";
-
-import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { UserPlus, Eye } from "lucide-react";
-import { CobradorRegistrationForm } from "@/components/auth/cobrador-registration-form";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
+import { getCobradoresByProvider } from "@/lib/actions";
+import { CobradorRegistrationModal } from "@/components/proveedor/cobrador-registration-modal";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-export default function ProveedorDashboard() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+
+export default async function ProveedorDashboard() {
+  const cobradores = await getCobradoresByProvider();
+  const cobradoresCount = cobradores.length;
+  const canCreateCobrador = cobradoresCount < 5;
+
+  const CreateButton = () => {
+    if (canCreateCobrador) {
+      return (
+        <CobradorRegistrationModal>
+          <Button className="w-full sm:w-auto">
+            <UserPlus className="mr-2 h-4 w-4" />
+            Crear Nuevo Cobrador
+          </Button>
+        </CobradorRegistrationModal>
+      );
+    }
+    
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span tabIndex={0} className="w-full sm:w-auto">
+              <Button className="w-full sm:w-auto" disabled>
+                <UserPlus className="mr-2 h-4 w-4" />
+                Crear Nuevo Cobrador
+              </Button>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Has alcanzado el límite de 5 cobradores.</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
 
   return (
     <Card>
@@ -31,27 +64,11 @@ export default function ProveedorDashboard() {
         
         <div className="space-y-6">
           <div>
-            <h3 className="text-lg font-medium">Gestión de Cobradores</h3>
+            <h3 className="text-lg font-medium">Gestión de Cobradores ({cobradoresCount}/5)</h3>
             <p className="text-sm text-muted-foreground">Crea nuevas cuentas o visualiza tus cobradores existentes.</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
-            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-              <DialogTrigger asChild>
-                <Button className="w-full sm:w-auto">
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Crear Nuevo Cobrador
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Registrar Nuevo Cobrador</DialogTitle>
-                  <DialogDescription>
-                    Completa los datos para crear una nueva cuenta de cobrador.
-                  </DialogDescription>
-                </DialogHeader>
-                <CobradorRegistrationForm onFormSubmit={() => setIsModalOpen(false)} />
-              </DialogContent>
-            </Dialog>
+            <CreateButton />
             <Button asChild variant="outline" className="w-full sm:w-auto">
               <Link href="/dashboard/proveedor/cobradores">
                 <Eye className="mr-2 h-4 w-4" />
