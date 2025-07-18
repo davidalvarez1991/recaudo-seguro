@@ -18,16 +18,8 @@ import { useTransition, useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-const ClientCreditSchema = z.object({
-  idNumber: z.string().min(6, "La cédula debe tener al menos 6 caracteres."),
-  address: z.string().min(5, "La dirección es obligatoria."),
-  contactPhone: z.string().min(10, "El teléfono debe tener 10 dígitos."),
-  guarantorPhone: z.string().min(10, "El teléfono del fiador debe tener 10 dígitos."),
-  idCardPhoto: z.any().refine(files => files?.length > 0, "La foto de la cédula es obligatoria."),
-  creditAmount: z.coerce.number().min(1, "El valor del crédito es obligatorio."),
-  installments: z.coerce.number().min(1, "El número de cuotas es obligatorio."),
-});
+import { ClientCreditSchema } from "@/lib/schemas";
+import { createClientAndCredit } from "@/lib/actions";
 
 type ClientRegistrationFormProps = {
   onFormSubmit?: () => void;
@@ -63,7 +55,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   });
 
   const onSubmit = (values: z.infer<typeof ClientCreditSchema>) => {
-    startTransition(() => {
+    startTransition(async () => {
        if (!cobradorId) {
             toast({
                 title: "Error",
@@ -72,33 +64,26 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
             });
             return;
         }
-        
-      const creditosKey = `creditos_${cobradorId}`;
-      const storedCreditosRaw = localStorage.getItem(creditosKey);
-      const storedCreditos = storedCreditosRaw ? JSON.parse(storedCreditosRaw) : [];
 
-      const newCredit = {
-        id: (storedCreditos.length + 1).toString(),
-        clienteId: values.idNumber,
-        valor: values.creditAmount,
-        cuotas: values.installments,
-        fecha: new Date().toISOString(),
-        estado: "Activo",
-        cobradorId: cobradorId,
-      };
+        const result = await createClientAndCredit(values);
 
-      const updatedCreditos = [...storedCreditos, newCredit];
-      localStorage.setItem(creditosKey, JSON.stringify(updatedCreditos));
-      window.dispatchEvent(new CustomEvent('creditos-updated'));
-      
-      toast({
-        title: "Registro Exitoso",
-        description: "El cliente y su crédito han sido creados correctamente.",
-        variant: "default",
-        className: "bg-accent text-accent-foreground border-accent",
-      });
-      form.reset();
-      onFormSubmit?.();
+        if (result.success) {
+          toast({
+            title: "Registro Exitoso",
+            description: "El cliente y su crédito han sido creados correctamente.",
+            variant: "default",
+            className: "bg-accent text-accent-foreground border-accent",
+          });
+          window.dispatchEvent(new CustomEvent('creditos-updated'));
+          form.reset();
+          onFormSubmit?.();
+        } else {
+           toast({
+            title: "Error en el registro",
+            description: result.error || "No se pudo completar la operación.",
+            variant: "destructive",
+          });
+        }
     });
   };
 
@@ -216,3 +201,5 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
+
+    

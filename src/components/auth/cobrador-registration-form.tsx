@@ -69,28 +69,7 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
              variant: "destructive",
            });
         } else if (result?.success) {
-            const cobradoresKey = `cobradores_${providerId}`;
-            const storedCobradoresRaw = localStorage.getItem(cobradoresKey);
-            const storedCobradores = storedCobradoresRaw ? JSON.parse(storedCobradoresRaw) : [];
-            
-            if (storedCobradores.some((c: any) => c.idNumber === values.idNumber)) {
-                toast({
-                    title: "Error",
-                    description: "Este cobrador ya existe.",
-                    variant: "destructive",
-                });
-                return;
-            }
-
-            const newCobrador = {
-                id: (storedCobradores.length + 1).toString(),
-                name: values.name,
-                idNumber: values.idNumber,
-                status: "Activo",
-                providerId: providerId,
-            };
-            const updatedCobradores = [...storedCobradores, newCobrador];
-            localStorage.setItem(cobradoresKey, JSON.stringify(updatedCobradores));
+            // Dispatch a custom event to notify other components that the cobradores list has been updated.
             window.dispatchEvent(new CustomEvent('cobradores-updated'));
 
             toast({
@@ -168,3 +147,5 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
     </Form>
   );
 }
+
+    
