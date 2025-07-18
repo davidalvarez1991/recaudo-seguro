@@ -6,7 +6,7 @@ import { LoginSchema, RegisterSchema, CobradorRegisterSchema, ClientCreditSchema
 import { redirect } from "next/navigation";
 import { cookies } from 'next/headers';
 import { db } from "./firebase";
-import { doc, setDoc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch,getCountFromServer } from "firebase/firestore";
+import { doc, setDoc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch, getCountFromServer } from "firebase/firestore";
 import bcrypt from 'bcryptjs';
 
 export async function login(values: z.infer<typeof LoginSchema>) {
