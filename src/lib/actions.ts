@@ -254,14 +254,23 @@ export async function getCobradoresByProvider() {
         const querySnapshot = await getDocs(q);
         const cobradores = querySnapshot.docs.map(doc => {
             const data = doc.data();
-            const createdAt = data.createdAt;
-            return {
+            const { createdAt, updatedAt, ...rest } = data;
+            
+            const plainObject = {
                 id: doc.id,
-                ...data,
-                createdAt: createdAt && typeof createdAt.toDate === 'function' 
-                    ? createdAt.toDate().toISOString() 
-                    : createdAt,
+                ...rest,
+                createdAt: '',
+                updatedAt: '',
             };
+
+            if (createdAt && typeof createdAt.toDate === 'function') {
+                plainObject.createdAt = createdAt.toDate().toISOString();
+            }
+            if (updatedAt && typeof updatedAt.toDate === 'function') {
+                plainObject.updatedAt = updatedAt.toDate().toISOString();
+            }
+
+            return plainObject;
         });
         return cobradores;
     } catch (error) {
@@ -346,7 +355,7 @@ export async function updateCobrador(values: z.infer<typeof EditCobradorSchema>)
     const batch = writeBatch(db);
     const oldData = oldUserDoc.data();
     
-    const newData = {
+    const newData: any = {
       ...oldData,
       idNumber: idNumber,
       name: name,
