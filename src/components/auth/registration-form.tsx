@@ -67,10 +67,13 @@ export function RegistrationForm({ role, showSuccessToast = false }: Registratio
           }
         }
       } catch (error) {
-         const result = error as { error?: string };
+         let errorMessage = "Algo salió mal. Por favor, inténtalo de nuevo.";
+         if (error instanceof Error) {
+            errorMessage = error.message;
+         }
          toast({
             title: "Error",
-            description: result?.error || "Algo salió mal. Por favor, inténtalo de nuevo.",
+            description: errorMessage,
             variant: "destructive",
           });
        }
