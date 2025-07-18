@@ -6,6 +6,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Home, Settings, HandCoins } from "lucide-react";
 import Link from "next/link";
@@ -17,6 +18,7 @@ type SidebarContentClientProps = {
 
 export function SidebarContentClient({ role }: SidebarContentClientProps) {
   const pathname = usePathname();
+  const { setOpenMobile } = useSidebar();
 
   if (role === 'cobrador') {
       return (
@@ -27,6 +29,7 @@ export function SidebarContentClient({ role }: SidebarContentClientProps) {
                 asChild
                 isActive={pathname === `/dashboard/${role}`}
                 tooltip="Inicio"
+                onClick={() => setOpenMobile(false)}
               >
                 <Link href={`/dashboard/${role}`}>
                   <Home />
@@ -39,7 +42,9 @@ export function SidebarContentClient({ role }: SidebarContentClientProps) {
                <SidebarMenuButton 
                 asChild
                 isActive={pathname.includes('/creditos')}
-                tooltip="Créditos">
+                tooltip="Créditos"
+                onClick={() => setOpenMobile(false)}
+               >
                 <Link href={`/dashboard/${role}/creditos`}>
                   <HandCoins />
                   <span>Créditos</span>
@@ -48,7 +53,7 @@ export function SidebarContentClient({ role }: SidebarContentClientProps) {
             </SidebarMenuItem>
             
             <SidebarMenuItem>
-               <SidebarMenuButton tooltip="Configuración">
+               <SidebarMenuButton tooltip="Configuración" onClick={() => setOpenMobile(false)}>
                 <Settings />
                 <span>Configuración</span>
               </SidebarMenuButton>
@@ -67,6 +72,7 @@ export function SidebarContentClient({ role }: SidebarContentClientProps) {
             asChild
             isActive={pathname === `/dashboard/${role}`}
             tooltip="Inicio"
+            onClick={() => setOpenMobile(false)}
           >
             <Link href={`/dashboard/${role}`}>
               <Home />
@@ -76,7 +82,7 @@ export function SidebarContentClient({ role }: SidebarContentClientProps) {
         </SidebarMenuItem>
         
         <SidebarMenuItem>
-           <SidebarMenuButton tooltip="Configuración">
+           <SidebarMenuButton tooltip="Configuración" onClick={() => setOpenMobile(false)}>
             <Settings />
             <span>Configuración</span>
           </SidebarMenuButton>

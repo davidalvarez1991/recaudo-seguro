@@ -6,6 +6,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Home, Settings, Users } from "lucide-react";
 import Link from "next/link";
@@ -14,6 +15,7 @@ import { usePathname } from "next/navigation";
 export function SidebarContentAdmin() {
   const pathname = usePathname();
   const role = 'admin';
+  const { setOpenMobile } = useSidebar();
 
   return (
     <SidebarContent>
@@ -23,6 +25,7 @@ export function SidebarContentAdmin() {
             asChild
             isActive={pathname === `/dashboard/${role}`}
             tooltip="Inicio"
+            onClick={() => setOpenMobile(false)}
           >
             <Link href={`/dashboard/${role}`}>
               <Home />
@@ -32,14 +35,14 @@ export function SidebarContentAdmin() {
         </SidebarMenuItem>
         
         <SidebarMenuItem>
-           <SidebarMenuButton tooltip="Gestión de Usuarios">
+           <SidebarMenuButton tooltip="Gestión de Usuarios" onClick={() => setOpenMobile(false)}>
             <Users />
             <span>Usuarios</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
         
         <SidebarMenuItem>
-           <SidebarMenuButton tooltip="Configuración">
+           <SidebarMenuButton tooltip="Configuración" onClick={() => setOpenMobile(false)}>
             <Settings />
             <span>Configuración</span>
           </SidebarMenuButton>
