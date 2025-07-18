@@ -5,20 +5,24 @@ import { z } from "zod";
 import { LoginSchema, RegisterSchema, CobradorRegisterSchema } from "./schemas";
 import { redirect } from "next/navigation";
 import { cookies } from 'next/headers';
+import { db } from "./firebase";
+import { doc, setDoc, getDoc, deleteDoc } from "firebase/firestore";
+import bcrypt from 'bcryptjs';
 
-// Mock user roles and passwords for demonstration purposes
+// Mock user roles for demonstration purposes. This will be replaced by Firestore logic.
 let users: Record<string, string> = {
   "10000001": "admin",
-  "20000002": "proveedor",
+  "20000002": "proveedor", // Will be created in DB on first login if not exists
   "40000004": "cliente",
-  "30000003": "cobrador", // Initial cobrador for testing
+  "30000003": "cobrador", 
 };
 
+// This will be replaced by storing hashed passwords in Firestore.
 let userPasswords: Record<string, string> = {
     "10000001": "password123",
     "20000002": "password123",
     "40000004": "password123",
-    "30000003": "password123", // Password for initial cobrador
+    "30000003": "password123",
 };
 
 export async function login(values: z.infer<typeof LoginSchema>) {
@@ -30,11 +34,23 @@ export async function login(values: z.infer<typeof LoginSchema>) {
   
   const { idNumber, password } = validatedFields.data;
   
+  // --- Firestore Login Logic (Future implementation) ---
+  // const userDocRef = doc(db, "users", idNumber);
+  // const userDoc = await getDoc(userDocRef);
+  // if (userDoc.exists()) {
+  //   const userData = userDoc.data();
+  //   const isPasswordValid = await bcrypt.compare(password, userData.password);
+  //   if (isPasswordValid) {
+  //     cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
+  //     cookies().set('userRole', userData.role, { httpOnly: true, path: '/' });
+  //     redirect(`/dashboard/${userData.role}`);
+  //   }
+  // }
+  
+  // --- Mock Login Logic (Current) ---
   const role = users[idNumber];
   const storedPassword = userPasswords[idNumber];
-
   if (role && password === storedPassword) {
-    // Simulate session by setting a cookie with the user's ID
     cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
     redirect(`/dashboard/${role}`);
   }
@@ -49,26 +65,37 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
     return { error: "Campos inválidos. Por favor, revisa los datos." };
   }
   
-  const { idNumber, email, password } = validatedFields.data;
+  const { idNumber, email, password, whatsappNumber } = validatedFields.data;
 
-  // Check if user already exists
-  if (users[idNumber]) {
+  // Check if user already exists in Firestore
+  const userDocRef = doc(db, "users", idNumber);
+  const userDoc = await getDoc(userDocRef);
+
+  if (userDoc.exists()) {
     return { error: "El número de cédula ya está registrado." };
   }
 
-  // In a real application, you would create the user in the database here.
-  console.log(`New ${role} registration:`, idNumber, email);
-  users[idNumber] = role;
-  userPasswords[idNumber] = password;
+  // Hash the password before storing
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  // Create user in Firestore
+  await setDoc(userDocRef, {
+      email,
+      whatsappNumber,
+      password: hashedPassword,
+      role: role,
+      createdAt: new Date(),
+  });
   
-  // Directly log in the new user by setting the cookie
+  // Also update mock data to keep login working during transition
+  users[idNumber] = role;
+  userPasswords[idNumber] = password; // Note: Storing plain text in mock, but hashed in DB
+  
   cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
   
   if (role === "proveedor") {
-    // Return a success URL for the component to handle redirection.
     return { success: true, successUrl: `/dashboard/proveedor` };
   } else {
-    // Return a success URL for other roles.
     return { success: true, successUrl: '/login?registered=true' };
   }
 }
@@ -86,8 +113,6 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
     return { error: "El número de cédula ya está registrado." };
   }
 
-  // In a real application, you would create the user in the database here.
-  console.log(`New cobrador registration:`, validatedFields.data.name, idNumber);
   users[idNumber] = 'cobrador';
   userPasswords[idNumber] = password;
 
@@ -99,7 +124,6 @@ export async function deleteCobrador(idNumber: string): Promise<{ error?: string
     return { error: "El cobrador no existe o no se puede eliminar." };
   }
 
-  // In a real app, delete from DB. Here, we delete from our mock objects.
   delete users[idNumber];
   delete userPasswords[idNumber];
   
@@ -115,7 +139,6 @@ export async function getLoggedInUser() {
 }
 
 export async function logout() {
-    // Clear the session cookie
     cookies().set('loggedInUser', '', { expires: new Date(0), path: '/' });
     redirect('/login');
 }
