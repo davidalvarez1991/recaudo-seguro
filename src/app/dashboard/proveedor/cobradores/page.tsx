@@ -9,10 +9,10 @@ import Link from "next/link";
 
 
 const cobradores = [
-  { id: "1", idNumber: "987654321", status: "Activo" },
-  { id: "2", idNumber: "123123123", status: "Inactivo" },
-  { id: "3", idNumber: "456456456", status: "Activo" },
-  { id: "4", idNumber: "789456", status: "Activo" },
+  { id: "1", name: "Carlos Ramirez", idNumber: "987654321", status: "Activo" },
+  { id: "2", name: "Ana Torres", idNumber: "123123123", status: "Inactivo" },
+  { id: "3", name: "Luis Guzman", idNumber: "456456456", status: "Activo" },
+  { id: "4", name: "Sofia Castro", idNumber: "789456", status: "Activo" },
 ];
 
 export default function GestionCobradoresPage() {
@@ -40,15 +40,15 @@ export default function GestionCobradoresPage() {
             <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>#</TableHead>
+                    <TableHead>Nombre del Cobrador</TableHead>
                     <TableHead>Número de Identificación</TableHead>
                     <TableHead>Estado</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {cobradores.map((cobrador, index) => (
+                  {cobradores.map((cobrador) => (
                     <TableRow key={cobrador.id}>
-                      <TableCell>{index + 1}</TableCell>
+                      <TableCell>{cobrador.name}</TableCell>
                       <TableCell>{cobrador.idNumber}</TableCell>
                       <TableCell>{cobrador.status}</TableCell>
                     </TableRow>
