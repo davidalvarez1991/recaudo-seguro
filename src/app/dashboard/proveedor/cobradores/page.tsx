@@ -22,22 +22,24 @@ export default function GestionCobradoresPage() {
           </CardHeader>
           <CardContent className="pt-6">
             <Card>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>#</TableHead>
-                  <TableHead>Número de Identificación</TableHead>
-                  <TableHead>Estado</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {cobradores.map((cobrador, index) => (
-                  <TableRow key={cobrador.id}>
-                    <TableCell>{index + 1}</TableCell>
-                    <TableCell>{cobrador.idNumber}</TableCell>
-                    <TableCell>{cobrador.status}</TableCell>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>#</TableHead>
+                    <TableHead>Número de Identificación</TableHead>
+                    <TableHead>Estado</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
+                </TableHeader>
+                <TableBody>
+                  {cobradores.map((cobrador, index) => (
+                    <TableRow key={cobrador.id}>
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell>{cobrador.idNumber}</TableCell>
+                      <TableCell>{cobrador.status}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </Card>
           </CardContent>
         </Card>
