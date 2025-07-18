@@ -31,7 +31,7 @@ export async function login(values: z.infer<typeof LoginSchema>) {
   return { error: "Credenciales inválidas." };
 }
 
-export async function register(values: z.infer<typeof RegisterSchema>, role: "cliente" | "proveedor" | "cobrador"): Promise<{ error?: string; successUrl?: string }> {
+export async function register(values: z.infer<typeof RegisterSchema>, role: "cliente" | "proveedor" | "cobrador"): Promise<{ error?: string; successUrl?: string; success?: boolean; }> {
   const validatedFields = RegisterSchema.safeParse(values);
 
   if (!validatedFields.success) {
@@ -50,14 +50,16 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
   console.log(`New ${role} registration:`, validatedFields.data.idNumber, validatedFields.data.email);
   users[validatedFields.data.idNumber] = role;
 
+  if (role === 'cobrador') {
+    return { success: true };
+  }
+  
   if (role === "proveedor") {
     // Return a success URL for the component to handle redirection.
-    return { successUrl: `/dashboard/proveedor` };
-  } else if (role === "cobrador") {
-    return { successUrl: `/dashboard/cobrador` };
+    return { success: true, successUrl: `/dashboard/proveedor` };
   } else {
     // Return a success URL for other roles.
-    return { successUrl: '/login?registered=true' };
+    return { success: true, successUrl: '/login?registered=true' };
   }
 }
 

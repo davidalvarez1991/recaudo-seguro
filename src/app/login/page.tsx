@@ -22,11 +22,6 @@ function LoginPageContent() {
               Regístrate aquí
             </Link>
           </p>
-           <p>¿Eres un cobrador?{" "}
-            <Link href="/register/cobrador" className="font-semibold underline text-primary hover:text-primary/80">
-              Regístrate aquí
-            </Link>
-          </p>
         </div>
       </AuthCard>
     </main>

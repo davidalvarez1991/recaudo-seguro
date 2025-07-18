@@ -22,9 +22,10 @@ import { useRouter } from "next/navigation";
 
 type RegistrationFormProps = {
   role: "cliente" | "proveedor" | "cobrador";
+  showSuccessToast?: boolean;
 };
 
-export function RegistrationForm({ role }: RegistrationFormProps) {
+export function RegistrationForm({ role, showSuccessToast = false }: RegistrationFormProps) {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
   const router = useRouter();
@@ -50,24 +51,26 @@ export function RegistrationForm({ role }: RegistrationFormProps) {
              description: result.error,
              variant: "destructive",
            });
-        } else if (result?.successUrl) {
+        } else if (result?.success) {
+          if (showSuccessToast) {
+            toast({
+              title: "Registro Exitoso",
+              description: `El perfil de ${role} ha sido creado.`,
+              variant: "default",
+              className: "bg-accent text-accent-foreground border-accent",
+            });
+            form.reset();
+          } else if (result?.successUrl) {
             router.push(result.successUrl);
+          }
         }
       } catch (error) {
          const result = error as { error?: string };
-         if (result?.error) {
-            toast({
-              title: "Error de registro",
-              description: result.error,
-              variant: "destructive",
-            });
-         } else {
-            toast({
-              title: "Error",
-              description: "Algo salió mal. Por favor, inténtalo de nuevo.",
-              variant: "destructive",
-            });
-         }
+         toast({
+            title: "Error",
+            description: result?.error || "Algo salió mal. Por favor, inténtalo de nuevo.",
+            variant: "destructive",
+          });
        }
     });
   };
