@@ -31,11 +31,18 @@ export async function login(values: z.infer<typeof LoginSchema>) {
   return { error: "Credenciales inválidas." };
 }
 
-export async function register(values: z.infer<typeof RegisterSchema>, role: "cliente" | "proveedor"): Promise<{ error?: string; successUrl?: string }> {
+export async function register(values: z.infer<typeof RegisterSchema>, role: "cliente" | "proveedor" | "cobrador"): Promise<{ error?: string; successUrl?: string }> {
   const validatedFields = RegisterSchema.safeParse(values);
 
   if (!validatedFields.success) {
     return { error: "Campos inválidos. Por favor, revisa los datos." };
+  }
+
+  if (role === 'cobrador') {
+    const cobradoresCount = Object.values(users).filter(userRole => userRole === 'cobrador').length;
+    if (cobradoresCount >= 5) {
+      return { error: "Se ha alcanzado el límite máximo de perfiles de cobrador." };
+    }
   }
 
   // In a real application, you would create the user in the database here.
@@ -46,6 +53,8 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: "cl
   if (role === "proveedor") {
     // Return a success URL for the component to handle redirection.
     return { successUrl: `/dashboard/proveedor` };
+  } else if (role === "cobrador") {
+    return { successUrl: `/dashboard/cobrador` };
   } else {
     // Return a success URL for other roles.
     return { successUrl: '/login?registered=true' };

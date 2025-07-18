@@ -21,7 +21,7 @@ import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 type RegistrationFormProps = {
-  role: "cliente" | "proveedor";
+  role: "cliente" | "proveedor" | "cobrador";
 };
 
 export function RegistrationForm({ role }: RegistrationFormProps) {
