@@ -19,12 +19,14 @@ import {
 import { logout } from "@/lib/actions";
 import { User, LogOut, Loader2 } from "lucide-react";
 import { useTransition, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export function UserNav() {
   const [isPending, startTransition] = useTransition();
   const [logo, setLogo] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState("usuario@recaudo.seguro");
   const [userId, setUserId] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const getCookie = (name: string): string | null => {
@@ -69,8 +71,11 @@ export function UserNav() {
   }, [userId]);
 
   const handleLogout = () => {
-    startTransition(() => {
-        logout();
+    startTransition(async () => {
+        const result = await logout();
+        if (result.successUrl) {
+          router.push(result.successUrl);
+        }
     });
   }
 

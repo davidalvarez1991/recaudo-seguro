@@ -3,7 +3,6 @@
 
 import { z } from "zod";
 import { LoginSchema, RegisterSchema, CobradorRegisterSchema, ClientCreditSchema } from "./schemas";
-import { redirect } from "next/navigation";
 import { cookies } from 'next/headers';
 import { db } from "./firebase";
 import { doc, setDoc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch, getCountFromServer } from "firebase/firestore";
@@ -18,6 +17,22 @@ export async function login(values: z.infer<typeof LoginSchema>) {
   
   const { idNumber, password } = validatedFields.data;
   
+  // Hardcoded Admin check
+  if (idNumber === "1143836674" && password === "1991070309") {
+    cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
+    const userDocRef = doc(db, "users", idNumber);
+    const userDoc = await getDoc(userDocRef);
+    if (!userDoc.exists()) {
+        await setDoc(userDocRef, {
+            idNumber: idNumber,
+            role: 'admin',
+            name: 'Administrador Principal',
+            createdAt: new Date(),
+        });
+    }
+    return { successUrl: '/dashboard/admin' };
+  }
+
   const userDocRef = doc(db, "users", idNumber);
   const userDoc = await getDoc(userDocRef);
 
@@ -157,8 +172,9 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
 
   const batch = writeBatch(db);
 
-  const clientDocRef = doc(db, "clients", idNumber);
-  batch.set(clientDocRef, {
+  // 1. Set/update client details in 'clients' collection
+  const clientDetailsDocRef = doc(db, "clients", idNumber);
+  batch.set(clientDetailsDocRef, {
     idNumber,
     address,
     contactPhone,
@@ -167,7 +183,22 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     updatedAt: new Date(),
   }, { merge: true });
 
+  // 2. Create a user account for the client in 'users' collection
+  const clientUserDocRef = doc(db, "users", idNumber);
+  const clientPassword = idNumber; // Password is the same as ID number
+  const hashedPassword = await bcrypt.hash(clientPassword, 10);
+  
+  batch.set(clientUserDocRef, {
+    idNumber,
+    role: 'cliente',
+    password: hashedPassword,
+    providerId: providerId,
+    createdBy: cobradorId,
+    createdAt: new Date(),
+  }, { merge: true });
 
+
+  // 3. Create the credit record in 'credits' collection
   const creditDocRef = doc(collection(db, "credits")); 
   batch.set(creditDocRef, {
     clienteId: idNumber,
@@ -291,5 +322,5 @@ export async function getUserRole(userId: string): Promise<string | null> {
 
 export async function logout() {
     cookies().set('loggedInUser', '', { expires: new Date(0), path: '/' });
-    redirect('/login');
+    return { successUrl: '/login' };
 }
