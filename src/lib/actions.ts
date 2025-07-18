@@ -69,7 +69,7 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
   }
 
   // In a real application, you would create the user in the database here.
-  console.log(`New cobrador registration:`, validatedFields.data.idNumber);
+  console.log(`New cobrador registration:`, validatedFields.data.name, validatedFields.data.idNumber);
   users[idNumber] = 'cobrador';
 
   return { success: true };

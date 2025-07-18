@@ -32,6 +32,9 @@ export const RegisterSchema = z.object({
 
 
 export const CobradorRegisterSchema = z.object({
+  name: z.string().min(3, {
+    message: "El nombre debe tener al menos 3 caracteres."
+  }),
   idNumber: z.string().min(6, {
     message: "El número de identificación debe tener al menos 6 caracteres.",
   }),

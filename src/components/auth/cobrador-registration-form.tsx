@@ -30,6 +30,7 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
   const form = useForm<z.infer<typeof CobradorRegisterSchema>>({
     resolver: zodResolver(CobradorRegisterSchema),
     defaultValues: {
+      name: "",
       idNumber: "",
       password: "",
     },
@@ -69,6 +70,19 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
+        <FormField
+          control={form.control}
+          name="name"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Nombre del Cobrador</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="John Doe" disabled={isPending} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <FormField
           control={form.control}
           name="idNumber"
