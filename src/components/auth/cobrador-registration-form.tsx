@@ -32,6 +32,7 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
     resolver: zodResolver(CobradorRegisterSchema),
     defaultValues: {
       name: "",
+      idNumber: "",
       password: "",
     },
   });
@@ -55,7 +56,7 @@ export function CobradorRegistrationForm({ onFormSubmit }: CobradorRegistrationF
               variant: "default",
               className: "bg-accent text-accent-foreground border-accent",
             });
-            form.reset();
+            form.reset({ name: "", idNumber: "", password: "" });
             onFormSubmit?.();
         }
       } catch (error) {
