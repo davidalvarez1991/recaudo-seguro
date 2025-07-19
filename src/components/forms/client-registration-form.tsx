@@ -39,15 +39,16 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       contactPhone: "",
       guarantorName: "",
       guarantorPhone: "",
-      creditAmount: "" as any, // Initialize with empty string to avoid NaN
-      installments: "" as any, // Initialize with empty string to avoid NaN
+      creditAmount: "" as any,
+      installments: "" as any,
       documents: undefined,
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof ClientCreditSchema>) => {
+  const onSubmit = async () => {
     if (!formRef.current) return;
     
+    // Create FormData directly from the form element to ensure file data is correct
     const formData = new FormData(formRef.current);
     
     startTransition(async () => {
@@ -77,6 +78,10 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
 
   return (
     <Form {...form}>
+      {/* 
+        We use form.handleSubmit to trigger validation, but our custom onSubmit
+        will handle the actual form data submission.
+      */}
       <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <ScrollArea className="h-96 w-full pr-6">
             <div className="space-y-4">
@@ -198,14 +203,14 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 <FormField
                     control={form.control}
                     name="documents"
-                    render={({ field }) => (
+                    render={() => (
                         <FormItem>
                             <FormLabel>Cargar Documentos</FormLabel>
                             <FormControl>
                                 <div className="relative">
                                     <UploadCloud className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                     <Input 
-                                        {...form.register('documents')}
+                                        name="documents" // Ensure name attribute is present for FormData
                                         type="file" 
                                         multiple
                                         className="pl-8"
@@ -227,5 +232,3 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
-
-    
