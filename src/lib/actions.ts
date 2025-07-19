@@ -299,11 +299,33 @@ export async function getCreditsByProvider() {
     
     try {
         const querySnapshot = await getDocs(q);
-        const credits = querySnapshot.docs.map(doc => ({
+        const creditsData = querySnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
-        })) as any[]; 
-        return credits;
+        })) as any[];
+
+        const enrichedData = await Promise.all(creditsData.map(async (credit) => {
+            let clienteName = 'Cliente no encontrado';
+            let cobradorName = 'Cobrador no encontrado';
+
+            if (credit.clienteId) {
+                const clientDocRef = doc(db, "users", credit.clienteId);
+                const clientDoc = await getDoc(clientDocRef);
+                if (clientDoc.exists()) {
+                    clienteName = clientDoc.data().name || 'Nombre no disponible';
+                }
+            }
+            if (credit.cobradorId) {
+                const cobradorDocRef = doc(db, "users", credit.cobradorId);
+                const cobradorDoc = await getDoc(cobradorDocRef);
+                if (cobradorDoc.exists()) {
+                    cobradorName = cobradorDoc.data().name || 'Nombre no disponible';
+                }
+            }
+            return { ...credit, clienteName, cobradorName };
+        }));
+        
+        return enrichedData;
     } catch (error) {
         console.error("Error fetching provider credits:", error);
         return [];

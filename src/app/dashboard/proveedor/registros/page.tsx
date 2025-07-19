@@ -10,10 +10,13 @@ import { getCreditsByProvider } from "@/lib/actions";
 type Registro = {
   id: string;
   cobradorId: string;
+  cobradorName?: string;
   clienteId: string;
+  clienteName?: string;
   tipo: string;
   valor: number;
   fecha: string;
+  formattedDate?: string;
 };
 
 export default async function RegistrosPage() {
@@ -21,12 +24,8 @@ export default async function RegistrosPage() {
 
   const formattedRecords = allActivityRecords
     .map((credito) => ({
-      id: credito.id,
-      cobradorId: credito.cobradorId,
-      clienteId: credito.clienteId,
+      ...credito,
       tipo: "Creación Crédito",
-      valor: credito.valor,
-      fecha: credito.fecha,
       formattedDate: new Date(credito.fecha).toLocaleDateString('es-CO', {
         year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
       }),
@@ -57,8 +56,8 @@ export default async function RegistrosPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Fecha</TableHead>
-                  <TableHead>ID Cobrador</TableHead>
-                  <TableHead>ID Cliente</TableHead>
+                  <TableHead>Cobrador</TableHead>
+                  <TableHead>Cliente</TableHead>
                   <TableHead>Tipo de Registro</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                 </TableRow>
@@ -67,8 +66,14 @@ export default async function RegistrosPage() {
                 {formattedRecords.map((registro) => (
                   <TableRow key={registro.id}>
                     <TableCell>{registro.formattedDate}</TableCell>
-                    <TableCell>{registro.cobradorId}</TableCell>
-                    <TableCell>{registro.clienteId}</TableCell>
+                    <TableCell>
+                        <div className="font-medium">{registro.cobradorName || 'Nombre no disponible'}</div>
+                        <div className="text-sm text-muted-foreground">ID: {registro.cobradorId}</div>
+                    </TableCell>
+                    <TableCell>
+                        <div className="font-medium">{registro.clienteName || 'Nombre no disponible'}</div>
+                        <div className="text-sm text-muted-foreground">CC: {registro.clienteId}</div>
+                    </TableCell>
                     <TableCell>
                       <Badge variant={'default'}>
                         {registro.tipo}
