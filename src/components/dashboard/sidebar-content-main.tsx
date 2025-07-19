@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -8,7 +7,7 @@ import {
   SidebarMenuButton,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Home, Settings, ClipboardList, Users, HandCoins } from "lucide-react";
+import { Home, Settings, ClipboardList, Users, HandCoins, LayoutDashboard } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -26,7 +25,7 @@ export function SidebarContentMain({ role }: SidebarContentMainProps) {
     }
   };
   
-  const isActive = (path: string) => pathname === path || (path !== `/dashboard/${role}` && pathname.startsWith(path));
+  const isActive = (path: string) => pathname === path;
 
   if (role === 'proveedor') {
     return (
@@ -35,7 +34,7 @@ export function SidebarContentMain({ role }: SidebarContentMainProps) {
           <SidebarMenuItem>
              <SidebarMenuButton
               asChild
-              isActive={isActive(`/dashboard/proveedor`)}
+              isActive={pathname === `/dashboard/proveedor`}
               tooltip="Inicio"
               onClick={handleLinkClick}
             >
@@ -125,9 +124,11 @@ export function SidebarContentMain({ role }: SidebarContentMainProps) {
             </SidebarMenuItem>
             
             <SidebarMenuItem>
-               <SidebarMenuButton tooltip="Configuración" onClick={handleLinkClick}>
-                <Settings />
-                <span>Configuración</span>
+               <SidebarMenuButton asChild isActive={isActive(`/dashboard/cobrador/settings`)} tooltip="Configuración" onClick={handleLinkClick}>
+                <Link href={`/dashboard/cobrador/settings`}>
+                    <Settings />
+                    <span>Configuración</span>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -143,20 +144,22 @@ export function SidebarContentMain({ role }: SidebarContentMainProps) {
            <SidebarMenuButton
             asChild
             isActive={isActive(`/dashboard/cliente`)}
-            tooltip="Inicio"
+            tooltip="Panel de Cliente"
             onClick={handleLinkClick}
           >
             <Link href={`/dashboard/cliente`}>
-              <Home />
-              <span>Inicio</span>
+              <LayoutDashboard />
+              <span>Panel de Cliente</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
         
         <SidebarMenuItem>
-           <SidebarMenuButton tooltip="Configuración" onClick={handleLinkClick}>
-            <Settings />
-            <span>Configuración</span>
+           <SidebarMenuButton asChild isActive={isActive(`/dashboard/cliente/settings`)} tooltip="Configuración" onClick={handleLinkClick}>
+            <Link href={`/dashboard/cliente/settings`}>
+                <Settings />
+                <span>Configuración</span>
+            </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>
