@@ -148,7 +148,6 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
 export async function createClientAndCredit(formData: FormData) {
   const rawData = Object.fromEntries(formData.entries());
   
-  // Exclude files from initial validation, they're handled separately.
   const validatedFields = ClientCreditSchema.omit({ documents: true }).safeParse(rawData);
 
   if (!validatedFields.success) {
