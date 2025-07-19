@@ -4,12 +4,28 @@ import { Button } from "@/components/ui/button";
 import { UserPlus, Eye } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
-import { getCobradoresByProvider } from "@/lib/actions";
+import { getCobradoresByProvider, getUserData } from "@/lib/actions";
 import { CobradorRegistrationModal } from "@/components/proveedor/cobrador-registration-modal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cookies } from "next/headers";
 
+type UserData = {
+    companyName?: string;
+    [key: string]: any;
+} | null;
 
 export default async function ProveedorDashboard() {
+  const cookieStore = cookies();
+  const userId = cookieStore.get('loggedInUser')?.value;
+  
+  let companyName = "Perfil de Proveedor";
+  if (userId) {
+    const userData: UserData = await getUserData(userId);
+    if (userData && userData.companyName) {
+      companyName = userData.companyName;
+    }
+  }
+
   const cobradores = await getCobradoresByProvider();
   const cobradoresCount = cobradores.length;
   const canCreateCobrador = cobradoresCount < 5;
@@ -51,8 +67,8 @@ export default async function ProveedorDashboard() {
       <CardHeader>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="space-y-1">
-                <CardTitle className="text-3xl">Perfil de Proveedor</CardTitle>
-                <CardDescription>Bienvenido a tu panel de proveedor.</CardDescription>
+                <CardTitle className="text-3xl">{companyName}</CardTitle>
+                <CardDescription>Bienvenido a tu panel de gestión.</CardDescription>
             </div>
         </div>
       </CardHeader>
