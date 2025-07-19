@@ -43,15 +43,8 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   });
 
   const onSubmit = (values: z.infer<typeof ClientCreditSchema>) => {
-    const formData = new FormData();
-    Object.entries(values).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-          formData.append(key, String(value));
-      }
-    });
-
     startTransition(async () => {
-        const result = await createClientAndCredit(formData);
+        const result = await createClientAndCredit(values);
 
         if (result.success) {
           toast({

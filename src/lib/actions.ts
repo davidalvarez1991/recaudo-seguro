@@ -6,7 +6,6 @@ import { LoginSchema, RegisterSchema, CobradorRegisterSchema, ClientCreditSchema
 import { cookies } from 'next/headers';
 import { db, storage } from "./firebase";
 import { doc, setDoc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch, getCountFromServer, updateDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import bcrypt from 'bcryptjs';
 
 export async function login(values: z.infer<typeof LoginSchema>) {
@@ -141,18 +140,15 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
 
     return { success: `El perfil de cobrador para ${name} ha sido creado.` };
   } catch (error) {
-    console.error("Error al registrar cobrador:", error);
     return { error: "No se pudo crear la cuenta del cobrador en la base de datos." };
   }
 }
 
 
-export async function createClientAndCredit(formData: FormData) {
-  const values = Object.fromEntries(formData.entries());
+export async function createClientAndCredit(values: z.infer<typeof ClientCreditSchema>) {
   const validatedFields = ClientCreditSchema.safeParse(values);
 
   if (!validatedFields.success) {
-    console.error(validatedFields.error.flatten().fieldErrors);
     return { error: "Campos inválidos. Por favor, revisa los datos." };
   }
 
@@ -201,7 +197,6 @@ export async function createClientAndCredit(formData: FormData) {
     await batch.commit();
     return { success: true };
   } catch (e) {
-    console.error("Error creating client and credit:", e);
     return { error: "No se pudo registrar el crédito. Inténtalo de nuevo." };
   }
 }
@@ -235,7 +230,6 @@ export async function getCreditsByCobrador() {
         
         return creditsWithClientNames;
     } catch (error) {
-        console.error("Error fetching credits:", error);
         return [];
     }
 }
@@ -269,7 +263,6 @@ export async function getCobradoresByProvider() {
         });
         return cobradores;
     } catch (error) {
-        console.error("Error fetching cobradores:", error);
         return [];
     }
 }
@@ -312,7 +305,6 @@ export async function getCreditsByProvider() {
         
         return enrichedData;
     } catch (error) {
-        console.error("Error fetching provider credits:", error);
         return [];
     }
 }
@@ -393,7 +385,6 @@ export async function updateCobrador(values: z.infer<typeof EditCobradorSchema>)
     await batch.commit();
     return { success: "El perfil del cobrador ha sido actualizado." };
   } catch (error) {
-    console.error("Error updating cobrador:", error);
     return { error: "No se pudo actualizar el perfil del cobrador." };
   }
 }
@@ -427,7 +418,6 @@ export async function deleteClientAndCredits(clienteId: string) {
     await batch.commit();
     return { success: true };
   } catch (error) {
-    console.error("Error deleting client and their credits:", error);
     return { error: "Ocurrió un error al eliminar al cliente y sus datos." };
   }
 }
@@ -448,7 +438,6 @@ export async function getUserData(userId: string) {
       }
       return null;
     } catch (error) {
-      console.error("Error fetching user data:", error);
       return null;
     }
 }
