@@ -7,6 +7,7 @@ import { cookies } from 'next/headers';
 import { db, storage } from "./firebase";
 import { doc, setDoc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch, getCountFromServer, updateDoc } from "firebase/firestore";
 import bcrypt from 'bcryptjs';
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 export async function login(values: z.infer<typeof LoginSchema>) {
   const validatedFields = LoginSchema.safeParse(values);
@@ -144,15 +145,16 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
   }
 }
 
-
-export async function createClientAndCredit(values: z.infer<typeof ClientCreditSchema>) {
+export async function createClientAndCredit(formData: FormData) {
+  const values = Object.fromEntries(formData.entries());
   const validatedFields = ClientCreditSchema.safeParse(values);
 
   if (!validatedFields.success) {
     return { error: "Campos inválidos. Por favor, revisa los datos." };
   }
 
-  const { idNumber, name, address, contactPhone, guarantorPhone, creditAmount, installments } = validatedFields.data;
+  const { idNumber, name, address, contactPhone, guarantorName, guarantorPhone, creditAmount, installments } = validatedFields.data;
+  const documentFiles = formData.getAll('documents') as File[];
   
   const cookieStore = cookies();
   const cobradorId = cookieStore.get('loggedInUser')?.value;
@@ -168,17 +170,36 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
   if (!providerId) {
     return { error: "No se pudo encontrar el proveedor asociado al cobrador." };
   }
+  
+  const documentUrls: string[] = [];
+  if (documentFiles && documentFiles.length > 0 && documentFiles[0].size > 0) {
+    for (const file of documentFiles) {
+        if (!(file instanceof File) || file.size === 0) continue;
+
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const fileRef = ref(storage, `documents/${idNumber}/${file.name}`);
+        
+        try {
+            await uploadBytes(fileRef, buffer);
+            const downloadURL = await getDownloadURL(fileRef);
+            documentUrls.push(downloadURL);
+        } catch (uploadError) {
+            return { error: `No se pudo subir el archivo ${file.name}.` };
+        }
+    }
+  }
 
   const batch = writeBatch(db);
 
-  // Guardar solo en la colección 'clients', no en 'users'.
   const clientDetailsDocRef = doc(db, "clients", idNumber);
   batch.set(clientDetailsDocRef, {
     idNumber,
     name,
     address,
     contactPhone,
+    guarantorName,
     guarantorPhone,
+    documentUrls,
     providerId: providerId,
     updatedAt: new Date(),
   }, { merge: true });

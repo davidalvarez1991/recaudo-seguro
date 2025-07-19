@@ -14,9 +14,9 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useTransition } from "react";
+import { useTransition, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, DollarSign, UploadCloud } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ClientCreditSchema } from "@/lib/schemas";
 import { createClientAndCredit } from "@/lib/actions";
@@ -28,6 +28,7 @@ type ClientRegistrationFormProps = {
 export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormProps) {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
+  const formRef = useRef<HTMLFormElement>(null);
 
   const form = useForm<z.infer<typeof ClientCreditSchema>>({
     resolver: zodResolver(ClientCreditSchema),
@@ -36,15 +37,21 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       name: "",
       address: "",
       contactPhone: "",
+      guarantorName: "",
       guarantorPhone: "",
       creditAmount: undefined,
       installments: undefined,
+      documents: undefined,
     },
   });
 
-  const onSubmit = (values: z.infer<typeof ClientCreditSchema>) => {
+  const onSubmit = async (values: z.infer<typeof ClientCreditSchema>) => {
+    if (!formRef.current) return;
+    
+    const formData = new FormData(formRef.current);
+    
     startTransition(async () => {
-        const result = await createClientAndCredit(values);
+        const result = await createClientAndCredit(formData);
 
         if (result.success) {
           toast({
@@ -70,7 +77,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <ScrollArea className="h-96 w-full pr-6">
             <div className="space-y-4">
                 <FormField
@@ -128,6 +135,20 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name="guarantorName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nombre del Fiador</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Jane Smith" disabled={isPending} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 
                 <FormField
                   control={form.control}
@@ -149,9 +170,12 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Valor del Crédito</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="number" placeholder="500000" disabled={isPending} onChange={e => field.onChange(e.target.valueAsNumber)} value={field.value ?? ""} />
-                      </FormControl>
+                        <div className="relative">
+                            <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <FormControl>
+                                <Input {...field} type="number" placeholder="500.000" disabled={isPending} onChange={e => field.onChange(e.target.valueAsNumber)} value={field.value ?? ""} className="pl-8"/>
+                            </FormControl>
+                        </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -169,6 +193,29 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                       <FormMessage />
                     </FormItem>
                   )}
+                />
+
+                <FormField
+                    control={form.control}
+                    name="documents"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Cargar Documentos</FormLabel>
+                            <FormControl>
+                                <div className="relative">
+                                    <UploadCloud className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input 
+                                        {...form.register('documents')}
+                                        type="file" 
+                                        multiple
+                                        className="pl-8"
+                                        disabled={isPending}
+                                    />
+                                </div>
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
                 />
             </div>
         </ScrollArea>

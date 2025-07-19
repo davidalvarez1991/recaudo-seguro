@@ -1,3 +1,4 @@
+
 import { z } from "zod";
 
 export const LoginSchema = z.object({
@@ -50,9 +51,11 @@ export const ClientCreditSchema = z.object({
   name: z.string().min(3, "El nombre completo es obligatorio."),
   address: z.string().min(5, "La dirección es obligatoria."),
   contactPhone: z.string().min(10, "El teléfono debe tener 10 dígitos."),
+  guarantorName: z.string().min(3, "El nombre del fiador es obligatorio."),
   guarantorPhone: z.string().min(10, "El teléfono del fiador debe tener 10 dígitos."),
   creditAmount: z.coerce.number().min(1, "El valor del crédito es obligatorio."),
   installments: z.coerce.number().min(1, "El número de cuotas es obligatorio."),
+  documents: z.any().optional(),
 });
 
 export const EditCobradorSchema = z.object({
