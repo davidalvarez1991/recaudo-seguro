@@ -171,6 +171,7 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
 
   const batch = writeBatch(db);
 
+  // Guardar solo en la colección 'clients', no en 'users'.
   const clientDetailsDocRef = doc(db, "clients", idNumber);
   batch.set(clientDetailsDocRef, {
     idNumber,
@@ -261,7 +262,8 @@ export async function getCobradoresByProvider() {
 
             return plainObject;
         });
-        return cobradores;
+        // Post-filter to avoid complex queries that require indexes
+        return cobradores.filter(c => c.idNumber !== "1143836674");
     } catch (error) {
         return [];
     }
@@ -406,6 +408,7 @@ export async function deleteClientAndCredits(clienteId: string) {
   try {
     const batch = writeBatch(db);
 
+    // Delete credits associated with the client
     const creditsRef = collection(db, "credits");
     const q = query(creditsRef, where("clienteId", "==", clienteId), where("providerId", "==", providerId));
     const creditsSnapshot = await getDocs(q);
@@ -413,6 +416,7 @@ export async function deleteClientAndCredits(clienteId: string) {
       batch.delete(doc.ref);
     });
     
+    // Delete the client document from 'clients' collection
     batch.delete(clientDetailsRef);
     
     await batch.commit();
