@@ -2,8 +2,7 @@
 "use client";
 
 import { SidebarContentAdmin } from "@/components/dashboard/sidebar-content-admin";
-import { SidebarContentClient } from "@/components/dashboard/sidebar-content-client";
-import { SidebarContentProveedor } from "@/components/dashboard/sidebar-content-proveedor";
+import { SidebarContentMain } from "@/components/dashboard/sidebar-content-main";
 import { useRouter } from "next/navigation";
 
 type SidebarContentProps = {
@@ -17,11 +16,13 @@ export function SidebarContent({ role }: SidebarContentProps) {
     case 'admin':
       return <SidebarContentAdmin />;
     case 'proveedor':
-      return <SidebarContentProveedor />;
     case 'cobrador':
-      return <SidebarContentClient role="cobrador" />;
+      return <SidebarContentMain role={role} />;
     case 'cliente':
-      return <SidebarContentClient role="cliente" />;
+        // For now, redirect or show a minimal sidebar if a client logs in
+        // Since their dashboard is simple.
+        // Let's reuse the main for now with a client case.
+         return <SidebarContentMain role={role} />;
     default:
       if (typeof window !== 'undefined') {
         router.push('/login');
