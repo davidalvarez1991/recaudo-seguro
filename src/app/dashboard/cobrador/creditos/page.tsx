@@ -62,7 +62,10 @@ export default async function CreditosPage() {
                   {formattedCreditos.map((credito) => (
                     <TableRow key={credito.id}>
                       <TableCell>{credito.formattedDate}</TableCell>
-                      <TableCell>{credito.clienteName || credito.clienteId}</TableCell>
+                      <TableCell>
+                        <div className="font-medium">{credito.clienteName || 'Nombre no disponible'}</div>
+                        <div className="text-sm text-muted-foreground">CC: {credito.clienteId}</div>
+                      </TableCell>
                       <TableCell className="text-right">
                         {`$${credito.valor.toLocaleString('es-CO')}`}
                       </TableCell>
