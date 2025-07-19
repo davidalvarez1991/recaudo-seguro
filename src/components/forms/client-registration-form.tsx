@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useTransition, useRef } from "react";
+import { useTransition } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, DollarSign, UploadCloud } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -28,7 +28,6 @@ type ClientRegistrationFormProps = {
 export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormProps) {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
-  const formRef = useRef<HTMLFormElement>(null);
 
   const form = useForm<z.infer<typeof ClientCreditSchema>>({
     resolver: zodResolver(ClientCreditSchema),
@@ -45,11 +44,11 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     },
   });
 
-  const onSubmit = async (formData: FormData) => {
+  const clientAction = async (formData: FormData) => {
     startTransition(async () => {
         const result = await createClientAndCredit(formData);
 
-        if (result.success) {
+        if (result && result.success) {
           toast({
             title: "Registro Exitoso",
             description: "El cliente y su crédito han sido creados correctamente.",
@@ -61,19 +60,25 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
           }
           form.reset();
           onFormSubmit?.();
-        } else {
+        } else if (result && result.error) {
            toast({
             title: "Error en el registro",
-            description: result.error || "No se pudo completar la operación.",
+            description: result.error,
             variant: "destructive",
           });
+        } else {
+            toast({
+                title: "Error inesperado",
+                description: "Ocurrió un problema al procesar la solicitud.",
+                variant: "destructive",
+            });
         }
     });
   };
 
   return (
     <Form {...form}>
-      <form ref={formRef} action={onSubmit} className="space-y-4">
+      <form action={clientAction} className="space-y-4">
         <ScrollArea className="h-96 w-full pr-6">
             <div className="space-y-4">
                 <FormField
