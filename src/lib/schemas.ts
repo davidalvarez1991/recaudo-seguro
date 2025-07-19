@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+
+
 export const LoginSchema = z.object({
   idNumber: z.string().min(1, {
     message: "El número de cédula es obligatorio.",
@@ -51,7 +55,14 @@ export const ClientCreditSchema = z.object({
   address: z.string().min(5, "La dirección es obligatoria."),
   contactPhone: z.string().min(10, "El teléfono debe tener 10 dígitos."),
   guarantorPhone: z.string().min(10, "El teléfono del fiador debe tener 10 dígitos."),
-  idCardPhoto: z.any().refine(files => files?.length > 0, "La foto de la cédula es obligatoria.").optional(),
+  idCardPhoto: z
+    .any()
+    .refine((file) => file instanceof File && file.size > 0, "La foto de la cédula es obligatoria.")
+    .refine((file) => file?.size <= MAX_FILE_SIZE, `El tamaño máximo de la imagen es 5MB.`)
+    .refine(
+      (file) => ACCEPTED_IMAGE_TYPES.includes(file?.type),
+      "Solo se aceptan formatos .jpg, .jpeg, .png y .webp."
+    ).optional().or(z.literal("")),
   creditAmount: z.coerce.number().min(1, "El valor del crédito es obligatorio."),
   installments: z.coerce.number().min(1, "El número de cuotas es obligatorio."),
 });

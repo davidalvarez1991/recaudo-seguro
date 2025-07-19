@@ -4,8 +4,9 @@
 import { z } from "zod";
 import { LoginSchema, RegisterSchema, CobradorRegisterSchema, ClientCreditSchema, EditCobradorSchema } from "./schemas";
 import { cookies } from 'next/headers';
-import { db } from "./firebase";
+import { db, storage } from "./firebase";
 import { doc, setDoc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch, getCountFromServer, updateDoc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import bcrypt from 'bcryptjs';
 
 export async function login(values: z.infer<typeof LoginSchema>) {
@@ -146,14 +147,16 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
 }
 
 
-export async function createClientAndCredit(values: z.infer<typeof ClientCreditSchema>) {
+export async function createClientAndCredit(formData: FormData) {
+  const values = Object.fromEntries(formData.entries());
   const validatedFields = ClientCreditSchema.safeParse(values);
 
   if (!validatedFields.success) {
+    console.error(validatedFields.error.flatten().fieldErrors);
     return { error: "Campos inválidos. Por favor, revisa los datos." };
   }
-  
-  const { idNumber, name, address, contactPhone, guarantorPhone, creditAmount, installments } = validatedFields.data;
+
+  const { idNumber, name, address, contactPhone, guarantorPhone, creditAmount, installments, idCardPhoto } = validatedFields.data;
   
   const cookieStore = cookies();
   const cobradorId = cookieStore.get('loggedInUser')?.value;
@@ -161,18 +164,29 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
   if (!cobradorId) {
     return { error: "El cobrador no está autenticado." };
   }
-  
+
   const cobradorDocRef = doc(db, "users", cobradorId);
   const cobradorDoc = await getDoc(cobradorDocRef);
   const providerId = cobradorDoc.exists() ? cobradorDoc.data().providerId : null;
 
   if (!providerId) {
-      return { error: "No se pudo encontrar el proveedor asociado al cobrador." };
+    return { error: "No se pudo encontrar el proveedor asociado al cobrador." };
+  }
+
+  let imageUrl = "";
+  if (idCardPhoto && idCardPhoto.size > 0) {
+    try {
+      const storageRef = ref(storage, `id_cards/${idNumber}-${Date.now()}`);
+      const snapshot = await uploadBytes(storageRef, idCardPhoto);
+      imageUrl = await getDownloadURL(snapshot.ref);
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      return { error: "No se pudo subir la imagen. Inténtalo de nuevo." };
+    }
   }
 
   const batch = writeBatch(db);
 
-  // 1. Set/update client details in 'clients' collection
   const clientDetailsDocRef = doc(db, "clients", idNumber);
   batch.set(clientDetailsDocRef, {
     idNumber,
@@ -181,12 +195,12 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     contactPhone,
     guarantorPhone,
     providerId: providerId,
+    idCardPhotoUrl: imageUrl,
     updatedAt: new Date(),
   }, { merge: true });
 
-  // 2. Create a user account for the client in 'users' collection
   const clientUserDocRef = doc(db, "users", idNumber);
-  const clientPassword = idNumber; // Password is the same as ID number
+  const clientPassword = idNumber;
   const hashedPassword = await bcrypt.hash(clientPassword, 10);
   
   batch.set(clientUserDocRef, {
@@ -199,13 +213,11 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     createdAt: new Date(),
   }, { merge: true });
 
-
-  // 3. Create the credit record in 'credits' collection
-  const creditDocRef = doc(collection(db, "credits")); 
+  const creditDocRef = doc(collection(db, "credits"));
   batch.set(creditDocRef, {
     clienteId: idNumber,
-    valor: creditAmount,
-    cuotas: installments,
+    valor: Number(creditAmount),
+    cuotas: Number(installments),
     fecha: new Date().toISOString(),
     estado: "Activo",
     cobradorId: cobradorId,
