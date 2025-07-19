@@ -49,8 +49,12 @@ export default async function ProveedorDashboard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-3xl">Perfil de Proveedor</CardTitle>
-        <CardDescription>Bienvenido a tu panel de proveedor.</CardDescription>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="space-y-1">
+                <CardTitle className="text-3xl">Perfil de Proveedor</CardTitle>
+                <CardDescription>Bienvenido a tu panel de proveedor.</CardDescription>
+            </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-8">
         <div>

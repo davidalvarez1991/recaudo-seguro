@@ -100,21 +100,19 @@ export default function GestionCobradoresPage() {
   return (
     <>
       <div className="flex flex-col gap-8">
-        <div>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-4">
-            <div className="space-y-1">
-                <h1 className="text-3xl font-bold tracking-tight">Gestión de Cobradores</h1>
-                <p className="text-muted-foreground">
-                Visualiza y administra las cuentas de tus cobradores.
-                </p>
-            </div>
-            <Button asChild variant="outline" className="w-full sm:w-auto">
-                <Link href="/dashboard/proveedor">
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Volver al Panel
-                </Link>
-            </Button>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-1">
+              <h1 className="text-3xl font-bold tracking-tight">Gestión de Cobradores</h1>
+              <p className="text-muted-foreground">
+              Visualiza y administra las cuentas de tus cobradores.
+              </p>
           </div>
+          <Button asChild variant="outline" className="w-full sm:w-auto">
+              <Link href="/dashboard/proveedor">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Volver al Panel
+              </Link>
+          </Button>
         </div>
         
         {loading ? (
