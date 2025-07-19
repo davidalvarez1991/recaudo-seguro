@@ -39,8 +39,8 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       contactPhone: "",
       guarantorName: "",
       guarantorPhone: "",
-      creditAmount: undefined,
-      installments: undefined,
+      creditAmount: "" as any, // Initialize with empty string to avoid NaN
+      installments: "" as any, // Initialize with empty string to avoid NaN
       documents: undefined,
     },
   });
@@ -173,7 +173,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                         <div className="relative">
                             <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <FormControl>
-                                <Input {...field} type="number" placeholder="500.000" disabled={isPending} onChange={e => field.onChange(e.target.valueAsNumber)} value={field.value ?? ""} className="pl-8"/>
+                                <Input {...field} type="number" placeholder="500000" disabled={isPending} value={field.value ?? ''} className="pl-8"/>
                             </FormControl>
                         </div>
                       <FormMessage />
@@ -188,7 +188,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     <FormItem>
                       <FormLabel>Cuotas a Diferir</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" placeholder="12" disabled={isPending} onChange={e => field.onChange(e.target.valueAsNumber)} value={field.value ?? ""} />
+                        <Input {...field} type="number" placeholder="12" disabled={isPending} value={field.value ?? ''} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -227,3 +227,5 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
+
+    
