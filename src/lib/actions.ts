@@ -416,6 +416,48 @@ export async function updateCobrador(values: z.infer<typeof EditCobradorSchema>)
   }
 }
 
+export async function deleteClientAndCredits(clienteId: string) {
+  const cookieStore = cookies();
+  const providerId = cookieStore.get('loggedInUser')?.value;
+  if (!providerId) {
+    return { error: "El proveedor no está autenticado." };
+  }
+
+  const clientDocRef = doc(db, "users", clienteId);
+  const clientDoc = await getDoc(clientDocRef);
+
+  if (!clientDoc.exists() || clientDoc.data().role !== 'cliente' || clientDoc.data().providerId !== providerId) {
+    return { error: "El cliente no existe o no tienes permiso para eliminarlo." };
+  }
+
+  try {
+    const batch = writeBatch(db);
+
+    // Find and delete all credits for the client
+    const creditsRef = collection(db, "credits");
+    const q = query(creditsRef, where("clienteId", "==", clienteId), where("providerId", "==", providerId));
+    const creditsSnapshot = await getDocs(q);
+    creditsSnapshot.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+    
+    // Delete the client's user document
+    batch.delete(clientDocRef);
+    
+    // Optionally, delete from the 'clients' collection if you have one
+    const clientDetailsRef = doc(db, "clients", clienteId);
+    if ((await getDoc(clientDetailsRef)).exists()) {
+        batch.delete(clientDetailsRef);
+    }
+
+    await batch.commit();
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting client and their credits:", error);
+    return { error: "Ocurrió un error al eliminar al cliente y sus datos." };
+  }
+}
+
 export async function getLoggedInUser() {
     const cookieStore = cookies();
     const loggedInUser = cookieStore.get('loggedInUser');
