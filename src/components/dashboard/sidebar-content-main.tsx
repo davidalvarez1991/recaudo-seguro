@@ -30,11 +30,11 @@ export function SidebarContentMain({ role }: SidebarContentMainProps) {
   if (role === 'proveedor') {
     return (
       <SidebarContent>
-        <SidebarMenu>
+        <SidebarMenu className="mt-4">
           <SidebarMenuItem>
              <SidebarMenuButton
               asChild
-              isActive={pathname === `/dashboard/proveedor`}
+              isActive={isActive(`/dashboard/proveedor`)}
               tooltip="Inicio"
               onClick={handleLinkClick}
             >
@@ -94,7 +94,7 @@ export function SidebarContentMain({ role }: SidebarContentMainProps) {
   if (role === 'cobrador') {
       return (
          <SidebarContent>
-          <SidebarMenu>
+          <SidebarMenu className="mt-4">
             <SidebarMenuItem>
                <SidebarMenuButton
                 asChild
@@ -139,7 +139,7 @@ export function SidebarContentMain({ role }: SidebarContentMainProps) {
   // Default to client sidebar
   return (
     <SidebarContent>
-      <SidebarMenu>
+      <SidebarMenu className="mt-4">
         <SidebarMenuItem>
            <SidebarMenuButton
             asChild

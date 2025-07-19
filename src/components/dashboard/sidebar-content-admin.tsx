@@ -17,15 +17,23 @@ export function SidebarContentAdmin() {
   const role = 'admin';
   const { setOpenMobile } = useSidebar();
 
+  const handleLinkClick = () => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+        setOpenMobile(false);
+    }
+  };
+
+  const isActive = (path: string) => pathname === path;
+
   return (
     <SidebarContent>
-      <SidebarMenu>
+      <SidebarMenu className="mt-4">
         <SidebarMenuItem>
            <SidebarMenuButton
             asChild
-            isActive={pathname === `/dashboard/${role}`}
+            isActive={isActive(`/dashboard/${role}`)}
             tooltip="Inicio"
-            onClick={() => setOpenMobile(false)}
+            onClick={handleLinkClick}
           >
             <Link href={`/dashboard/${role}`}>
               <Home />
@@ -35,14 +43,14 @@ export function SidebarContentAdmin() {
         </SidebarMenuItem>
         
         <SidebarMenuItem>
-           <SidebarMenuButton tooltip="Gestión de Usuarios" onClick={() => setOpenMobile(false)}>
+           <SidebarMenuButton tooltip="Gestión de Usuarios" onClick={handleLinkClick}>
             <Users />
             <span>Usuarios</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
         
         <SidebarMenuItem>
-           <SidebarMenuButton tooltip="Configuración" onClick={() => setOpenMobile(false)}>
+           <SidebarMenuButton tooltip="Configuración" onClick={handleLinkClick}>
             <Settings />
             <span>Configuración</span>
           </SidebarMenuButton>
