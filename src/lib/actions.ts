@@ -148,10 +148,8 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
 export async function createClientAndCredit(formData: FormData) {
   const rawData = Object.fromEntries(formData.entries());
   
-  // Extract files separately, as they are not part of the Zod schema for simple values
-  const documentFiles = formData.getAll('documents').filter(f => f instanceof File) as File[];
-
-  const validatedFields = ClientCreditSchema.safeParse(rawData);
+  // Exclude files from initial validation, they're handled separately.
+  const validatedFields = ClientCreditSchema.omit({ documents: true }).safeParse(rawData);
 
   if (!validatedFields.success) {
     console.error("Validation failed", validatedFields.error.flatten().fieldErrors);
@@ -160,26 +158,20 @@ export async function createClientAndCredit(formData: FormData) {
 
   const { idNumber, name, address, contactPhone, guarantorName, guarantorPhone, creditAmount, installments } = validatedFields.data;
   
+  const documentFiles = formData.getAll('documents').filter(f => f instanceof File && f.size > 0) as File[];
+
   const cookieStore = cookies();
   const cobradorId = cookieStore.get('loggedInUser')?.value;
-
-  if (!cobradorId) {
-    return { error: "El cobrador no está autenticado." };
-  }
+  if (!cobradorId) return { error: "El cobrador no está autenticado." };
 
   const cobradorDocRef = doc(db, "users", cobradorId);
   const cobradorDoc = await getDoc(cobradorDocRef);
   const providerId = cobradorDoc.exists() ? cobradorDoc.data().providerId : null;
-
-  if (!providerId) {
-    return { error: "No se pudo encontrar el proveedor asociado al cobrador." };
-  }
+  if (!providerId) return { error: "No se pudo encontrar el proveedor asociado al cobrador." };
   
   const documentUrls: string[] = [];
   if (documentFiles.length > 0) {
     for (const file of documentFiles) {
-        if (file.size === 0) continue;
-
         const buffer = Buffer.from(await file.arrayBuffer());
         const fileRef = ref(storage, `documents/${idNumber}/${file.name}`);
         
@@ -204,7 +196,7 @@ export async function createClientAndCredit(formData: FormData) {
     contactPhone,
     guarantorName,
     guarantorPhone,
-    documentUrls, // Save array of URLs
+    documentUrls,
     providerId: providerId,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -213,8 +205,8 @@ export async function createClientAndCredit(formData: FormData) {
   const creditDocRef = doc(collection(db, "credits"));
   batch.set(creditDocRef, {
     clienteId: idNumber,
-    valor: Number(creditAmount),
-    cuotas: Number(installments),
+    valor: creditAmount,
+    cuotas: installments,
     fecha: new Date().toISOString(),
     estado: "Activo",
     cobradorId: cobradorId,

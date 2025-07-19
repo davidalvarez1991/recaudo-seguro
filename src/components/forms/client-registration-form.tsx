@@ -45,23 +45,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     },
   });
 
-  const onSubmit = async (values: z.infer<typeof ClientCreditSchema>) => {
-    if (!formRef.current) return;
-
-    const formData = new FormData();
-    Object.entries(values).forEach(([key, value]) => {
-      if (key !== 'documents' && value) {
-        formData.append(key, String(value));
-      }
-    });
-
-    const fileInput = formRef.current.elements.namedItem('documents') as HTMLInputElement;
-    if (fileInput && fileInput.files) {
-        for (let i = 0; i < fileInput.files.length; i++) {
-            formData.append('documents', fileInput.files[i]);
-        }
-    }
-    
+  const onSubmit = async (formData: FormData) => {
     startTransition(async () => {
         const result = await createClientAndCredit(formData);
 
@@ -89,7 +73,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
 
   return (
     <Form {...form}>
-      <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form ref={formRef} action={onSubmit} className="space-y-4">
         <ScrollArea className="h-96 w-full pr-6">
             <div className="space-y-4">
                 <FormField
@@ -217,7 +201,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                                 <div className="relative">
                                     <UploadCloud className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                     <Input 
-                                        name="documents" // Crucial for FormData
+                                        name="documents" 
                                         type="file" 
                                         multiple
                                         className="pl-8"
