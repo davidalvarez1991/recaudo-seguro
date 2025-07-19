@@ -14,19 +14,21 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useTransition, useRef } from "react";
+import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, DollarSign, UploadCloud } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ClientCreditSchema } from "@/lib/schemas";
 import { createClientAndCredit } from "@/lib/actions";
+import { Progress } from "@/components/ui/progress";
 
 type ClientRegistrationFormProps = {
   onFormSubmit?: () => void;
 };
 
 export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormProps) {
-  const [isPending, startTransition] = useTransition();
+  const [isPending, setIsPending] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const { toast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -39,50 +41,72 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       contactPhone: "",
       guarantorName: "",
       guarantorPhone: "",
-      creditAmount: undefined,
-      installments: undefined,
+      creditAmount: "",
+      installments: "",
       documents: undefined,
     },
   });
 
-  const onSubmit = (values: z.infer<typeof ClientCreditSchema>) => {
-    if (!formRef.current) return;
-    const formData = new FormData(formRef.current);
+  const formatCurrency = (value: string) => {
+    if (!value) return "";
+    const numberValue = parseInt(value.replace(/[^\d]/g, ""), 10);
+    if (isNaN(numberValue)) return "";
+    return new Intl.NumberFormat('es-CO').format(numberValue);
+  };
+  
+  const clientAction = async (formData: FormData) => {
+    setIsPending(true);
+    setUploadProgress(0);
 
-    startTransition(async () => {
-        const result = await createClientAndCredit(formData);
+    const onProgress = (progress: number) => {
+      setUploadProgress(progress);
+    };
 
-        if (result && result.success) {
-          toast({
-            title: "Registro Exitoso",
-            description: "El cliente y su crédito han sido creados correctamente.",
-            variant: "default",
-            className: "bg-accent text-accent-foreground border-accent",
-          });
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('creditos-updated'));
-          }
-          form.reset();
-          onFormSubmit?.();
-        } else if (result && result.error) {
-           toast({
-            title: "Error en el registro",
-            description: result.error,
+    const result = await createClientAndCredit(formData, onProgress);
+    
+    setIsPending(false);
+    setUploadProgress(null);
+
+    if (result && result.success) {
+      toast({
+        title: "Registro Exitoso",
+        description: "El cliente y su crédito han sido creados correctamente.",
+        variant: "default",
+        className: "bg-accent text-accent-foreground border-accent",
+      });
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('creditos-updated'));
+      }
+      form.reset();
+      onFormSubmit?.();
+    } else if (result && result.error) {
+       toast({
+        title: "Error en el registro",
+        description: result.error,
+        variant: "destructive",
+      });
+    } else {
+        toast({
+            title: "Error inesperado",
+            description: "Ocurrió un problema al procesar la solicitud.",
             variant: "destructive",
-          });
-        } else {
-            toast({
-                title: "Error inesperado",
-                description: "Ocurrió un problema al procesar la solicitud.",
-                variant: "destructive",
-            });
-        }
-    });
+        });
+    }
   };
 
   return (
     <Form {...form}>
-      <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form
+        ref={formRef}
+        action={clientAction}
+        onSubmit={form.handleSubmit(() => {
+          if (formRef.current) {
+            const formData = new FormData(formRef.current);
+            clientAction(formData);
+          }
+        })}
+        className="space-y-4"
+      >
         <ScrollArea className="h-96 w-full pr-6">
             <div className="space-y-4">
                 <FormField
@@ -178,14 +202,13 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                         <div className="relative">
                             <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <FormControl>
-                                <Input 
-                                    {...field} 
-                                    type="number" 
-                                    placeholder="500000" 
+                                <Input
+                                    {...field}
+                                    type="text"
+                                    placeholder="1.000.000" 
                                     disabled={isPending} 
                                     className="pl-8"
-                                    onChange={e => field.onChange(e.target.value)}
-                                    value={field.value ?? ''}
+                                    onChange={e => field.onChange(formatCurrency(e.target.value))}
                                 />
                             </FormControl>
                         </div>
@@ -205,9 +228,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                             {...field} 
                             type="number" 
                             placeholder="12" 
-                            disabled={isPending} 
-                            onChange={e => field.onChange(e.target.value)}
-                            value={field.value ?? ''}
+                            disabled={isPending}
                         />
                       </FormControl>
                       <FormMessage />
@@ -231,6 +252,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                                         className="pl-8"
                                         disabled={isPending}
                                         onChange={(e) => onChange(e.target.files)}
+                                        accept="image/*,application/pdf"
                                     />
                                 </div>
                             </FormControl>
@@ -240,9 +262,15 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 />
             </div>
         </ScrollArea>
+        {isPending && uploadProgress !== null && (
+          <div className="space-y-2 pt-2">
+            <Label>Subiendo archivos...</Label>
+            <Progress value={uploadProgress} className="w-full" />
+          </div>
+        )}
         <Button type="submit" className="w-full" disabled={isPending}>
           {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Crear Cliente y Crédito
+          {isPending ? "Registrando..." : "Crear Cliente y Crédito"}
         </Button>
       </form>
     </Form>

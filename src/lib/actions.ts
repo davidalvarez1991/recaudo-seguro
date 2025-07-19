@@ -7,7 +7,7 @@ import { cookies } from 'next/headers';
 import { db, storage } from "./firebase";
 import { doc, setDoc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch, getCountFromServer, updateDoc } from "firebase/firestore";
 import bcrypt from 'bcryptjs';
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from "firebase/storage";
 
 export async function login(values: z.infer<typeof LoginSchema>) {
   const validatedFields = LoginSchema.safeParse(values);
@@ -145,11 +145,18 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
   }
 }
 
-export async function createClientAndCredit(formData: FormData) {
-  const rawData = Object.fromEntries(formData.entries());
-  
-  const validatedFields = ClientCreditSchema.omit({ documents: true }).safeParse(rawData);
+export async function createClientAndCredit(formData: FormData, onProgress?: (progress: number) => void) {
+  const rawData: {[k: string]: any} = {};
+  formData.forEach((value, key) => {
+    if (key !== 'documents') {
+      rawData[key] = value;
+    }
+  });
 
+  const cleanedCreditAmount = typeof rawData.creditAmount === 'string' ? rawData.creditAmount.replace(/[^\d]/g, '') : rawData.creditAmount;
+  rawData.creditAmount = cleanedCreditAmount;
+
+  const validatedFields = ClientCreditSchema.omit({ documents: true }).safeParse(rawData);
   if (!validatedFields.success) {
     console.error("Validation failed", validatedFields.error.flatten().fieldErrors);
     return { error: "Campos inválidos. Por favor, revisa los datos." };
@@ -170,6 +177,7 @@ export async function createClientAndCredit(formData: FormData) {
   
   const documentUrls: string[] = [];
   if (documentFiles.length > 0) {
+    let uploadedCount = 0;
     for (const file of documentFiles) {
         const buffer = Buffer.from(await file.arrayBuffer());
         const fileRef = ref(storage, `documents/${idNumber}/${file.name}`);
@@ -178,6 +186,8 @@ export async function createClientAndCredit(formData: FormData) {
             await uploadBytes(fileRef, buffer);
             const downloadURL = await getDownloadURL(fileRef);
             documentUrls.push(downloadURL);
+            uploadedCount++;
+            onProgress?.((uploadedCount / documentFiles.length) * 100);
         } catch (uploadError: any) {
             console.error(`Upload error for ${file.name}:`, uploadError);
             return { error: `No se pudo subir el archivo ${file.name}.` };
