@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useTransition } from "react";
+import { useTransition, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, DollarSign, UploadCloud } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -28,6 +28,7 @@ type ClientRegistrationFormProps = {
 export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormProps) {
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
+  const formRef = useRef<HTMLFormElement>(null);
 
   const form = useForm<z.infer<typeof ClientCreditSchema>>({
     resolver: zodResolver(ClientCreditSchema),
@@ -38,13 +39,16 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       contactPhone: "",
       guarantorName: "",
       guarantorPhone: "",
-      creditAmount: "" as any,
-      installments: "" as any,
+      creditAmount: undefined,
+      installments: undefined,
       documents: undefined,
     },
   });
 
-  const clientAction = async (formData: FormData) => {
+  const onSubmit = (values: z.infer<typeof ClientCreditSchema>) => {
+    if (!formRef.current) return;
+    const formData = new FormData(formRef.current);
+
     startTransition(async () => {
         const result = await createClientAndCredit(formData);
 
@@ -78,7 +82,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
 
   return (
     <Form {...form}>
-      <form action={clientAction} className="space-y-4">
+      <form ref={formRef} onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <ScrollArea className="h-96 w-full pr-6">
             <div className="space-y-4">
                 <FormField
@@ -174,7 +178,15 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                         <div className="relative">
                             <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <FormControl>
-                                <Input {...field} type="number" placeholder="500000" disabled={isPending} value={field.value ?? ''} className="pl-8"/>
+                                <Input 
+                                    {...field} 
+                                    type="number" 
+                                    placeholder="500000" 
+                                    disabled={isPending} 
+                                    className="pl-8"
+                                    onChange={e => field.onChange(e.target.value)}
+                                    value={field.value ?? ''}
+                                />
                             </FormControl>
                         </div>
                       <FormMessage />
@@ -189,7 +201,14 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     <FormItem>
                       <FormLabel>Cuotas a Diferir</FormLabel>
                       <FormControl>
-                        <Input {...field} type="number" placeholder="12" disabled={isPending} value={field.value ?? ''} />
+                        <Input 
+                            {...field} 
+                            type="number" 
+                            placeholder="12" 
+                            disabled={isPending} 
+                            onChange={e => field.onChange(e.target.value)}
+                            value={field.value ?? ''}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -199,19 +218,19 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 <FormField
                     control={form.control}
                     name="documents"
-                    render={({ field }) => (
+                    render={({ field: { value, onChange, ...fieldProps} }) => (
                         <FormItem>
                             <FormLabel>Cargar Documentos</FormLabel>
                             <FormControl>
                                 <div className="relative">
                                     <UploadCloud className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                     <Input 
-                                        name="documents" 
+                                        {...fieldProps}
                                         type="file" 
                                         multiple
                                         className="pl-8"
                                         disabled={isPending}
-                                        onChange={(e) => field.onChange(e.target.files)}
+                                        onChange={(e) => onChange(e.target.files)}
                                     />
                                 </div>
                             </FormControl>
