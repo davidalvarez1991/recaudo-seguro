@@ -3,6 +3,8 @@ import { AuthCard } from "@/components/auth/auth-card";
 import { LoginForm } from "@/components/auth/login-form";
 import Link from "next/link";
 import { Suspense } from "react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 
 export default function LoginPage() {
   return (
@@ -13,17 +15,14 @@ export default function LoginPage() {
           description="Ingresa tus credenciales para acceder a tu cuenta."
         >
           <LoginForm />
-          <div className="mt-6 space-y-2 text-center text-sm">
-            <p>¿Eres un cliente nuevo?{" "}
-              <Link href="/register/client" className="font-semibold underline text-primary hover:text-primary/80">
-                Regístrate aquí
+          <Separator className="my-6" />
+          <div className="space-y-4 text-center">
+            <p className="text-sm text-muted-foreground">¿No tienes una cuenta de proveedor?</p>
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/register/proveedor">
+                Regístrate como Proveedor
               </Link>
-            </p>
-            <p>¿Quieres ser proveedor?{" "}
-              <Link href="/register/proveedor" className="font-semibold underline text-primary hover:text-primary/80">
-                Regístrate aquí
-              </Link>
-            </p>
+            </Button>
           </div>
         </AuthCard>
       </main>
