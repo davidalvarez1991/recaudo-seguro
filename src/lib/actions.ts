@@ -146,15 +146,19 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
 }
 
 export async function createClientAndCredit(formData: FormData) {
-  const values = Object.fromEntries(formData.entries());
-  const validatedFields = ClientCreditSchema.safeParse(values);
+  const rawData = Object.fromEntries(formData.entries());
+  
+  // Extract files separately, as they are not part of the Zod schema for simple values
+  const documentFiles = formData.getAll('documents').filter(f => f instanceof File) as File[];
+
+  const validatedFields = ClientCreditSchema.safeParse(rawData);
 
   if (!validatedFields.success) {
+    console.error("Validation failed", validatedFields.error.flatten().fieldErrors);
     return { error: "Campos inválidos. Por favor, revisa los datos." };
   }
 
   const { idNumber, name, address, contactPhone, guarantorName, guarantorPhone, creditAmount, installments } = validatedFields.data;
-  const documentFiles = formData.getAll('documents') as File[];
   
   const cookieStore = cookies();
   const cobradorId = cookieStore.get('loggedInUser')?.value;
@@ -172,9 +176,9 @@ export async function createClientAndCredit(formData: FormData) {
   }
   
   const documentUrls: string[] = [];
-  if (documentFiles && documentFiles.length > 0 && documentFiles[0].size > 0) {
+  if (documentFiles.length > 0) {
     for (const file of documentFiles) {
-        if (!(file instanceof File) || file.size === 0) continue;
+        if (file.size === 0) continue;
 
         const buffer = Buffer.from(await file.arrayBuffer());
         const fileRef = ref(storage, `documents/${idNumber}/${file.name}`);
@@ -183,7 +187,8 @@ export async function createClientAndCredit(formData: FormData) {
             await uploadBytes(fileRef, buffer);
             const downloadURL = await getDownloadURL(fileRef);
             documentUrls.push(downloadURL);
-        } catch (uploadError) {
+        } catch (uploadError: any) {
+            console.error(`Upload error for ${file.name}:`, uploadError);
             return { error: `No se pudo subir el archivo ${file.name}.` };
         }
     }
@@ -199,8 +204,9 @@ export async function createClientAndCredit(formData: FormData) {
     contactPhone,
     guarantorName,
     guarantorPhone,
-    documentUrls,
+    documentUrls, // Save array of URLs
     providerId: providerId,
+    createdAt: new Date(),
     updatedAt: new Date(),
   }, { merge: true });
 
@@ -218,7 +224,8 @@ export async function createClientAndCredit(formData: FormData) {
   try {
     await batch.commit();
     return { success: true };
-  } catch (e) {
+  } catch (e: any) {
+    console.error("Batch commit error:", e);
     return { error: "No se pudo registrar el crédito. Inténtalo de nuevo." };
   }
 }
@@ -283,7 +290,7 @@ export async function getCobradoresByProvider() {
 
             return plainObject;
         });
-        // Post-filter to avoid complex queries that require indexes
+        
         return cobradores.filter(c => c.idNumber !== "1143836674");
     } catch (error) {
         return [];
