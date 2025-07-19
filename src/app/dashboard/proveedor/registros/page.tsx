@@ -50,7 +50,6 @@ export default function RegistrosPage() {
         .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
       setRegistros(formattedRecords);
     } catch (error) {
-      console.error("Failed to fetch records", error);
       toast({
         title: "Error",
         description: "No se pudieron cargar los registros.",

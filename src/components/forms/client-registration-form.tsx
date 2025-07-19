@@ -37,7 +37,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       address: "",
       contactPhone: "",
       guarantorPhone: "",
-      idCardPhoto: undefined,
       creditAmount: undefined,
       installments: undefined,
     },
@@ -46,12 +45,8 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   const onSubmit = (values: z.infer<typeof ClientCreditSchema>) => {
     const formData = new FormData();
     Object.entries(values).forEach(([key, value]) => {
-      if (value) {
-        if (key === 'idCardPhoto' && value instanceof File) {
-          formData.append(key, value);
-        } else if (typeof value === 'string' || typeof value === 'number') {
+      if (value !== undefined && value !== null) {
           formData.append(key, String(value));
-        }
       }
     });
 
@@ -153,25 +148,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                       <FormMessage />
                     </FormItem>
                   )}
-                />
-
-                <FormField
-                    control={form.control}
-                    name="idCardPhoto"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Foto de la Cédula</FormLabel>
-                            <FormControl>
-                                 <Input 
-                                    type="file" 
-                                    disabled={isPending} 
-                                    accept="image/png, image/jpeg, image/gif, image/webp" 
-                                    onChange={(e) => field.onChange(e.target.files ? e.target.files[0] : null)}
-                                 />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
                 />
 
                 <FormField

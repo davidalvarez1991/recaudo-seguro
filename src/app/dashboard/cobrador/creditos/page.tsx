@@ -29,19 +29,23 @@ export default function CreditosPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchCredits() {
-      const creditsData: Credito[] = await getCreditsByCobrador();
-      const formattedCreditos = creditsData.map((c) => ({
-        ...c,
-        formattedDate: new Date(c.fecha).toLocaleDateString('es-CO', {
-            year: 'numeric', month: 'long', day: 'numeric'
-        }),
-      }));
-      setCreditos(formattedCreditos);
-      setLoading(false);
+  const fetchCredits = async () => {
+    setLoading(true);
+    try {
+        const creditsData: Credito[] = await getCreditsByCobrador();
+        const formattedCreditos = creditsData.map((c) => ({
+            ...c,
+            formattedDate: new Date(c.fecha).toLocaleDateString('es-CO', {
+                year: 'numeric', month: 'long', day: 'numeric'
+            }),
+        }));
+        setCreditos(formattedCreditos);
+    } finally {
+        setLoading(false);
     }
+  }
 
+  useEffect(() => {
     fetchCredits();
     
     const handleCreditsUpdate = () => fetchCredits();
@@ -58,8 +62,6 @@ export default function CreditosPage() {
   };
   
   const handleRegisterPayment = () => {
-    // Logic to register payment will be added here later
-    console.log("Registrando pago para:", selectedCredit?.id);
     setIsModalOpen(false);
   };
 

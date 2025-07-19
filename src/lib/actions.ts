@@ -156,7 +156,7 @@ export async function createClientAndCredit(formData: FormData) {
     return { error: "Campos inválidos. Por favor, revisa los datos." };
   }
 
-  const { idNumber, name, address, contactPhone, guarantorPhone, creditAmount, installments, idCardPhoto } = validatedFields.data;
+  const { idNumber, name, address, contactPhone, guarantorPhone, creditAmount, installments } = validatedFields.data;
   
   const cookieStore = cookies();
   const cobradorId = cookieStore.get('loggedInUser')?.value;
@@ -173,18 +173,6 @@ export async function createClientAndCredit(formData: FormData) {
     return { error: "No se pudo encontrar el proveedor asociado al cobrador." };
   }
 
-  let imageUrl = "";
-  if (idCardPhoto && idCardPhoto.size > 0) {
-    try {
-      const storageRef = ref(storage, `id_cards/${idNumber}-${Date.now()}`);
-      const snapshot = await uploadBytes(storageRef, idCardPhoto);
-      imageUrl = await getDownloadURL(snapshot.ref);
-    } catch (error) {
-      console.error("Error uploading image:", error);
-      return { error: "No se pudo subir la imagen. Inténtalo de nuevo." };
-    }
-  }
-
   const batch = writeBatch(db);
 
   const clientDetailsDocRef = doc(db, "clients", idNumber);
@@ -195,22 +183,7 @@ export async function createClientAndCredit(formData: FormData) {
     contactPhone,
     guarantorPhone,
     providerId: providerId,
-    idCardPhotoUrl: imageUrl,
     updatedAt: new Date(),
-  }, { merge: true });
-
-  const clientUserDocRef = doc(db, "users", idNumber);
-  const clientPassword = idNumber;
-  const hashedPassword = await bcrypt.hash(clientPassword, 10);
-  
-  batch.set(clientUserDocRef, {
-    idNumber,
-    name,
-    role: 'cliente',
-    password: hashedPassword,
-    providerId: providerId,
-    createdBy: cobradorId,
-    createdAt: new Date(),
   }, { merge: true });
 
   const creditDocRef = doc(collection(db, "credits"));
@@ -251,7 +224,7 @@ export async function getCreditsByCobrador() {
 
         const creditsWithClientNames = await Promise.all(creditsData.map(async (credit) => {
             if (credit.clienteId) {
-                const clientDocRef = doc(db, "users", credit.clienteId);
+                const clientDocRef = doc(db, "clients", credit.clienteId);
                 const clientDoc = await getDoc(clientDocRef);
                 if (clientDoc.exists()) {
                     return { ...credit, clienteName: clientDoc.data().name || 'Nombre no disponible' };
@@ -321,7 +294,7 @@ export async function getCreditsByProvider() {
             let cobradorName = 'Cobrador no encontrado';
 
             if (credit.clienteId) {
-                const clientDocRef = doc(db, "users", credit.clienteId);
+                const clientDocRef = doc(db, "clients", credit.clienteId);
                 const clientDoc = await getDoc(clientDocRef);
                 if (clientDoc.exists()) {
                     clienteName = clientDoc.data().name || 'Nombre no disponible';
@@ -386,7 +359,6 @@ export async function updateCobrador(values: z.infer<typeof EditCobradorSchema>)
     return { error: "No se encontró el cobrador o no tienes permiso para editarlo." };
   }
 
-  // If the ID number is being changed, we need to check if the new ID is already taken.
   if (originalIdNumber !== idNumber) {
     const newUserDocRef = doc(db, "users", idNumber);
     const newUserDoc = await getDoc(newUserDocRef);
@@ -411,12 +383,10 @@ export async function updateCobrador(values: z.infer<typeof EditCobradorSchema>)
     }
 
     if (originalIdNumber !== idNumber) {
-      // Create new document and delete old one
       const newUserDocRef = doc(db, "users", idNumber);
       batch.set(newUserDocRef, newData);
       batch.delete(oldUserDocRef);
     } else {
-      // Just update the existing document
       batch.update(oldUserDocRef, newData);
     }
     
@@ -435,17 +405,16 @@ export async function deleteClientAndCredits(clienteId: string) {
     return { error: "El proveedor no está autenticado." };
   }
 
-  const clientDocRef = doc(db, "users", clienteId);
-  const clientDoc = await getDoc(clientDocRef);
+  const clientDetailsRef = doc(db, "clients", clienteId);
+  const clientDoc = await getDoc(clientDetailsRef);
 
-  if (!clientDoc.exists() || clientDoc.data().role !== 'cliente' || clientDoc.data().providerId !== providerId) {
+  if (!clientDoc.exists() || clientDoc.data().providerId !== providerId) {
     return { error: "El cliente no existe o no tienes permiso para eliminarlo." };
   }
 
   try {
     const batch = writeBatch(db);
 
-    // Find and delete all credits for the client
     const creditsRef = collection(db, "credits");
     const q = query(creditsRef, where("clienteId", "==", clienteId), where("providerId", "==", providerId));
     const creditsSnapshot = await getDocs(q);
@@ -453,15 +422,8 @@ export async function deleteClientAndCredits(clienteId: string) {
       batch.delete(doc.ref);
     });
     
-    // Delete the client's user document
-    batch.delete(clientDocRef);
+    batch.delete(clientDetailsRef);
     
-    // Optionally, delete from the 'clients' collection if you have one
-    const clientDetailsRef = doc(db, "clients", clienteId);
-    if ((await getDoc(clientDetailsRef)).exists()) {
-        batch.delete(clientDetailsRef);
-    }
-
     await batch.commit();
     return { success: true };
   } catch (error) {
