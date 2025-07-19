@@ -7,7 +7,9 @@ import { cookies } from 'next/headers';
 import { db, storage } from "./firebase";
 import { doc, setDoc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch, getCountFromServer, updateDoc } from "firebase/firestore";
 import bcrypt from 'bcryptjs';
-import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+
+const ADMIN_ID = "1143836674";
 
 export async function login(values: z.infer<typeof LoginSchema>) {
   const validatedFields = LoginSchema.safeParse(values);
@@ -18,8 +20,7 @@ export async function login(values: z.infer<typeof LoginSchema>) {
   
   const { idNumber, password } = validatedFields.data;
   
-  // Hardcoded Admin check
-  if (idNumber === "1143836674" && password === "1991070309") {
+  if (idNumber === ADMIN_ID && password === "1991070309") {
     cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
     const userDocRef = doc(db, "users", idNumber);
     const userDoc = await getDoc(userDocRef);
@@ -146,24 +147,26 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
 }
 
 export async function createClientAndCredit(formData: FormData, onProgress?: (progress: number) => void) {
-  const rawData: {[k: string]: any} = {};
+  const rawData: { [k: string]: any } = {};
   formData.forEach((value, key) => {
     if (key !== 'documents') {
       rawData[key] = value;
     }
   });
 
-  const cleanedCreditAmount = typeof rawData.creditAmount === 'string' ? rawData.creditAmount.replace(/[^\d]/g, '') : rawData.creditAmount;
+  const cleanedCreditAmount = typeof rawData.creditAmount === 'string'
+    ? rawData.creditAmount.replace(/[^\d]/g, '')
+    : rawData.creditAmount;
   rawData.creditAmount = cleanedCreditAmount;
 
   const validatedFields = ClientCreditSchema.omit({ documents: true }).safeParse(rawData);
+
   if (!validatedFields.success) {
     console.error("Validation failed", validatedFields.error.flatten().fieldErrors);
     return { error: "Campos inválidos. Por favor, revisa los datos." };
   }
 
   const { idNumber, name, address, contactPhone, guarantorName, guarantorPhone, creditAmount, installments } = validatedFields.data;
-  
   const documentFiles = formData.getAll('documents').filter(f => f instanceof File && f.size > 0) as File[];
 
   const cookieStore = cookies();
@@ -173,25 +176,28 @@ export async function createClientAndCredit(formData: FormData, onProgress?: (pr
   const cobradorDocRef = doc(db, "users", cobradorId);
   const cobradorDoc = await getDoc(cobradorDocRef);
   const providerId = cobradorDoc.exists() ? cobradorDoc.data().providerId : null;
-  if (!providerId) return { error: "No se pudo encontrar el proveedor asociado al cobrador." };
+  if (!providerId && cobradorId !== ADMIN_ID) {
+    return { error: "No se pudo encontrar el proveedor asociado al cobrador." };
+  }
   
+  const finalProviderId = cobradorId === ADMIN_ID ? 'admin' : providerId;
+
   const documentUrls: string[] = [];
   if (documentFiles.length > 0) {
     let uploadedCount = 0;
     for (const file of documentFiles) {
-        const buffer = Buffer.from(await file.arrayBuffer());
-        const fileRef = ref(storage, `documents/${idNumber}/${file.name}`);
-        
-        try {
-            await uploadBytes(fileRef, buffer);
-            const downloadURL = await getDownloadURL(fileRef);
-            documentUrls.push(downloadURL);
-            uploadedCount++;
-            onProgress?.((uploadedCount / documentFiles.length) * 100);
-        } catch (uploadError: any) {
-            console.error(`Upload error for ${file.name}:`, uploadError);
-            return { error: `No se pudo subir el archivo ${file.name}.` };
-        }
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const fileRef = ref(storage, `documents/${idNumber}/${file.name}`);
+      try {
+        await uploadBytes(fileRef, buffer);
+        const downloadURL = await getDownloadURL(fileRef);
+        documentUrls.push(downloadURL);
+        uploadedCount++;
+        onProgress?.((uploadedCount / documentFiles.length) * 100);
+      } catch (uploadError: any) {
+        console.error(`Upload error for ${file.name}:`, uploadError);
+        return { error: `No se pudo subir el archivo ${file.name}.` };
+      }
     }
   }
 
@@ -206,7 +212,7 @@ export async function createClientAndCredit(formData: FormData, onProgress?: (pr
     guarantorName,
     guarantorPhone,
     documentUrls,
-    providerId: providerId,
+    providerId: finalProviderId,
     createdAt: new Date(),
     updatedAt: new Date(),
   }, { merge: true });
@@ -219,7 +225,7 @@ export async function createClientAndCredit(formData: FormData, onProgress?: (pr
     fecha: new Date().toISOString(),
     estado: "Activo",
     cobradorId: cobradorId,
-    providerId: providerId,
+    providerId: finalProviderId,
   });
 
   try {
@@ -292,7 +298,7 @@ export async function getCobradoresByProvider() {
             return plainObject;
         });
         
-        return cobradores.filter(c => c.idNumber !== "1143836674");
+        return cobradores.filter(c => c.idNumber !== ADMIN_ID);
     } catch (error) {
         return [];
     }
@@ -430,22 +436,20 @@ export async function deleteClientAndCredits(clienteId: string) {
   const clientDetailsRef = doc(db, "clients", clienteId);
   const clientDoc = await getDoc(clientDetailsRef);
 
-  if (!clientDoc.exists() || clientDoc.data().providerId !== providerId) {
+  if (!clientDoc.exists() || (clientDoc.data().providerId !== providerId && providerId !== ADMIN_ID)) {
     return { error: "El cliente no existe o no tienes permiso para eliminarlo." };
   }
 
   try {
     const batch = writeBatch(db);
 
-    // Delete credits associated with the client
     const creditsRef = collection(db, "credits");
-    const q = query(creditsRef, where("clienteId", "==", clienteId), where("providerId", "==", providerId));
+    const q = query(creditsRef, where("clienteId", "==", clienteId), where("providerId", "==", clientDoc.data().providerId));
     const creditsSnapshot = await getDocs(q);
     creditsSnapshot.forEach((doc) => {
       batch.delete(doc.ref);
     });
     
-    // Delete the client document from 'clients' collection
     batch.delete(clientDetailsRef);
     
     await batch.commit();

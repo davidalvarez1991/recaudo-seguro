@@ -26,6 +26,8 @@ type Registro = {
   formattedDate?: string;
 };
 
+const ADMIN_ID = "1143836674";
+
 export default function RegistrosPage() {
   const [registros, setRegistros] = useState<Registro[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,6 +42,7 @@ export default function RegistrosPage() {
     try {
       const allActivityRecords: Registro[] = await getCreditsByProvider();
       const formattedRecords = allActivityRecords
+        .filter(credito => credito.cobradorId !== ADMIN_ID) // <-- Filtro para excluir al administrador
         .map((credito) => ({
           ...credito,
           tipo: "Creación Crédito",
