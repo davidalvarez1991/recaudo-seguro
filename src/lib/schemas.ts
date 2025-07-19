@@ -47,6 +47,7 @@ export const CobradorRegisterSchema = z.object({
 
 export const ClientCreditSchema = z.object({
   idNumber: z.string().min(6, "La cédula debe tener al menos 6 caracteres."),
+  name: z.string().min(3, "El nombre completo es obligatorio."),
   address: z.string().min(5, "La dirección es obligatoria."),
   contactPhone: z.string().min(10, "El teléfono debe tener 10 dígitos."),
   guarantorPhone: z.string().min(10, "El teléfono del fiador debe tener 10 dígitos."),

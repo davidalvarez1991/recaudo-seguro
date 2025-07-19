@@ -153,7 +153,7 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     return { error: "Campos inválidos. Por favor, revisa los datos." };
   }
   
-  const { idNumber, address, contactPhone, guarantorPhone, creditAmount, installments } = validatedFields.data;
+  const { idNumber, name, address, contactPhone, guarantorPhone, creditAmount, installments } = validatedFields.data;
   
   const cookieStore = cookies();
   const cobradorId = cookieStore.get('loggedInUser')?.value;
@@ -176,6 +176,7 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
   const clientDetailsDocRef = doc(db, "clients", idNumber);
   batch.set(clientDetailsDocRef, {
     idNumber,
+    name,
     address,
     contactPhone,
     guarantorPhone,
@@ -190,6 +191,7 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
   
   batch.set(clientUserDocRef, {
     idNumber,
+    name,
     role: 'cliente',
     password: hashedPassword,
     providerId: providerId,
@@ -230,12 +232,23 @@ export async function getCreditsByCobrador() {
     
     try {
         const querySnapshot = await getDocs(q);
-        const credits = querySnapshot.docs.map(doc => ({
+        const creditsData = querySnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
-        })) as any[]; 
+        })) as any[];
+
+        const creditsWithClientNames = await Promise.all(creditsData.map(async (credit) => {
+            if (credit.clienteId) {
+                const clientDocRef = doc(db, "users", credit.clienteId);
+                const clientDoc = await getDoc(clientDocRef);
+                if (clientDoc.exists()) {
+                    return { ...credit, clienteName: clientDoc.data().name || 'Nombre no disponible' };
+                }
+            }
+            return { ...credit, clienteName: 'Cliente no encontrado' };
+        }));
         
-        return credits;
+        return creditsWithClientNames;
     } catch (error) {
         console.error("Error fetching credits:", error);
         return [];

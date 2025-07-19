@@ -10,6 +10,7 @@ import { getCreditsByCobrador } from "@/lib/actions";
 type Credito = {
   id: string;
   clienteId: string;
+  clienteName?: string;
   valor: number;
   cuotas: number;
   fecha: string;
@@ -51,7 +52,7 @@ export default async function CreditosPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Fecha</TableHead>
-                    <TableHead>ID Cliente</TableHead>
+                    <TableHead>Cliente</TableHead>
                     <TableHead className="text-right">Valor del Crédito</TableHead>
                     <TableHead className="text-center">Cuotas</TableHead>
                     <TableHead>Estado</TableHead>
@@ -61,7 +62,7 @@ export default async function CreditosPage() {
                   {formattedCreditos.map((credito) => (
                     <TableRow key={credito.id}>
                       <TableCell>{credito.formattedDate}</TableCell>
-                      <TableCell>{credito.clienteId}</TableCell>
+                      <TableCell>{credito.clienteName || credito.clienteId}</TableCell>
                       <TableCell className="text-right">
                         {`$${credito.valor.toLocaleString('es-CO')}`}
                       </TableCell>

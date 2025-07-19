@@ -33,6 +33,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     resolver: zodResolver(ClientCreditSchema),
     defaultValues: {
       idNumber: "",
+      name: "",
       address: "",
       contactPhone: "",
       guarantorPhone: "",
@@ -83,6 +84,20 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                       <FormLabel>Número de Cédula</FormLabel>
                       <FormControl>
                         <Input {...field} placeholder="123456789" disabled={isPending} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nombre Completo</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="John Doe" disabled={isPending} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
