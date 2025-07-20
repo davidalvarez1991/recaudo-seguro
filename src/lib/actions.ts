@@ -2,490 +2,284 @@
 "use server";
 
 import { z } from "zod";
-import { LoginSchema, RegisterSchema, CobradorRegisterSchema, ClientCreditSchema, EditCobradorSchema } from "./schemas";
-import { cookies } from 'next/headers';
-import { db, storage } from "./firebase";
-import { doc, setDoc, getDoc, deleteDoc, collection, query, where, getDocs, writeBatch, getCountFromServer, updateDoc } from "firebase/firestore";
+import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema } from "./schemas";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
-const ADMIN_ID = "1143836674";
+// --- Mock Database ---
+let mockUsers = [
+    { id: '1', idNumber: '123456', password: 'password123', role: 'proveedor', companyName: 'Mi Empresa SAS', whatsappNumber: '3001112233', email: 'proveedor@test.com', createdAt: new Date().toISOString() },
+    { id: '2', idNumber: '789012', password: 'password123', role: 'cobrador', name: 'Carlos Cobrador', providerId: '123456', createdAt: new Date().toISOString() },
+    { id: '3', idNumber: '111222', password: 'password123', role: 'cliente', name: 'Ana Cliente', whatsappNumber: '3003334455', email: 'cliente@test.com', providerId: '123456', createdAt: new Date().toISOString() },
+    { id: '4', idNumber: '1143836674', password: 'password123', role: 'admin', name: 'Admin User', email: 'admin@test.com', createdAt: new Date().toISOString() }
+];
 
+let mockCredits = [
+    { id: 'cred001', clienteId: '111222', clienteName: 'Ana Cliente', cobradorId: '789012', providerId: '123456', valor: 500000, cuotas: 12, fecha: new Date('2024-05-01T10:00:00Z').toISOString(), estado: 'Activo' },
+    { id: 'cred002', clienteId: '111222', clienteName: 'Ana Cliente', cobradorId: '789012', providerId: '123456', valor: 200000, cuotas: 6, fecha: new Date('2024-06-15T14:30:00Z').toISOString(), estado: 'Activo' },
+];
+
+let mockCobradores = [
+    { id: 'cob001', idNumber: '789012', name: 'Carlos Cobrador', role: 'cobrador', providerId: '123456', createdAt: new Date().toISOString() }
+];
+
+// --- Utility Functions ---
+const findUserByIdNumber = (idNumber: string) => mockUsers.find(u => u.idNumber === idNumber);
+const findUserById = (id: string) => mockUsers.find(u => u.id === id);
+
+
+// --- Auth Actions ---
 export async function login(values: z.infer<typeof LoginSchema>) {
-  const validatedFields = LoginSchema.safeParse(values);
-
-  if (!validatedFields.success) {
-    return { error: "Campos inválidos." };
-  }
-  
-  const { idNumber, password } = validatedFields.data;
-  
-  if (idNumber === ADMIN_ID && password === "1991070309") {
-    cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
-    const userDocRef = doc(db, "users", idNumber);
-    const userDoc = await getDoc(userDocRef);
-    if (!userDoc.exists()) {
-        await setDoc(userDocRef, {
-            idNumber: idNumber,
-            role: 'admin',
-            name: 'Administrador Principal',
-            createdAt: new Date(),
-        });
-    }
-    return { successUrl: '/dashboard/admin' };
-  }
-
-  const userDocRef = doc(db, "users", idNumber);
-  const userDoc = await getDoc(userDocRef);
-
-  if (!userDoc.exists()) {
-      return { error: "Credenciales inválidas." };
-  }
-
-  const userData = userDoc.data();
-  const isPasswordValid = await bcrypt.compare(password, userData.password);
-
-  if (!isPasswordValid) {
-    return { error: "Credenciales inválidas." };
-  }
-    
-  cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
-  return { successUrl: `/dashboard/${userData.role}` };
-}
-
-export async function register(values: z.infer<typeof RegisterSchema>, role: "cliente" | "proveedor") {
-  const validatedFields = RegisterSchema.safeParse(values);
-
-  if (!validatedFields.success) {
-    return { error: "Campos inválidos. Por favor, revisa los datos." };
-  }
-  
-  const { idNumber, email, password, whatsappNumber, companyName } = validatedFields.data;
-  
-  if (role === 'proveedor' && (!companyName || companyName.trim() === '')) {
-      return { error: "El nombre de la empresa es obligatorio para los proveedores." };
-  }
-
-  const userDocRef = doc(db, "users", idNumber);
-  const userDoc = await getDoc(userDocRef);
-
-  if (userDoc.exists()) {
-    return { error: "El número de cédula ya está registrado." };
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  const userData: any = {
-      idNumber,
-      email,
-      whatsappNumber,
-      password: hashedPassword,
-      role: role,
-      createdAt: new Date(),
-  };
-  
-  if (role === 'proveedor' && companyName) {
-      userData.companyName = companyName;
-  }
-
-  await setDoc(userDocRef, userData);
-  
-  cookies().set('loggedInUser', idNumber, { httpOnly: true, path: '/' });
-  
-  return { successUrl: `/dashboard/${role}` };
-}
-
-
-export async function registerCobrador(values: z.infer<typeof CobradorRegisterSchema>) {
-  const validatedFields = CobradorRegisterSchema.safeParse(values);
-
-  if (!validatedFields.success) {
-    return { error: "Datos inválidos. Por favor revise el formulario." };
-  }
-  
-  const cookieStore = cookies();
-  const providerIdNumber = cookieStore.get('loggedInUser')?.value;
-
-  if (!providerIdNumber) {
-    return { error: "El proveedor no está autenticado. Por favor inicie sesión de nuevo." };
-  }
-
-  const { idNumber, password, name } = validatedFields.data;
-  
-  const cobradorDocRef = doc(db, "users", idNumber);
-  const cobradorDoc = await getDoc(cobradorDocRef);
-
-  if (cobradorDoc.exists()) {
-    return { error: "El número de cédula del cobrador ya está registrado." };
-  }
-
-  const cobradoresCollection = collection(db, "users");
-  const q = query(cobradoresCollection, where("providerId", "==", providerIdNumber), where("role", "==", "cobrador"));
-  const countSnapshot = await getCountFromServer(q);
-  const cobradoresCount = countSnapshot.data().count;
-
-  if (cobradoresCount >= 5) {
-    return { error: "Ha alcanzado el límite de 5 cobradores por proveedor." };
-  }
-  
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const validatedFields = LoginSchema.safeParse(values);
+
+    if (!validatedFields.success) {
+      return { error: "Campos inválidos." };
+    }
+
+    const { idNumber, password } = validatedFields.data;
+    const existingUser = findUserByIdNumber(idNumber);
+
+    if (!existingUser || existingUser.password !== password) {
+      return { error: "Cédula o contraseña incorrecta." };
+    }
     
-    await setDoc(cobradorDocRef, {
+    // Set cookie
+    cookies().set('loggedInUser', existingUser.id, { httpOnly: true, path: '/' });
+
+    return { successUrl: `/dashboard/${existingUser.role}` };
+
+  } catch (error) {
+    return { error: "Algo salió mal en el servidor." };
+  }
+}
+
+export async function register(values: z.infer<typeof RegisterSchema>, role: 'cliente' | 'proveedor') {
+    const validatedFields = RegisterSchema.safeParse(values);
+
+    if (!validatedFields.success) {
+        return { error: "Campos inválidos." };
+    }
+
+    const { idNumber, password, companyName, email, whatsappNumber } = validatedFields.data;
+
+    if (findUserByIdNumber(idNumber)) {
+        return { error: "El número de identificación ya está registrado." };
+    }
+    
+    const newUser = {
+        id: (mockUsers.length + 1).toString(),
         idNumber,
-        name,
-        password: hashedPassword,
-        role: 'cobrador',
-        providerId: providerIdNumber,
-        createdAt: new Date(),
-    });
-
-    return { success: `El perfil de cobrador para ${name} ha sido creado.` };
-  } catch (error) {
-    return { error: "No se pudo crear la cuenta del cobrador en la base de datos." };
-  }
-}
-
-export async function createClientAndCredit(formData: FormData, onProgress?: (progress: number) => void) {
-  const rawData: { [k: string]: any } = {};
-  formData.forEach((value, key) => {
-    if (key !== 'documents') {
-      rawData[key] = value;
-    }
-  });
-
-  const cleanedCreditAmount = typeof rawData.creditAmount === 'string'
-    ? rawData.creditAmount.replace(/[^\d]/g, '')
-    : rawData.creditAmount;
-  rawData.creditAmount = cleanedCreditAmount;
-
-  const validatedFields = ClientCreditSchema.omit({ documents: true }).safeParse(rawData);
-
-  if (!validatedFields.success) {
-    console.error("Validation failed", validatedFields.error.flatten().fieldErrors);
-    return { error: "Campos inválidos. Por favor, revisa los datos." };
-  }
-
-  const { idNumber, name, address, contactPhone, guarantorName, guarantorPhone, creditAmount, installments } = validatedFields.data;
-  const documentFiles = formData.getAll('documents').filter(f => f instanceof File && f.size > 0) as File[];
-
-  const cookieStore = cookies();
-  const cobradorId = cookieStore.get('loggedInUser')?.value;
-  if (!cobradorId) return { error: "El cobrador no está autenticado." };
-
-  const cobradorDocRef = doc(db, "users", cobradorId);
-  const cobradorDoc = await getDoc(cobradorDocRef);
-  const providerId = cobradorDoc.exists() ? cobradorDoc.data().providerId : null;
-  if (!providerId && cobradorId !== ADMIN_ID) {
-    return { error: "No se pudo encontrar el proveedor asociado al cobrador." };
-  }
-  
-  const finalProviderId = cobradorId === ADMIN_ID ? 'admin' : providerId;
-
-  const documentUrls: string[] = [];
-  if (documentFiles.length > 0) {
-    let uploadedCount = 0;
-    for (const file of documentFiles) {
-      const buffer = Buffer.from(await file.arrayBuffer());
-      const fileRef = ref(storage, `documents/${idNumber}/${file.name}`);
-      try {
-        await uploadBytes(fileRef, buffer);
-        const downloadURL = await getDownloadURL(fileRef);
-        documentUrls.push(downloadURL);
-        uploadedCount++;
-        onProgress?.((uploadedCount / documentFiles.length) * 100);
-      } catch (uploadError: any) {
-        console.error(`Upload error for ${file.name}:`, uploadError);
-        return { error: `No se pudo subir el archivo ${file.name}.` };
-      }
-    }
-  }
-
-  const batch = writeBatch(db);
-
-  const clientDetailsDocRef = doc(db, "clients", idNumber);
-  batch.set(clientDetailsDocRef, {
-    idNumber,
-    name,
-    address,
-    contactPhone,
-    guarantorName,
-    guarantorPhone,
-    documentUrls,
-    providerId: finalProviderId,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }, { merge: true });
-
-  const creditDocRef = doc(collection(db, "credits"));
-  batch.set(creditDocRef, {
-    clienteId: idNumber,
-    valor: creditAmount,
-    cuotas: installments,
-    fecha: new Date().toISOString(),
-    estado: "Activo",
-    cobradorId: cobradorId,
-    providerId: finalProviderId,
-  });
-
-  try {
-    await batch.commit();
-    return { success: true };
-  } catch (e: any) {
-    console.error("Batch commit error:", e);
-    return { error: "No se pudo registrar el crédito. Inténtalo de nuevo." };
-  }
-}
-
-
-export async function getCreditsByCobrador() {
-    const cookieStore = cookies();
-    const cobradorId = cookieStore.get('loggedInUser')?.value;
-    if (!cobradorId) return [];
-
-    const creditsRef = collection(db, "credits");
-    const q = query(creditsRef, where("cobradorId", "==", cobradorId));
-    
-    try {
-        const querySnapshot = await getDocs(q);
-        const creditsData = querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        })) as any[];
-
-        const creditsWithClientNames = await Promise.all(creditsData.map(async (credit) => {
-            if (credit.clienteId) {
-                const clientDocRef = doc(db, "clients", credit.clienteId);
-                const clientDoc = await getDoc(clientDocRef);
-                if (clientDoc.exists()) {
-                    return { ...credit, clienteName: clientDoc.data().name || 'Nombre no disponible' };
-                }
-            }
-            return { ...credit, clienteName: 'Cliente no encontrado' };
-        }));
-        
-        return creditsWithClientNames;
-    } catch (error) {
-        return [];
-    }
-}
-
-export async function getCobradoresByProvider() {
-    const cookieStore = cookies();
-    const providerId = cookieStore.get('loggedInUser')?.value;
-    if (!providerId) return [];
-
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("providerId", "==", providerId), where("role", "==", "cobrador"));
-
-    try {
-        const querySnapshot = await getDocs(q);
-        const cobradores = querySnapshot.docs.map(doc => {
-            const data = doc.data();
-            
-            const plainObject: {[key: string]: any} = {
-                id: doc.id,
-                ...data,
-            };
-
-            if (data.createdAt && typeof data.createdAt.toDate === 'function') {
-                plainObject.createdAt = data.createdAt.toDate().toISOString();
-            }
-            if (data.updatedAt && typeof data.updatedAt.toDate === 'function') {
-                plainObject.updatedAt = data.updatedAt.toDate().toISOString();
-            }
-
-            return plainObject;
-        });
-        
-        return cobradores.filter(c => c.idNumber !== ADMIN_ID);
-    } catch (error) {
-        return [];
-    }
-}
-
-export async function getCreditsByProvider() {
-    const cookieStore = cookies();
-    const providerId = cookieStore.get('loggedInUser')?.value;
-    if (!providerId) return [];
-
-    const creditsRef = collection(db, "credits");
-    const q = query(creditsRef, where("providerId", "==", providerId));
-    
-    try {
-        const querySnapshot = await getDocs(q);
-        const creditsData = querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        })) as any[];
-
-        const enrichedData = await Promise.all(creditsData.map(async (credit) => {
-            let clienteName = 'Cliente no encontrado';
-            let cobradorName = 'Cobrador no encontrado';
-
-            if (credit.clienteId) {
-                const clientDocRef = doc(db, "clients", credit.clienteId);
-                const clientDoc = await getDoc(clientDocRef);
-                if (clientDoc.exists()) {
-                    clienteName = clientDoc.data().name || 'Nombre no disponible';
-                }
-            }
-            if (credit.cobradorId) {
-                const cobradorDocRef = doc(db, "users", credit.cobradorId);
-                const cobradorDoc = await getDoc(cobradorDocRef);
-                if (cobradorDoc.exists()) {
-                    cobradorName = cobradorDoc.data().name || 'Nombre no disponible';
-                }
-            }
-            return { ...credit, clienteName, cobradorName };
-        }));
-        
-        return enrichedData;
-    } catch (error) {
-        return [];
-    }
-}
-
-
-export async function deleteCobrador(idNumber: string) {
-  const cookieStore = cookies();
-  const providerId = cookieStore.get('loggedInUser')?.value;
-  if (!providerId) {
-    return { error: "El proveedor no está autenticado." };
-  }
-
-  const userDocRef = doc(db, "users", idNumber);
-  const userDoc = await getDoc(userDocRef);
-
-  if (!userDoc.exists() || userDoc.data().role !== 'cobrador' || userDoc.data().providerId !== providerId) {
-    return { error: "El cobrador no existe o no tienes permiso para eliminarlo." };
-  }
-
-  await deleteDoc(userDocRef);
-  
-  return { success: true };
-}
-
-export async function updateCobrador(values: z.infer<typeof EditCobradorSchema>) {
-  const validatedFields = EditCobradorSchema.safeParse(values);
-
-  if (!validatedFields.success) {
-    return { error: "Datos inválidos." };
-  }
-  
-  const { originalIdNumber, idNumber, name, password } = validatedFields.data;
-
-  const cookieStore = cookies();
-  const providerId = cookieStore.get('loggedInUser')?.value;
-  if (!providerId) {
-    return { error: "El proveedor no está autenticado." };
-  }
-
-  const oldUserDocRef = doc(db, "users", originalIdNumber);
-  const oldUserDoc = await getDoc(oldUserDocRef);
-
-  if (!oldUserDoc.exists() || oldUserDoc.data().providerId !== providerId) {
-    return { error: "No se encontró el cobrador o no tienes permiso para editarlo." };
-  }
-
-  if (originalIdNumber !== idNumber) {
-    const newUserDocRef = doc(db, "users", idNumber);
-    const newUserDoc = await getDoc(newUserDocRef);
-    if (newUserDoc.exists()) {
-      return { error: "El nuevo número de identificación ya está en uso." };
-    }
-  }
-
-  try {
-    const batch = writeBatch(db);
-    const oldData = oldUserDoc.data();
-    
-    const newData: any = {
-      ...oldData,
-      idNumber: idNumber,
-      name: name,
-      updatedAt: new Date(),
+        password, // In a real app, hash this!
+        role,
+        companyName: role === 'proveedor' ? companyName : undefined,
+        name: role === 'cliente' ? 'Nuevo Cliente' : undefined,
+        email,
+        whatsappNumber,
+        createdAt: new Date().toISOString()
     };
-
-    if (password) {
-      newData.password = await bcrypt.hash(password, 10);
-    }
-
-    if (originalIdNumber !== idNumber) {
-      const newUserDocRef = doc(db, "users", idNumber);
-      batch.set(newUserDocRef, newData);
-      batch.delete(oldUserDocRef);
-    } else {
-      batch.update(oldUserDocRef, newData);
-    }
+    mockUsers.push(newUser);
     
-    await batch.commit();
-    return { success: "El perfil del cobrador ha sido actualizado." };
-  } catch (error) {
-    return { error: "No se pudo actualizar el perfil del cobrador." };
-  }
+    cookies().set('loggedInUser', newUser.id, { httpOnly: true, path: '/' });
+
+    return { successUrl: `/dashboard/${role}` };
 }
 
-export async function deleteClientAndCredits(clienteId: string) {
-  const cookieStore = cookies();
-  const providerId = cookieStore.get('loggedInUser')?.value;
-  if (!providerId) {
-    return { error: "El proveedor no está autenticado." };
-  }
-
-  const clientDetailsRef = doc(db, "clients", clienteId);
-  const clientDoc = await getDoc(clientDetailsRef);
-
-  if (!clientDoc.exists() || (clientDoc.data().providerId !== providerId && providerId !== ADMIN_ID)) {
-    return { error: "El cliente no existe o no tienes permiso para eliminarlo." };
-  }
-
-  try {
-    const batch = writeBatch(db);
-
-    const creditsRef = collection(db, "credits");
-    const q = query(creditsRef, where("clienteId", "==", clienteId), where("providerId", "==", clientDoc.data().providerId));
-    const creditsSnapshot = await getDocs(q);
-    creditsSnapshot.forEach((doc) => {
-      batch.delete(doc.ref);
-    });
-    
-    batch.delete(clientDetailsRef);
-    
-    await batch.commit();
-    return { success: true };
-  } catch (error) {
-    return { error: "Ocurrió un error al eliminar al cliente y sus datos." };
-  }
+export async function logout() {
+  cookies().set('loggedInUser', '', { expires: new Date(0), path: '/' });
+  return { successUrl: '/login' };
 }
 
-export async function getLoggedInUser() {
-    const cookieStore = cookies();
-    const loggedInUser = cookieStore.get('loggedInUser');
-    return loggedInUser ? { id: loggedInUser.value } : null;
+// --- Data Fetching Actions ---
+
+export async function getUserRole(userId: string) {
+    const user = findUserById(userId);
+    return user?.role || null;
 }
 
 export async function getUserData(userId: string) {
-    if (!userId) return null;
-    try {
-      const userDocRef = doc(db, "users", userId);
-      const userDoc = await getDoc(userDocRef);
-      if (userDoc.exists()) {
-          return userDoc.data();
-      }
-      return null;
-    } catch (error) {
-      return null;
+    const user = findUserById(userId);
+    if (!user) return null;
+    // Return a copy to avoid mutating the mock DB
+    return { ...user };
+}
+
+export async function getCobradoresByProvider() {
+    const providerIdCookie = cookies().get('loggedInUser');
+    if (!providerIdCookie) return [];
+    
+    const provider = findUserById(providerIdCookie.value);
+    if (!provider || provider.role !== 'proveedor') return [];
+
+    return mockCobradores.filter(c => c.providerId === provider.idNumber);
+}
+
+export async function getCreditsByProvider() {
+    const providerIdCookie = cookies().get('loggedInUser');
+    if (!providerIdCookie) return [];
+    
+    const provider = findUserById(providerIdCookie.value);
+    if (!provider || provider.role !== 'proveedor') return [];
+
+    return mockCredits
+        .filter(c => c.providerId === provider.idNumber)
+        .map(c => ({
+            ...c,
+            cobradorName: mockCobradores.find(cob => cob.idNumber === c.cobradorId)?.name,
+            clienteName: mockUsers.find(cli => cli.idNumber === c.clienteId)?.name
+        }));
+}
+
+export async function getCreditsByCobrador() {
+    const cobradorIdCookie = cookies().get('loggedInUser');
+    if (!cobradorIdCookie) return [];
+
+    const cobrador = findUserById(cobradorIdCookie.value);
+    if (!cobrador || cobrador.role !== 'cobrador') return [];
+    
+    return mockCredits
+      .filter(c => c.cobradorId === cobrador.idNumber)
+      .map(c => ({
+        ...c,
+        clienteName: mockUsers.find(cli => cli.idNumber === c.clienteId)?.name
+      }));
+}
+
+// --- Data Mutation Actions ---
+
+export async function registerCobrador(values: z.infer<typeof CobradorRegisterSchema>) {
+    const providerIdCookie = cookies().get('loggedInUser');
+    if (!providerIdCookie) {
+        return { error: "No se pudo identificar al proveedor." };
     }
+    const provider = findUserById(providerIdCookie.value);
+    if (!provider || provider.role !== 'proveedor') {
+        return { error: "Acción no autorizada." };
+    }
+
+    if (findUserByIdNumber(values.idNumber)) {
+        return { error: "El número de identificación ya está en uso." };
+    }
+
+    const newCobrador = {
+        id: `cob${mockCobradores.length + 1}`,
+        idNumber: values.idNumber,
+        name: values.name,
+        role: 'cobrador',
+        providerId: provider.idNumber,
+        createdAt: new Date().toISOString()
+    };
+    mockCobradores.push(newCobrador);
+
+    const newUser = {
+        id: (mockUsers.length + 1).toString(),
+        idNumber: values.idNumber,
+        password: values.password,
+        role: 'cobrador',
+        name: values.name,
+        providerId: provider.idNumber,
+        createdAt: new Date().toISOString()
+    };
+    mockUsers.push(newUser);
+
+    return { success: `Cobrador ${values.name} registrado exitosamente.` };
 }
 
-export async function getUserRole(userId: string): Promise<string | null> {
-    const userData = await getUserData(userId);
-    return userData ? userData.role : null;
+export async function updateCobrador(values: z.infer<typeof EditCobradorSchema>) {
+    const { originalIdNumber, idNumber, name, password } = values;
+
+    const cobradorIndex = mockCobradores.findIndex(c => c.idNumber === originalIdNumber);
+    const userIndex = mockUsers.findIndex(u => u.idNumber === originalIdNumber);
+
+    if (cobradorIndex === -1 || userIndex === -1) {
+        return { error: "Cobrador no encontrado." };
+    }
+
+    if (originalIdNumber !== idNumber && findUserByIdNumber(idNumber)) {
+        return { error: "El nuevo número de identificación ya está en uso." };
+    }
+    
+    mockCobradores[cobradorIndex] = { ...mockCobradores[cobradorIndex], idNumber, name };
+    mockUsers[userIndex] = { ...mockUsers[userIndex], idNumber, name };
+
+    if (password) {
+        mockUsers[userIndex].password = password;
+    }
+
+    return { success: "Cobrador actualizado exitosamente." };
 }
 
-
-export async function logout() {
-    cookies().set('loggedInUser', '', { expires: new Date(0), path: '/' });
-    return { successUrl: '/login' };
+export async function deleteCobrador(idNumber: string) {
+    mockCobradores = mockCobradores.filter(c => c.idNumber !== idNumber);
+    mockUsers = mockUsers.filter(u => u.idNumber !== idNumber);
+    return { success: true };
 }
+
+export async function deleteClientAndCredits(clienteId: string) {
+    mockUsers = mockUsers.filter(u => u.idNumber !== clienteId);
+    mockCredits = mockCredits.filter(c => c.clienteId !== clienteId);
+    return { success: true };
+}
+
+export async function createClientAndCredit(formData: FormData, onProgress: (progress: number) => void) {
+    const cobradorIdCookie = cookies().get('loggedInUser');
+    if (!cobradorIdCookie) return { error: "No se pudo identificar al cobrador." };
+
+    const cobrador = findUserById(cobradorIdCookie.value);
+    if (!cobrador || cobrador.role !== 'cobrador') return { error: "Acción no autorizada." };
+    
+    const providerId = cobrador.providerId;
+    if(!providerId) return { error: "El cobrador no tiene un proveedor asociado." };
+
+    const rawData = Object.fromEntries(formData.entries());
+    const validatedFields = ClientCreditSchema.safeParse(rawData);
+
+    if (!validatedFields.success) {
+        console.error(validatedFields.error.flatten().fieldErrors);
+        return { error: "Datos del formulario inválidos." };
+    }
+    
+    const { idNumber, name, creditAmount, installments } = validatedFields.data;
+
+    // Simulate file upload progress
+    onProgress(25);
+    await new Promise(resolve => setTimeout(resolve, 250));
+    onProgress(50);
+    await new Promise(resolve => setTimeout(resolve, 250));
+    onProgress(75);
+    await new Promise(resolve => setTimeout(resolve, 250));
+    
+    // Check if client user already exists
+    if (!findUserByIdNumber(idNumber)) {
+        const newClientUser = {
+            id: (mockUsers.length + 1).toString(),
+            idNumber,
+            name,
+            password: 'password123', // Default password
+            role: 'cliente',
+            providerId,
+            createdAt: new Date().toISOString()
+        };
+        mockUsers.push(newClientUser);
+    }
+    
+    const newCredit = {
+        id: `cred${mockCredits.length + 1}`,
+        clienteId: idNumber,
+        clienteName: name,
+        cobradorId: cobrador.idNumber,
+        providerId,
+        valor: parseFloat(creditAmount.replace(/[^\d]/g, '')),
+        cuotas: parseInt(installments, 10),
+        fecha: new Date().toISOString(),
+        estado: 'Activo'
+    };
+    mockCredits.push(newCredit);
+    
+    onProgress(100);
+
+    return { success: true };
+}
+
+    
