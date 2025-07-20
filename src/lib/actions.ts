@@ -283,5 +283,3 @@ export async function createClientAndCredit(formData: FormData, onProgress: (pro
 }
 
     
-
-    
