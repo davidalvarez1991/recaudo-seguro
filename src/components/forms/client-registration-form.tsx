@@ -54,6 +54,12 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     if (isNaN(numberValue)) return "";
     return new Intl.NumberFormat('es-CO').format(numberValue);
   };
+
+  const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const formattedValue = formatCurrency(value);
+    form.setValue('creditAmount', formattedValue);
+  };
   
   const clientAction = async (formData: FormData) => {
     setIsPending(true);
@@ -232,7 +238,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                                     placeholder="1.000.000" 
                                     disabled={isPending} 
                                     className="pl-8"
-                                    onChange={e => field.onChange(formatCurrency(e.target.value))}
+                                    onChange={handleCurrencyChange}
                                 />
                             </FormControl>
                         </div>
@@ -300,3 +306,4 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
+
