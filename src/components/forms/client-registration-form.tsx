@@ -21,6 +21,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ClientCreditSchema } from "@/lib/schemas";
 import { createClientAndCredit } from "@/lib/actions";
 import { Progress } from "@/components/ui/progress";
+import { Label } from "@/components/ui/label";
 
 type ClientRegistrationFormProps = {
   onFormSubmit?: () => void;
@@ -49,7 +50,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
 
   const formatCurrency = (value: string) => {
     if (!value) return "";
-    const numberValue = parseInt(value.replace(/[^\d]/g, ""), 10);
+    const numberValue = parseInt(value.replace(/\D/g, ""), 10);
     if (isNaN(numberValue)) return "";
     return new Intl.NumberFormat('es-CO').format(numberValue);
   };
@@ -102,7 +103,30 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         onSubmit={form.handleSubmit(() => {
           if (formRef.current) {
             const formData = new FormData(formRef.current);
-            clientAction(formData);
+            const rawData = Object.fromEntries(formData.entries());
+
+            // Manually parse and validate with Zod before submitting
+            const validatedFields = ClientCreditSchema.safeParse(rawData);
+            if(!validatedFields.success) {
+                // Let the form's resolver handle showing errors
+                return;
+            }
+
+            // Create a new FormData to ensure clean data is sent
+            const cleanFormData = new FormData();
+            for (const key in validatedFields.data) {
+                const value = validatedFields.data[key as keyof typeof validatedFields.data];
+                if (key === 'documents') {
+                    if (value instanceof FileList) {
+                        for (let i = 0; i < value.length; i++) {
+                            cleanFormData.append('documents', value[i]);
+                        }
+                    }
+                } else if (value !== undefined && value !== null) {
+                    cleanFormData.append(key, value as string);
+                }
+            }
+             clientAction(cleanFormData);
           }
         })}
         className="space-y-4"
