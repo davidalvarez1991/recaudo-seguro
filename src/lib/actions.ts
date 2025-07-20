@@ -270,7 +270,7 @@ export async function createClientAndCredit(formData: FormData, onProgress: (pro
         clienteName: name,
         cobradorId: cobrador.idNumber,
         providerId,
-        valor: parseFloat(creditAmount.replace(/\\./g, '').replace(',', '.')),
+        valor: parseFloat(creditAmount.replace(/\./g, '').replace(',', '.')),
         cuotas: parseInt(installments, 10),
         fecha: new Date().toISOString(),
         estado: 'Activo'
@@ -281,5 +281,3 @@ export async function createClientAndCredit(formData: FormData, onProgress: (pro
 
     return { success: true };
 }
-
-    
