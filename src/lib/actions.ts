@@ -7,7 +7,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
 import { db, storage } from "./firebase";
-import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // --- Utility Functions ---
@@ -115,8 +115,12 @@ export async function getUserRole(userId: string) {
 
 export async function getUserData(userId: string) {
     const user = await findUserById(userId);
+    if (user && user.createdAt && user.createdAt instanceof Timestamp) {
+        return { ...user, createdAt: user.createdAt.toDate().toISOString() };
+    }
     return user || null;
 }
+
 
 export async function getCobradoresByProvider() {
     const providerIdCookie = cookies().get('loggedInUser');
@@ -129,7 +133,26 @@ export async function getCobradoresByProvider() {
     const q = query(cobradoresRef, where("role", "==", "cobrador"), where("providerId", "==", provider.idNumber));
     const querySnapshot = await getDocs(q);
 
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        // Convert Firestore Timestamp to a serializable format (ISO string)
+        const createdAt = data.createdAt;
+        let serializableCreatedAt;
+
+        if (createdAt instanceof Timestamp) {
+            serializableCreatedAt = createdAt.toDate().toISOString();
+        } else if (typeof createdAt === 'string') {
+            serializableCreatedAt = createdAt;
+        } else {
+            serializableCreatedAt = new Date().toISOString();
+        }
+
+        return { 
+            id: doc.id, 
+            ...data,
+            createdAt: serializableCreatedAt
+        };
+    });
 }
 
 export async function getCreditsByProvider() {
@@ -222,7 +245,11 @@ export async function updateCobrador(values: z.infer<typeof EditCobradorSchema>)
     }
     
     const userDoc = querySnapshot.docs[0];
-    const updateData: { idNumber: string; name: string; password?: string } = { idNumber, name };
+    const updateData: { idNumber: string; name: string; password?: string, updatedAt?: string } = { 
+        idNumber, 
+        name,
+        updatedAt: new Date().toISOString()
+    };
 
     if (password) {
         updateData.password = await bcrypt.hash(password, 10);

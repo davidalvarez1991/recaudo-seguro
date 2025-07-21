@@ -21,7 +21,7 @@ type Cobrador = {
   idNumber: string;
   role: string;
   providerId: string;
-  createdAt: string;
+  createdAt: string; // Changed to string to be serializable
   updatedAt?: string;
 };
 
