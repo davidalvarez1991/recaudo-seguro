@@ -56,7 +56,7 @@ async function ensureAdminUser() {
         });
     } else {
         // Optional: If you want to ensure the password is up to date
-        const passwordsMatch = await bcrypt.compare(adminPassword, adminUser.password);
+        const passwordsMatch = await bcrypt.compare(adminPassword, adminUser.password as string);
         if (!passwordsMatch) {
             const hashedPassword = await bcrypt.hash(adminPassword, 10);
             const adminDocRef = doc(db, "users", adminUser.id);
@@ -342,7 +342,7 @@ export async function deleteClientAndCredits(clienteId: string) {
     return { success: true };
 }
 
-export async function createClientAndCredit(formData: FormData, onProgress: (progress: number) => void) {
+export async function createClientAndCredit(formData: FormData) {
     const cobradorIdCookie = cookies().get('loggedInUser');
     if (!cobradorIdCookie) return { error: "No se pudo identificar al cobrador." };
 
@@ -361,20 +361,6 @@ export async function createClientAndCredit(formData: FormData, onProgress: (pro
     }
     
     const { idNumber, name, address, contactPhone, guarantorName, guarantorPhone, creditAmount, installments, documents } = validatedFields.data;
-
-    let totalFiles = Array.isArray(documents) ? documents.length : 0;
-    let filesUploaded = 0;
-    
-    const updateProgress = () => {
-        if (totalFiles > 0) {
-            const progress = Math.round(((filesUploaded / totalFiles) * 0.9 + 0.1) * 100);
-            onProgress(progress);
-        } else {
-             onProgress(50);
-        }
-    };
-    
-    updateProgress();
     
     let existingClient = await findUserByIdNumber(idNumber);
     if (!existingClient) {
@@ -394,14 +380,11 @@ export async function createClientAndCredit(formData: FormData, onProgress: (pro
     
     const documentUrls: string[] = [];
     if (documents && documents.length > 0) {
-        totalFiles = documents.length;
         for (const file of documents) {
             const storageRef = ref(storage, `documents/${providerId}/${idNumber}/${file.name}`);
             await uploadBytes(storageRef, file);
             const url = await getDownloadURL(storageRef);
             documentUrls.push(url);
-            filesUploaded++;
-            updateProgress();
         }
     }
 
@@ -420,8 +403,6 @@ export async function createClientAndCredit(formData: FormData, onProgress: (pro
             phone: guarantorPhone
         }
     });
-    
-    onProgress(100);
 
     return { success: true };
 }

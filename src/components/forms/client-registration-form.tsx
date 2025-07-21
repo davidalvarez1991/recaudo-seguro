@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, DollarSign, UploadCloud } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -48,6 +48,22 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     },
   });
 
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isPending && uploadProgress === null) {
+      setUploadProgress(0);
+    }
+    if (isPending && uploadProgress !== null && uploadProgress < 90) {
+      timer = setTimeout(() => {
+        setUploadProgress((prev) => (prev !== null ? prev + 10 : 0));
+      }, 500);
+    }
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [isPending, uploadProgress]);
+
+
   const formatCurrency = (value: string) => {
     if (!value) return "";
     const numberValue = parseInt(value.replace(/\D/g, ""), 10);
@@ -63,16 +79,11 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   
   const clientAction = async (formData: FormData) => {
     setIsPending(true);
-    setUploadProgress(0);
+    setUploadProgress(10); // Start progress
 
-    const onProgress = (progress: number) => {
-      setUploadProgress(progress);
-    };
-
-    const result = await createClientAndCredit(formData, onProgress);
+    const result = await createClientAndCredit(formData);
     
-    setIsPending(false);
-    setUploadProgress(null);
+    setUploadProgress(100);
 
     if (result && result.success) {
       toast({
@@ -99,6 +110,8 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
             variant: "destructive",
         });
     }
+    setIsPending(false);
+    setTimeout(() => setUploadProgress(null), 500);
   };
 
   return (
@@ -107,33 +120,9 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         ref={formRef}
         action={clientAction}
         onSubmit={form.handleSubmit(() => {
-          if (formRef.current) {
-            const formData = new FormData(formRef.current);
-            const rawData = Object.fromEntries(formData.entries());
-
-            // Manually parse and validate with Zod before submitting
-            const validatedFields = ClientCreditSchema.safeParse(rawData);
-            if(!validatedFields.success) {
-                // Let the form's resolver handle showing errors
-                return;
+            if(formRef.current) {
+                clientAction(new FormData(formRef.current));
             }
-
-            // Create a new FormData to ensure clean data is sent
-            const cleanFormData = new FormData();
-            for (const key in validatedFields.data) {
-                const value = validatedFields.data[key as keyof typeof validatedFields.data];
-                if (key === 'documents') {
-                    if (value instanceof FileList) {
-                        for (let i = 0; i < value.length; i++) {
-                            cleanFormData.append('documents', value[i]);
-                        }
-                    }
-                } else if (value !== undefined && value !== null) {
-                    cleanFormData.append(key, value as string);
-                }
-            }
-             clientAction(cleanFormData);
-          }
         })}
         className="space-y-4"
       >
@@ -306,4 +295,3 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
-
