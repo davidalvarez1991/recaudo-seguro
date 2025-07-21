@@ -43,7 +43,8 @@ async function ensureAdminUser() {
     if (!adminUser) {
         const hashedPassword = await bcrypt.hash(adminPassword, 10);
         const usersRef = collection(db, "users");
-        const adminDocRef = doc(usersRef); // Create a new doc with a generated ID
+        // Use the ID number as the document ID for the admin for predictability
+        const adminDocRef = doc(usersRef, adminId);
         
         await setDoc(adminDocRef, {
             idNumber: adminId,
@@ -271,6 +272,10 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
 
 export async function updateCobrador(values: z.infer<typeof EditCobradorSchema>) {
     const { originalIdNumber, idNumber, name, password } = values;
+
+    if (originalIdNumber === '0703091991') {
+        return { error: "La cuenta de administrador no puede ser modificada." };
+    }
 
     const usersRef = collection(db, "users");
     const q = query(usersRef, where("idNumber", "==", originalIdNumber));
