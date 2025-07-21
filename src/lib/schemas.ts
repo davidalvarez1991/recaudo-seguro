@@ -1,6 +1,9 @@
 
 import { z } from "zod";
 
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+const ALLOWED_FILE_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf", "video/mp4", "video/quicktime"];
+
 export const LoginSchema = z.object({
   idNumber: z.string().min(1, {
     message: "El número de cédula es obligatorio.",
@@ -51,11 +54,30 @@ export const ClientCreditSchema = z.object({
   name: z.string().min(3, "El nombre completo es obligatorio."),
   address: z.string().min(5, "La dirección es obligatoria."),
   contactPhone: z.string().min(10, "El teléfono debe tener 10 dígitos."),
-  guarantorName: z.string().min(3, "El nombre del fiador es obligatorio."),
-  guarantorPhone: z.string().min(10, "El teléfono del fiador debe tener 10 dígitos."),
+  requiresGuarantor: z.boolean().default(true),
+  guarantorName: z.string().optional(),
+  guarantorPhone: z.string().optional(),
+  guarantorAddress: z.string().optional(),
   creditAmount: z.string().min(1, "El valor del crédito es obligatorio."),
   installments: z.string().min(1, "El número de cuotas es obligatorio."),
-  documents: z.any().optional(),
+  documents: z
+    .any()
+    .refine((files) => !files || files.length <= 3, 'No se pueden subir más de 3 archivos.')
+    .refine((files) => !files || Array.from(files).every((file: any) => file.size <= MAX_FILE_SIZE), 'El tamaño máximo por archivo es 50MB.')
+    .refine((files) => !files || Array.from(files).every((file: any) => ALLOWED_FILE_TYPES.includes(file.type)), 'Tipo de archivo no permitido.')
+    .optional(),
+}).superRefine((data, ctx) => {
+    if (data.requiresGuarantor) {
+        if (!data.guarantorName || data.guarantorName.length < 3) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El nombre del fiador es obligatorio.", path: ['guarantorName']});
+        }
+        if (!data.guarantorPhone || data.guarantorPhone.length < 10) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El teléfono del fiador debe tener 10 dígitos.", path: ['guarantorPhone']});
+        }
+        if (!data.guarantorAddress || data.guarantorAddress.length < 5) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La dirección del fiador es obligatoria.", path: ['guarantorAddress']});
+        }
+    }
 });
 
 export const EditCobradorSchema = z.object({

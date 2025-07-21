@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
@@ -22,6 +22,8 @@ import { ClientCreditSchema } from "@/lib/schemas";
 import { createClientAndCredit } from "@/lib/actions";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 
 type ClientRegistrationFormProps = {
   onFormSubmit?: () => void;
@@ -30,6 +32,7 @@ type ClientRegistrationFormProps = {
 export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormProps) {
   const [isPending, setIsPending] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [requiresGuarantor, setRequiresGuarantor] = useState(true);
   const { toast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -42,12 +45,22 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       contactPhone: "",
       guarantorName: "",
       guarantorPhone: "",
+      guarantorAddress: "",
       creditAmount: "",
       installments: "",
       documents: undefined,
+      requiresGuarantor: true,
     },
+    context: {
+        requiresGuarantor: true,
+    }
   });
 
+  useEffect(() => {
+    form.setValue('requiresGuarantor', requiresGuarantor);
+    form.trigger(['guarantorName', 'guarantorPhone', 'guarantorAddress']);
+  }, [requiresGuarantor, form]);
+  
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (isPending && uploadProgress === null) {
@@ -183,34 +196,77 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     </FormItem>
                   )}
                 />
-
-                <FormField
-                  control={form.control}
-                  name="guarantorName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nombre del Fiador</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Jane Smith" disabled={isPending} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
                 
-                <FormField
-                  control={form.control}
-                  name="guarantorPhone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Teléfono del Fiador</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="tel" placeholder="3017654321" disabled={isPending} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                <Separator className="my-6" />
+
+                <Controller
+                    control={form.control}
+                    name="requiresGuarantor"
+                    render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                            <div className="space-y-0.5">
+                                <FormLabel>¿Requiere Fiador?</FormLabel>
+                            </div>
+                            <FormControl>
+                                <Switch
+                                    checked={field.value}
+                                    onCheckedChange={(checked) => {
+                                        field.onChange(checked);
+                                        setRequiresGuarantor(checked);
+                                    }}
+                                    disabled={isPending}
+                                />
+                            </FormControl>
+                        </FormItem>
+                    )}
                 />
+
+                {requiresGuarantor && (
+                    <div className="space-y-4 pt-2">
+                        <FormField
+                            control={form.control}
+                            name="guarantorName"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Nombre del Fiador</FormLabel>
+                                <FormControl>
+                                    <Input {...field} placeholder="Jane Smith" disabled={isPending} />
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        
+                        <FormField
+                            control={form.control}
+                            name="guarantorPhone"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Teléfono del Fiador</FormLabel>
+                                <FormControl>
+                                    <Input {...field} type="tel" placeholder="3017654321" disabled={isPending} />
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name="guarantorAddress"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Dirección del Fiador</FormLabel>
+                                <FormControl>
+                                    <Input {...field} placeholder="Calle Falsa 123" disabled={isPending} />
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
+                )}
+                
+                <Separator className="my-6" />
 
                 <FormField
                   control={form.control}
@@ -260,7 +316,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     name="documents"
                     render={({ field: { value, onChange, ...fieldProps} }) => (
                         <FormItem>
-                            <FormLabel>Cargar Documentos</FormLabel>
+                            <FormLabel>Cargar Documentos (Opcional, máx. 3)</FormLabel>
                             <FormControl>
                                 <div className="relative">
                                     <UploadCloud className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -271,7 +327,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                                         className="pl-8"
                                         disabled={isPending}
                                         onChange={(e) => onChange(e.target.files)}
-                                        accept="image/*,application/pdf"
+                                        accept="image/*,video/*,application/pdf"
                                     />
                                 </div>
                             </FormControl>

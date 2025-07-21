@@ -352,20 +352,29 @@ export async function createClientAndCredit(formData: FormData) {
     const providerId = cobrador.providerId;
     if(!providerId) return { error: "El cobrador no tiene un proveedor asociado." };
 
-    const rawData = Object.fromEntries(formData.entries());
+    const rawData: {[k:string]: any} = Object.fromEntries(formData.entries());
+    // Convert requiresGuarantor to boolean
+    rawData.requiresGuarantor = rawData.requiresGuarantor === 'on';
+
+    // Handle documents
+    const documents = formData.getAll('documents').filter(f => (f as File).size > 0);
+    rawData.documents = documents.length > 0 ? documents : undefined;
+    
     const validatedFields = ClientCreditSchema.safeParse(rawData);
 
     if (!validatedFields.success) {
         console.error(validatedFields.error.flatten().fieldErrors);
-        return { error: "Datos del formulario inválidos." };
+        const errors = validatedFields.error.flatten().fieldErrors;
+        const firstError = Object.values(errors)[0]?.[0] || "Datos del formulario inválidos.";
+        return { error: firstError };
     }
     
-    const { idNumber, name, address, contactPhone, guarantorName, guarantorPhone, creditAmount, installments, documents } = validatedFields.data;
+    const { idNumber, name, address, contactPhone, guarantorName, guarantorPhone, guarantorAddress, creditAmount, installments, requiresGuarantor } = validatedFields.data;
     
     let existingClient = await findUserByIdNumber(idNumber);
     if (!existingClient) {
         const defaultPassword = await bcrypt.hash('password123', 10);
-        const newClientUserRef = await addDoc(collection(db, "users"),{
+        await addDoc(collection(db, "users"),{
             idNumber,
             name,
             password: defaultPassword,
@@ -375,12 +384,11 @@ export async function createClientAndCredit(formData: FormData) {
             contactPhone,
             createdAt: new Date().toISOString()
         });
-        existingClient = { id: newClientUserRef.id, idNumber };
     }
     
     const documentUrls: string[] = [];
-    if (documents && documents.length > 0) {
-        for (const file of documents) {
+    if (validatedFields.data.documents && validatedFields.data.documents.length > 0) {
+        for (const file of validatedFields.data.documents) {
             const storageRef = ref(storage, `documents/${providerId}/${idNumber}/${file.name}`);
             await uploadBytes(storageRef, file);
             const url = await getDownloadURL(storageRef);
@@ -398,10 +406,11 @@ export async function createClientAndCredit(formData: FormData) {
         fecha: new Date().toISOString(),
         estado: 'Activo',
         documentUrls,
-        guarantor: {
+        guarantor: requiresGuarantor ? {
             name: guarantorName,
-            phone: guarantorPhone
-        }
+            phone: guarantorPhone,
+            address: guarantorAddress
+        } : null,
     });
 
     return { success: true };
