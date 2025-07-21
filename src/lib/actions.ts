@@ -8,11 +8,12 @@ import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
 
 // --- Mock Database ---
+// Passwords are now hashed. Default password for all is "password123"
 let mockUsers = [
-    { id: '1', idNumber: '123456', password: 'password123', role: 'proveedor', companyName: 'Mi Empresa SAS', whatsappNumber: '3001112233', email: 'proveedor@test.com', createdAt: new Date().toISOString() },
-    { id: '2', idNumber: '789012', password: 'password123', role: 'cobrador', name: 'Carlos Cobrador', providerId: '123456', createdAt: new Date().toISOString() },
-    { id: '3', idNumber: '111222', password: 'password123', role: 'cliente', name: 'Ana Cliente', whatsappNumber: '3003334455', email: 'cliente@test.com', providerId: '123456', createdAt: new Date().toISOString() },
-    { id: '4', idNumber: '1143836674', password: 'password123', role: 'admin', name: 'Admin User', email: 'admin@test.com', createdAt: new Date().toISOString() }
+    { id: '1', idNumber: '123456', password: bcrypt.hashSync('password123', 10), role: 'proveedor', companyName: 'Mi Empresa SAS', whatsappNumber: '3001112233', email: 'proveedor@test.com', createdAt: new Date().toISOString() },
+    { id: '2', idNumber: '789012', password: bcrypt.hashSync('password123', 10), role: 'cobrador', name: 'Carlos Cobrador', providerId: '123456', createdAt: new Date().toISOString() },
+    { id: '3', idNumber: '111222', password: bcrypt.hashSync('password123', 10), role: 'cliente', name: 'Ana Cliente', whatsappNumber: '3003334455', email: 'cliente@test.com', providerId: '123456', createdAt: new Date().toISOString() },
+    { id: '4', idNumber: '1143836674', password: bcrypt.hashSync('password123', 10), role: 'admin', name: 'Admin User', email: 'admin@test.com', createdAt: new Date().toISOString() }
 ];
 
 let mockCredits = [
@@ -41,7 +42,13 @@ export async function login(values: z.infer<typeof LoginSchema>) {
     const { idNumber, password } = validatedFields.data;
     const existingUser = findUserByIdNumber(idNumber);
 
-    if (!existingUser || existingUser.password !== password) {
+    if (!existingUser) {
+      return { error: "Cédula o contraseña incorrecta." };
+    }
+
+    const passwordsMatch = await bcrypt.compare(password, existingUser.password);
+
+    if (!passwordsMatch) {
       return { error: "Cédula o contraseña incorrecta." };
     }
     
@@ -68,10 +75,12 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: 'cl
         return { error: "El número de identificación ya está registrado." };
     }
     
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
     const newUser = {
         id: (mockUsers.length + 1).toString(),
         idNumber,
-        password, // In a real app, hash this!
+        password: hashedPassword,
         role,
         companyName: role === 'proveedor' ? companyName : undefined,
         name: role === 'cliente' ? 'Nuevo Cliente' : undefined,
@@ -161,6 +170,8 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
     if (findUserByIdNumber(values.idNumber)) {
         return { error: "El número de identificación ya está en uso." };
     }
+    
+    const hashedPassword = await bcrypt.hash(values.password, 10);
 
     const newCobrador = {
         id: `cob${mockCobradores.length + 1}`,
@@ -175,7 +186,7 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
     const newUser = {
         id: (mockUsers.length + 1).toString(),
         idNumber: values.idNumber,
-        password: values.password,
+        password: hashedPassword,
         role: 'cobrador',
         name: values.name,
         providerId: provider.idNumber,
@@ -204,7 +215,7 @@ export async function updateCobrador(values: z.infer<typeof EditCobradorSchema>)
     mockUsers[userIndex] = { ...mockUsers[userIndex], idNumber, name };
 
     if (password) {
-        mockUsers[userIndex].password = password;
+        mockUsers[userIndex].password = await bcrypt.hash(password, 10);
     }
 
     return { success: "Cobrador actualizado exitosamente." };
@@ -252,11 +263,12 @@ export async function createClientAndCredit(formData: FormData, onProgress: (pro
     
     // Check if client user already exists
     if (!findUserByIdNumber(idNumber)) {
+        const defaultPassword = await bcrypt.hash('password123', 10);
         const newClientUser = {
             id: (mockUsers.length + 1).toString(),
             idNumber,
             name,
-            password: 'password123', // Default password
+            password: defaultPassword,
             role: 'cliente',
             providerId,
             createdAt: new Date().toISOString()
