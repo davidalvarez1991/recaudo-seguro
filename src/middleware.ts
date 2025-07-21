@@ -8,13 +8,16 @@ export async function middleware(request: NextRequest) {
 
   const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register');
 
-  // If user is logged in and tries to access an auth page, redirect to dashboard
+  // If user is logged in and tries to access an auth page, redirect to a default dashboard
   if (loggedInUserCookie && isAuthPage) {
-    const dashboardUrl = new URL('/dashboard/proveedor', request.url); // Default dashboard
+    // We don't know the role here, so redirect to a generic dashboard path.
+    // The dashboard layout will handle role-specific routing.
+    // Let's send them to a base path they are likely to have access to.
+    const dashboardUrl = new URL('/dashboard/proveedor', request.url);
     return NextResponse.redirect(dashboardUrl);
   }
 
-  // If user is not logged in and tries to access a dashboard page, redirect to login
+  // If user is not logged in and tries to access a protected dashboard page, redirect to login
   if (!loggedInUserCookie && pathname.startsWith('/dashboard')) {
     const loginUrl = new URL('/login', request.url);
     return NextResponse.redirect(loginUrl);
