@@ -1,7 +1,6 @@
 
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { getUserRole } from '@/lib/actions';
  
 export async function middleware(request: NextRequest) {
   const loggedInUserCookie = request.cookies.get('loggedInUser');
@@ -9,47 +8,18 @@ export async function middleware(request: NextRequest) {
 
   const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register');
 
+  // If user is logged in and tries to access an auth page, redirect to dashboard
   if (loggedInUserCookie && isAuthPage) {
-    const userId = loggedInUserCookie.value;
-    const role = await getUserRole(userId);
-    const dashboardUrl = request.nextUrl.clone();
-    
-    if (role) {
-      dashboardUrl.pathname = `/dashboard/${role}`;
-    } else {
-      // If role can't be found, log out and redirect to login
-      const response = NextResponse.redirect(new URL('/login', request.url));
-      response.cookies.set('loggedInUser', '', { expires: new Date(0), path: '/' });
-      return response;
-    }
+    const dashboardUrl = new URL('/dashboard/proveedor', request.url); // Default dashboard
     return NextResponse.redirect(dashboardUrl);
   }
 
+  // If user is not logged in and tries to access a dashboard page, redirect to login
   if (!loggedInUserCookie && pathname.startsWith('/dashboard')) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    return NextResponse.redirect(url);
+    const loginUrl = new URL('/login', request.url);
+    return NextResponse.redirect(loginUrl);
   }
  
-  if (loggedInUserCookie && pathname.startsWith('/dashboard')) {
-    const userId = loggedInUserCookie.value;
-    const role = await getUserRole(userId);
-    
-    if (!role) {
-        // If user is logged in but role can't be determined (e.g., user deleted)
-        const response = NextResponse.redirect(new URL('/login', request.url));
-        response.cookies.set('loggedInUser', '', { expires: new Date(0), path: '/' });
-        return response;
-    }
-      
-    const expectedPath = `/dashboard/${role}`;
-    if (!pathname.startsWith(expectedPath)) {
-        const url = request.nextUrl.clone();
-        url.pathname = expectedPath;
-        return NextResponse.redirect(url);
-    }
-  }
-
   return NextResponse.next();
 }
 
