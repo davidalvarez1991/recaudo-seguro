@@ -1,17 +1,27 @@
 
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { getUserRole } from '@/lib/actions';
  
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const loggedInUserCookie = request.cookies.get('loggedInUser');
   const { pathname } = request.nextUrl;
 
   const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register');
 
   if (loggedInUserCookie && isAuthPage) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/dashboard/proveedor'; // Redirect to a generic dashboard path
-    return NextResponse.redirect(url);
+    const userId = loggedInUserCookie.value;
+    const role = await getUserRole(userId);
+    const dashboardUrl = request.nextUrl.clone();
+    
+    if (role) {
+      dashboardUrl.pathname = `/dashboard/${role}`;
+    } else {
+      // Fallback to a generic dashboard or home if role not found
+      // or handle potential error
+      dashboardUrl.pathname = '/'; 
+    }
+    return NextResponse.redirect(dashboardUrl);
   }
 
   if (!loggedInUserCookie && pathname.startsWith('/dashboard')) {
