@@ -135,23 +135,17 @@ export async function getCobradoresByProvider() {
 
     return querySnapshot.docs.map(doc => {
         const data = doc.data();
-        // Convert Firestore Timestamp to a serializable format (ISO string)
-        const createdAt = data.createdAt;
-        let serializableCreatedAt;
+        const serializableData: { [key: string]: any } = { id: doc.id, ...data };
 
-        if (createdAt instanceof Timestamp) {
-            serializableCreatedAt = createdAt.toDate().toISOString();
-        } else if (typeof createdAt === 'string') {
-            serializableCreatedAt = createdAt;
-        } else {
-            serializableCreatedAt = new Date().toISOString();
+        // Convert Firestore Timestamps to a serializable format (ISO string)
+        if (data.createdAt && data.createdAt instanceof Timestamp) {
+            serializableData.createdAt = data.createdAt.toDate().toISOString();
+        }
+        if (data.updatedAt && data.updatedAt instanceof Timestamp) {
+            serializableData.updatedAt = data.updatedAt.toDate().toISOString();
         }
 
-        return { 
-            id: doc.id, 
-            ...data,
-            createdAt: serializableCreatedAt
-        };
+        return serializableData;
     });
 }
 
@@ -245,10 +239,10 @@ export async function updateCobrador(values: z.infer<typeof EditCobradorSchema>)
     }
     
     const userDoc = querySnapshot.docs[0];
-    const updateData: { idNumber: string; name: string; password?: string, updatedAt?: string } = { 
+    const updateData: { idNumber: string; name: string; password?: string, updatedAt?: Timestamp } = { 
         idNumber, 
         name,
-        updatedAt: new Date().toISOString()
+        updatedAt: Timestamp.now()
     };
 
     if (password) {
