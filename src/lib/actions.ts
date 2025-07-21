@@ -43,7 +43,6 @@ async function ensureAdminUser() {
     if (!adminUser) {
         const hashedPassword = await bcrypt.hash(adminPassword, 10);
         const usersRef = collection(db, "users");
-        // Use the ID number as the document ID for the admin for predictability
         const adminDocRef = doc(usersRef, adminId);
         
         await setDoc(adminDocRef, {
@@ -76,21 +75,15 @@ export async function login(values: z.infer<typeof LoginSchema>) {
 
     const { idNumber, password } = validatedFields.data;
 
-    // Special check for admin user creation/update on login attempt
     if (idNumber === "0703091991") {
         await ensureAdminUser();
     }
     
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("idNumber", "==", idNumber));
-    const querySnapshot = await getDocs(q);
+    const existingUser = await findUserByIdNumber(idNumber);
 
-    if (querySnapshot.empty) {
+    if (!existingUser || !existingUser.password) {
         return { error: "Cédula o contraseña incorrecta." };
     }
-
-    const userDoc = querySnapshot.docs[0];
-    const existingUser = userDoc.data();
 
     const passwordsMatch = await bcrypt.compare(password, existingUser.password);
 
@@ -98,7 +91,7 @@ export async function login(values: z.infer<typeof LoginSchema>) {
       return { error: "Cédula o contraseña incorrecta." };
     }
     
-    cookies().set('loggedInUser', userDoc.id, { httpOnly: true, path: '/' });
+    cookies().set('loggedInUser', existingUser.id, { httpOnly: true, path: '/' });
 
     return { successUrl: `/dashboard/${existingUser.role}` };
 
@@ -129,7 +122,7 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: 'cl
         password: hashedPassword,
         role,
         companyName: role === 'proveedor' ? companyName : "",
-        name: role === 'proveedor' ? companyName : "Nuevo Cliente", // Asignar companyName a name para proveedor
+        name: role === 'proveedor' ? companyName : "Nuevo Cliente",
         email,
         whatsappNumber,
         createdAt: new Date().toISOString()
@@ -184,7 +177,6 @@ export async function getCobradoresByProvider() {
         const data = doc.data();
         const serializableData: { [key: string]: any } = { id: doc.id, ...data };
 
-        // Convert Firestore Timestamps to a serializable format (ISO string)
         if (data.createdAt && data.createdAt instanceof Timestamp) {
             serializableData.createdAt = data.createdAt.toDate().toISOString();
         }
