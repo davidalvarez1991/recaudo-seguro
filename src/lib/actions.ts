@@ -31,9 +31,6 @@ const findUserById = async (id: string) => {
     return { id: userSnap.id, ...userSnap.data() };
 }
 
-// --- Auth Actions ---
-
-// Function to ensure the admin user exists
 async function ensureAdminUser() {
     const adminId = "0703091991";
     const adminPassword = "19913030";
@@ -43,7 +40,8 @@ async function ensureAdminUser() {
     if (!adminUser) {
         const hashedPassword = await bcrypt.hash(adminPassword, 10);
         const usersRef = collection(db, "users");
-        const adminDocRef = doc(usersRef, adminId);
+        // Use the ID number as the document ID for the admin for predictability
+        const adminDocRef = doc(usersRef, adminId); 
         
         await setDoc(adminDocRef, {
             idNumber: adminId,
@@ -55,12 +53,12 @@ async function ensureAdminUser() {
         });
     } else {
         // If user exists, check if password needs to be hashed.
-        // This is a one-time migration for the admin account if it was created with a plain text password.
         const isHashed = adminUser.password && adminUser.password.startsWith('$2a$');
         if (!isHashed) {
              const passwordsMatch = adminUser.password === adminPassword;
              if (passwordsMatch) {
                 const hashedPassword = await bcrypt.hash(adminPassword, 10);
+                // Use the document ID fetched from the findUserByIdNumber query
                 const adminDocRef = doc(db, "users", adminUser.id);
                 await updateDoc(adminDocRef, { password: hashedPassword });
              }
@@ -69,6 +67,7 @@ async function ensureAdminUser() {
 }
 
 
+// --- Auth Actions ---
 export async function login(values: z.infer<typeof LoginSchema>) {
   try {
     const validatedFields = LoginSchema.safeParse(values);
@@ -79,7 +78,7 @@ export async function login(values: z.infer<typeof LoginSchema>) {
 
     const { idNumber, password } = validatedFields.data;
 
-    // Special handling for admin user to ensure it exists and password is correct/migrated
+    // Special handling for admin user to ensure it exists and password is correct
     if (idNumber === "0703091991") {
         await ensureAdminUser();
     }
@@ -96,6 +95,7 @@ export async function login(values: z.infer<typeof LoginSchema>) {
       return { error: "Cédula o contraseña incorrecta." };
     }
     
+    // Use the actual document ID for the cookie
     cookies().set('loggedInUser', existingUser.id, { httpOnly: true, path: '/' });
 
     return { successUrl: `/dashboard/${existingUser.role}` };
@@ -206,6 +206,7 @@ export async function getCreditsByProvider() {
     
     const credits = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
+    // Enhance credits with related data
     for (const credit of credits) {
         const cobrador = await findUserByIdNumber(credit.cobradorId as string);
         const cliente = await findUserByIdNumber(credit.clienteId as string);
@@ -421,5 +422,3 @@ export async function createClientAndCredit(formData: FormData) {
 
     return { success: true };
 }
-
-    
