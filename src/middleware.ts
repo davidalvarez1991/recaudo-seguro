@@ -9,7 +9,7 @@ export async function middleware(request: NextRequest) {
 
   const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register');
 
-  if (loggedInUserCookie && isAuthPage) {
+  if (loggedInUserCookie && isAuthTriagePage) {
     const userId = loggedInUserCookie.value;
     const role = await getUserRole(userId);
     const dashboardUrl = request.nextUrl.clone();
@@ -17,9 +17,7 @@ export async function middleware(request: NextRequest) {
     if (role) {
       dashboardUrl.pathname = `/dashboard/${role}`;
     } else {
-      // Fallback to a generic dashboard or home if role not found
-      // or handle potential error
-      dashboardUrl.pathname = '/'; 
+      dashboardUrl.pathname = '/login'; 
     }
     return NextResponse.redirect(dashboardUrl);
   }
@@ -30,12 +28,22 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
  
+  if (loggedInUserCookie && pathname.startsWith('/dashboard')) {
+    const userId = loggedInUserCookie.value;
+    const role = await getUserRole(userId);
+    const expectedPath = `/dashboard/${role}`;
+    if (pathname.startsWith('/dashboard') && !pathname.startsWith(expectedPath)) {
+        const url = request.nextUrl.clone();
+        url.pathname = expectedPath;
+        return NextResponse.redirect(url);
+    }
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
   matcher: [
-    // Match all routes except for internal Next.js assets and static files.
     '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
 }
