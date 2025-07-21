@@ -8,16 +8,16 @@ export function middleware(request: NextRequest) {
 
   const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register');
 
-  // If user is logged in and tries to access an auth page, redirect them away.
-  // We can redirect to a generic dashboard path, the layout will handle the rest.
   if (loggedInUserCookie && isAuthPage) {
-    return NextResponse.redirect(new URL('/dashboard/proveedor', request.url)); 
+    const url = request.nextUrl.clone();
+    url.pathname = '/dashboard/proveedor'; // Redirect to a generic dashboard path
+    return NextResponse.redirect(url);
   }
 
-  // If user is not logged in and tries to access a protected dashboard route,
-  // redirect them to the login page.
   if (!loggedInUserCookie && pathname.startsWith('/dashboard')) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    return NextResponse.redirect(url);
   }
  
   return NextResponse.next();

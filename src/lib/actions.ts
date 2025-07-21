@@ -90,7 +90,7 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: 'cl
         password: hashedPassword,
         role,
         companyName: role === 'proveedor' ? companyName : "",
-        name: role === 'cliente' ? 'Nuevo Cliente' : "",
+        name: role === 'proveedor' ? companyName : "Nuevo Cliente", // Asignar companyName a name para proveedor
         email,
         whatsappNumber,
         createdAt: new Date().toISOString()
@@ -338,7 +338,7 @@ export async function createClientAndCredit(formData: FormData, onProgress: (pro
         clienteName: name,
         cobradorId: cobrador.idNumber,
         providerId,
-        valor: parseFloat(creditAmount.replace(/\\./g, '').replace(',', '.')),
+        valor: parseFloat(creditAmount.replace(/\./g, '').replace(',', '.')),
         cuotas: parseInt(installments, 10),
         fecha: new Date().toISOString(),
         estado: 'Activo',
