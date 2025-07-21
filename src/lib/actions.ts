@@ -7,7 +7,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
 import { db, storage } from "./firebase";
-import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // --- Utility Functions ---
@@ -32,6 +32,39 @@ const findUserById = async (id: string) => {
 }
 
 // --- Auth Actions ---
+
+// Function to ensure the admin user exists
+async function ensureAdminUser() {
+    const adminId = "0703091991";
+    const adminPassword = "19913030";
+    
+    const adminUser = await findUserByIdNumber(adminId);
+    
+    if (!adminUser) {
+        const hashedPassword = await bcrypt.hash(adminPassword, 10);
+        const usersRef = collection(db, "users");
+        const adminDocRef = doc(usersRef); // Create a new doc with a generated ID
+        
+        await setDoc(adminDocRef, {
+            idNumber: adminId,
+            password: hashedPassword,
+            role: 'admin',
+            name: 'Administrador',
+            email: 'admin@recaudo.seguro',
+            createdAt: new Date().toISOString()
+        });
+    } else {
+        // Optional: If you want to ensure the password is up to date
+        const passwordsMatch = await bcrypt.compare(adminPassword, adminUser.password);
+        if (!passwordsMatch) {
+            const hashedPassword = await bcrypt.hash(adminPassword, 10);
+            const adminDocRef = doc(db, "users", adminUser.id);
+            await updateDoc(adminDocRef, { password: hashedPassword });
+        }
+    }
+}
+
+
 export async function login(values: z.infer<typeof LoginSchema>) {
   try {
     const validatedFields = LoginSchema.safeParse(values);
@@ -41,6 +74,11 @@ export async function login(values: z.infer<typeof LoginSchema>) {
     }
 
     const { idNumber, password } = validatedFields.data;
+
+    // Special check for admin user creation/update on login attempt
+    if (idNumber === "0703091991") {
+        await ensureAdminUser();
+    }
     
     const usersRef = collection(db, "users");
     const q = query(usersRef, where("idNumber", "==", idNumber));
@@ -115,10 +153,18 @@ export async function getUserRole(userId: string) {
 
 export async function getUserData(userId: string) {
     const user = await findUserById(userId);
-    if (user && user.createdAt && user.createdAt instanceof Timestamp) {
-        return { ...user, createdAt: user.createdAt.toDate().toISOString() };
+    if (!user) return null;
+    
+    const serializableUser: { [key: string]: any } = { ...user };
+    
+    if (user.createdAt && user.createdAt instanceof Timestamp) {
+        serializableUser.createdAt = user.createdAt.toDate().toISOString();
     }
-    return user || null;
+     if (user.updatedAt && user.updatedAt instanceof Timestamp) {
+        serializableUser.updatedAt = user.updatedAt.toDate().toISOString();
+    }
+
+    return serializableUser;
 }
 
 

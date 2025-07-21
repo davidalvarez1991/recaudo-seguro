@@ -26,7 +26,7 @@ type Registro = {
   formattedDate?: string;
 };
 
-const ADMIN_ID = "1143836674";
+const ADMIN_ID = "0703091991";
 
 export default function RegistrosPage() {
   const [registros, setRegistros] = useState<Registro[]>([]);
