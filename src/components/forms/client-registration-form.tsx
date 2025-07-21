@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, DollarSign, UploadCloud, Eraser } from "lucide-react";
+import { Loader2, DollarSign, UploadCloud, Eraser, FileText, X } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ClientCreditSchema } from "@/lib/schemas";
 import { createClientAndCredit } from "@/lib/actions";
@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import SignatureCanvas from 'react-signature-canvas';
+import { Badge } from "@/components/ui/badge";
 
 type ClientRegistrationFormProps = {
   onFormSubmit?: () => void;
@@ -34,9 +35,11 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   const [isPending, setIsPending] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [requiresGuarantor, setRequiresGuarantor] = useState(true);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const { toast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
   const sigPadRef = useRef<SignatureCanvas>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<z.infer<typeof ClientCreditSchema>>({
     resolver: zodResolver(ClientCreditSchema),
@@ -79,6 +82,32 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     };
   }, [isPending, uploadProgress]);
 
+  useEffect(() => {
+    form.setValue('documents', selectedFiles.length > 0 ? selectedFiles : undefined);
+  }, [selectedFiles, form]);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files) {
+      const newFiles = Array.from(event.target.files);
+      setSelectedFiles((prevFiles) => {
+          const combined = [...prevFiles, ...newFiles];
+          // Enforce max 3 files
+          if (combined.length > 3) {
+              toast({
+                  title: "Límite de archivos alcanzado",
+                  description: "Solo puedes subir un máximo de 3 archivos.",
+                  variant: "destructive"
+              });
+              return prevFiles;
+          }
+          return combined;
+      });
+    }
+  };
+
+  const removeFile = (indexToRemove: number) => {
+    setSelectedFiles((prevFiles) => prevFiles.filter((_, index) => index !== indexToRemove));
+  };
 
   const formatCurrency = (value: string) => {
     if (!value) return "";
@@ -102,6 +131,17 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     setIsPending(true);
     setUploadProgress(10); // Start progress
 
+    // Append files to formData
+    selectedFiles.forEach((file) => {
+      formData.append('documents', file);
+    });
+    
+    // Check and append signature
+    if (sigPadRef.current && !sigPadRef.current.isEmpty()) {
+      const signatureDataUrl = sigPadRef.current.toDataURL('image/png');
+      formData.append('signature', signatureDataUrl);
+    }
+
     const result = await createClientAndCredit(formData);
     
     setUploadProgress(100);
@@ -117,6 +157,8 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         window.dispatchEvent(new CustomEvent('creditos-updated'));
       }
       form.reset();
+      setSelectedFiles([]);
+      clearSignature();
       onFormSubmit?.();
     } else if (result && result.error) {
        toast({
@@ -140,15 +182,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       <form
         ref={formRef}
         action={clientAction}
-        onSubmit={form.handleSubmit(() => {
-            if(formRef.current) {
-                if (sigPadRef.current && !sigPadRef.current.isEmpty()) {
-                  const signatureDataUrl = sigPadRef.current.toDataURL('image/png');
-                  form.setValue('signature', signatureDataUrl);
-                }
-                clientAction(new FormData(formRef.current));
-            }
-        })}
         className="space-y-4"
       >
         <ScrollArea className="h-96 w-full pr-6">
@@ -326,24 +359,54 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 <FormField
                     control={form.control}
                     name="documents"
-                    render={({ field: { value, onChange, ...fieldProps} }) => (
+                    render={() => (
                         <FormItem>
                             <FormLabel>Cargar Documentos (Opcional, máx. 3)</FormLabel>
                             <FormControl>
-                                <div className="relative">
-                                    <UploadCloud className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <>
                                     <Input 
-                                        {...fieldProps}
+                                        ref={fileInputRef}
                                         type="file" 
                                         multiple
-                                        className="pl-8"
-                                        disabled={isPending}
-                                        onChange={(e) => onChange(e.target.files)}
+                                        className="hidden"
+                                        disabled={isPending || selectedFiles.length >= 3}
+                                        onChange={handleFileChange}
                                         accept="image/*,video/*,application/pdf"
                                     />
-                                </div>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={() => fileInputRef.current?.click()}
+                                      disabled={isPending || selectedFiles.length >= 3}
+                                    >
+                                      <UploadCloud className="mr-2" />
+                                      Elegir archivos ({selectedFiles.length}/3)
+                                    </Button>
+                                </>
                             </FormControl>
                             <FormMessage />
+                            {selectedFiles.length > 0 && (
+                              <div className="space-y-2 mt-2">
+                                {selectedFiles.map((file, index) => (
+                                  <div key={index} className="flex items-center justify-between p-2 border rounded-md">
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                      <FileText className="h-5 w-5 shrink-0" />
+                                      <span className="text-sm truncate">{file.name}</span>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6"
+                                      onClick={() => removeFile(index)}
+                                      disabled={isPending}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                         </FormItem>
                     )}
                 />
@@ -396,7 +459,17 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
             <Progress value={uploadProgress} className="w-full" />
           </div>
         )}
-        <Button type="submit" className="w-full" disabled={isPending}>
+        <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={isPending}
+            onClick={() => {
+                if (formRef.current) {
+                    const formData = new FormData(formRef.current);
+                    clientAction(formData);
+                }
+            }}
+        >
           {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {isPending ? "Registrando..." : "Crear Cliente y Crédito"}
         </Button>

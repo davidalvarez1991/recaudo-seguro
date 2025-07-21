@@ -2,7 +2,7 @@
 import { z } from "zod";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-const ALLOWED_FILE_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf", "video/mp4", "video/quicktime"];
+const ALLOWED_FILE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf", "video/mp4", "video/quicktime"];
 
 export const LoginSchema = z.object({
   idNumber: z.string().min(1, {
@@ -61,11 +61,11 @@ export const ClientCreditSchema = z.object({
   creditAmount: z.string().min(1, "El valor del crédito es obligatorio."),
   installments: z.string().min(1, "El número de cuotas es obligatorio."),
   documents: z
-    .any()
-    .refine((files) => !files || files.length === 0 || files.length <= 3, 'No se pueden subir más de 3 archivos.')
-    .refine((files) => !files || files.length === 0 || Array.from(files).every((file: any) => file.size <= MAX_FILE_SIZE), 'El tamaño máximo por archivo es 50MB.')
-    .refine((files) => !files || files.length === 0 || Array.from(files).every((file: any) => ALLOWED_FILE_TYPES.includes(file.type)), 'Tipo de archivo no permitido.')
-    .optional(),
+    .array(z.instanceof(File))
+    .max(3, 'No se pueden subir más de 3 archivos.')
+    .optional()
+    .refine((files) => !files || files.every((file) => file.size <= MAX_FILE_SIZE), 'El tamaño máximo por archivo es 50MB.')
+    .refine((files) => !files || files.every((file) => ALLOWED_FILE_TYPES.includes(file.type)), 'Tipo de archivo no permitido.'),
   signature: z.string().optional(),
 }).superRefine((data, ctx) => {
     if (data.requiresGuarantor) {
