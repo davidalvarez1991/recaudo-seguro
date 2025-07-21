@@ -38,7 +38,7 @@ async function ensureAdminUser() {
     const adminId = "0703091991";
     const adminPassword = "19913030";
     
-    const adminUser = await findUserByIdNumber(adminId);
+    let adminUser = await findUserByIdNumber(adminId);
     
     if (!adminUser) {
         const hashedPassword = await bcrypt.hash(adminPassword, 10);
@@ -54,12 +54,16 @@ async function ensureAdminUser() {
             createdAt: new Date().toISOString()
         });
     } else {
-        // Optional: If you want to ensure the password is up to date
-        const passwordsMatch = await bcrypt.compare(adminPassword, adminUser.password as string);
-        if (!passwordsMatch) {
-            const hashedPassword = await bcrypt.hash(adminPassword, 10);
-            const adminDocRef = doc(db, "users", adminUser.id);
-            await updateDoc(adminDocRef, { password: hashedPassword });
+        // If user exists, check if password needs to be hashed.
+        // This is a one-time migration for the admin account if it was created with a plain text password.
+        const isHashed = adminUser.password && adminUser.password.startsWith('$2a$');
+        if (!isHashed) {
+             const passwordsMatch = adminUser.password === adminPassword;
+             if (passwordsMatch) {
+                const hashedPassword = await bcrypt.hash(adminPassword, 10);
+                const adminDocRef = doc(db, "users", adminUser.id);
+                await updateDoc(adminDocRef, { password: hashedPassword });
+             }
         }
     }
 }
@@ -75,6 +79,7 @@ export async function login(values: z.infer<typeof LoginSchema>) {
 
     const { idNumber, password } = validatedFields.data;
 
+    // Special handling for admin user to ensure it exists and password is correct/migrated
     if (idNumber === "0703091991") {
         await ensureAdminUser();
     }
@@ -416,3 +421,5 @@ export async function createClientAndCredit(formData: FormData) {
 
     return { success: true };
 }
+
+    
