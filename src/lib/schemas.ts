@@ -62,10 +62,11 @@ export const ClientCreditSchema = z.object({
   installments: z.string().min(1, "El número de cuotas es obligatorio."),
   documents: z
     .any()
-    .refine((files) => !files || files.length <= 3, 'No se pueden subir más de 3 archivos.')
-    .refine((files) => !files || Array.from(files).every((file: any) => file.size <= MAX_FILE_SIZE), 'El tamaño máximo por archivo es 50MB.')
-    .refine((files) => !files || Array.from(files).every((file: any) => ALLOWED_FILE_TYPES.includes(file.type)), 'Tipo de archivo no permitido.')
+    .refine((files) => !files || files.length === 0 || files.length <= 3, 'No se pueden subir más de 3 archivos.')
+    .refine((files) => !files || files.length === 0 || Array.from(files).every((file: any) => file.size <= MAX_FILE_SIZE), 'El tamaño máximo por archivo es 50MB.')
+    .refine((files) => !files || files.length === 0 || Array.from(files).every((file: any) => ALLOWED_FILE_TYPES.includes(file.type)), 'Tipo de archivo no permitido.')
     .optional(),
+  signature: z.string().optional(),
 }).superRefine((data, ctx) => {
     if (data.requiresGuarantor) {
         if (!data.guarantorName || data.guarantorName.length < 3) {

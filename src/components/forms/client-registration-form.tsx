@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, DollarSign, UploadCloud } from "lucide-react";
+import { Loader2, DollarSign, UploadCloud, Eraser } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ClientCreditSchema } from "@/lib/schemas";
 import { createClientAndCredit } from "@/lib/actions";
@@ -24,6 +24,7 @@ import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import SignatureCanvas from 'react-signature-canvas';
 
 type ClientRegistrationFormProps = {
   onFormSubmit?: () => void;
@@ -35,6 +36,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   const [requiresGuarantor, setRequiresGuarantor] = useState(true);
   const { toast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
+  const sigPadRef = useRef<SignatureCanvas>(null);
 
   const form = useForm<z.infer<typeof ClientCreditSchema>>({
     resolver: zodResolver(ClientCreditSchema),
@@ -50,6 +52,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       installments: "",
       documents: undefined,
       requiresGuarantor: true,
+      signature: "",
     },
     context: {
         requiresGuarantor: true,
@@ -88,6 +91,11 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     const value = e.target.value;
     const formattedValue = formatCurrency(value);
     form.setValue('creditAmount', formattedValue);
+  };
+
+  const clearSignature = () => {
+    sigPadRef.current?.clear();
+    form.setValue('signature', '');
   };
   
   const clientAction = async (formData: FormData) => {
@@ -134,6 +142,10 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         action={clientAction}
         onSubmit={form.handleSubmit(() => {
             if(formRef.current) {
+                if (sigPadRef.current && !sigPadRef.current.isEmpty()) {
+                  const signatureDataUrl = sigPadRef.current.toDataURL('image/png');
+                  form.setValue('signature', signatureDataUrl);
+                }
                 clientAction(new FormData(formRef.current));
             }
         })}
@@ -335,6 +347,47 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                         </FormItem>
                     )}
                 />
+
+                <Separator className="my-6" />
+
+                <FormField
+                  control={form.control}
+                  name="signature"
+                  render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Firma del Cliente (Opcional)</FormLabel>
+                          <FormControl>
+                              <div className="relative w-full aspect-[2/1] border border-input rounded-md bg-background">
+                                  <SignatureCanvas
+                                      ref={sigPadRef}
+                                      penColor="black"
+                                      canvasProps={{ className: "w-full h-full rounded-md" }}
+                                      onEnd={() => {
+                                        if (sigPadRef.current) {
+                                          field.onChange(sigPadRef.current.toDataURL('image/png'));
+                                        }
+                                      }}
+                                      disabled={isPending}
+                                  />
+                                  <input type="hidden" {...field} />
+                              </div>
+                          </FormControl>
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={clearSignature}
+                            disabled={isPending}
+                            className="mt-2"
+                          >
+                              <Eraser className="mr-2 h-4 w-4" />
+                              Limpiar Firma
+                          </Button>
+                          <FormMessage />
+                      </FormItem>
+                  )}
+              />
+
             </div>
         </ScrollArea>
         {isPending && uploadProgress !== null && (

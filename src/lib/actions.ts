@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
 import { db, storage } from "./firebase";
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, uploadString } from "firebase/storage";
 
 // --- Utility Functions ---
 const findUserByIdNumber = async (idNumber: string) => {
@@ -369,7 +369,7 @@ export async function createClientAndCredit(formData: FormData) {
         return { error: firstError };
     }
     
-    const { idNumber, name, address, contactPhone, guarantorName, guarantorPhone, guarantorAddress, creditAmount, installments, requiresGuarantor } = validatedFields.data;
+    const { idNumber, name, address, contactPhone, guarantorName, guarantorPhone, guarantorAddress, creditAmount, installments, requiresGuarantor, signature } = validatedFields.data;
     
     let existingClient = await findUserByIdNumber(idNumber);
     if (!existingClient) {
@@ -395,6 +395,14 @@ export async function createClientAndCredit(formData: FormData) {
             documentUrls.push(url);
         }
     }
+    
+    let signatureUrl: string | null = null;
+    if (signature) {
+        const signatureRef = ref(storage, `signatures/${providerId}/${idNumber}/signature.png`);
+        const snapshot = await uploadString(signatureRef, signature, 'data_url');
+        signatureUrl = await getDownloadURL(snapshot.ref);
+    }
+
 
     await addDoc(collection(db, "credits"), {
         clienteId: idNumber,
@@ -406,6 +414,7 @@ export async function createClientAndCredit(formData: FormData) {
         fecha: new Date().toISOString(),
         estado: 'Activo',
         documentUrls,
+        signatureUrl,
         guarantor: requiresGuarantor ? {
             name: guarantorName,
             phone: guarantorPhone,
