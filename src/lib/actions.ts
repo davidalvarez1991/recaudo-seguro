@@ -22,25 +22,19 @@ const findUserByIdNumber = async (idNumber: string) => {
     return { id: userDoc.id, ...userDoc.data() };
 };
 
-const findUserById = async (id: string) => {
-    const userRef = doc(db, "users", id);
-    const userSnap = await getDoc(userRef);
-    if (!userSnap.exists()) {
-        return null;
-    }
-    return { id: userSnap.id, ...userSnap.data() };
-}
-
 async function ensureAdminUser() {
     const adminId = "0703091991";
-    let adminUser = await findUserByIdNumber(adminId);
+    const adminPassword = process.env.ADMIN_PASSWORD || "19913030";
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    const usersRef = collection(db, "users");
     
-    if (!adminUser) {
-        const adminPassword = process.env.ADMIN_PASSWORD || "19913030";
-        const hashedPassword = await bcrypt.hash(adminPassword, 10);
-        const usersRef = collection(db, "users");
-        const adminDocRef = doc(usersRef, adminId); 
-        
+    // Check if admin exists by idNumber
+    const q = query(usersRef, where("idNumber", "==", adminId));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+        // Admin doesn't exist, create it. Use the ID number as the document ID for consistency.
+        const adminDocRef = doc(usersRef, adminId);
         await setDoc(adminDocRef, {
             idNumber: adminId,
             password: hashedPassword,
@@ -50,6 +44,13 @@ async function ensureAdminUser() {
             createdAt: new Date().toISOString()
         });
         console.log("Admin user created.");
+    } else {
+        // Admin exists, ensure password is correct.
+        const adminDocRef = querySnapshot.docs[0].ref;
+        await updateDoc(adminDocRef, {
+            password: hashedPassword
+        });
+        console.log("Admin user password reset for safety.");
     }
 }
 
@@ -67,24 +68,20 @@ export async function login(values: z.infer<typeof LoginSchema>) {
 
     const { idNumber, password } = validatedFields.data;
     
-    const usersRef = collection(db, "users");
-    const q = query(usersRef, where("idNumber", "==", idNumber));
-    const querySnapshot = await getDocs(q);
+    const user = await findUserByIdNumber(idNumber);
 
-    if (querySnapshot.empty) {
+    if (!user) {
         return { error: "Cédula o contraseña incorrecta." };
     }
-
-    const userDoc = querySnapshot.docs[0];
-    const userData = userDoc.data();
-
+    
+    const userData: any = user; // To access password field
     const passwordsMatch = await bcrypt.compare(password, userData.password);
 
     if (!passwordsMatch) {
       return { error: "Cédula o contraseña incorrecta." };
     }
     
-    cookies().set('loggedInUser', userDoc.id, { httpOnly: true, path: '/' });
+    cookies().set('loggedInUser', user.id, { httpOnly: true, path: '/' });
     cookies().set('userRole', userData.role, { httpOnly: true, path: '/' });
 
     return { successUrl: `/dashboard/${userData.role}` };
@@ -141,13 +138,20 @@ export async function getUserRole(userId: string) {
     if (cookieRole) {
       return cookieRole;
     }
-    const user = await findUserById(userId);
-    return user?.role || null;
+    // Fallback in case cookie is missing, but do not set it here.
+    const userDocRef = doc(db, "users", userId);
+    const userSnap = await getDoc(userDocRef);
+    if (!userSnap.exists()) return null;
+    return userSnap.data().role || null;
 }
 
 export async function getUserData(userId: string) {
-    const user = await findUserById(userId);
-    if (!user) return null;
+    const userDocRef = doc(db, "users", userId);
+    const userSnap = await getDoc(userDocRef);
+    if (!userSnap.exists()) {
+        return null;
+    }
+    const user = { id: userSnap.id, ...userSnap.data() };
     
     const serializableUser: { [key: string]: any } = { ...user };
     
@@ -166,7 +170,11 @@ export async function getCobradoresByProvider() {
     const providerIdCookie = cookies().get('loggedInUser');
     if (!providerIdCookie) return [];
     
-    const provider = await findUserById(providerIdCookie.value);
+    const providerDocRef = doc(db, "users", providerIdCookie.value);
+    const providerSnap = await getDoc(providerDocRef);
+    if (!providerSnap.exists()) return [];
+    const provider = providerSnap.data();
+
     if (!provider || provider.role !== 'proveedor') return [];
 
     const cobradoresRef = collection(db, "users");
@@ -192,7 +200,11 @@ export async function getCreditsByProvider() {
     const providerIdCookie = cookies().get('loggedInUser');
     if (!providerIdCookie) return [];
     
-    const provider = await findUserById(providerIdCookie.value);
+    const providerDocRef = doc(db, "users", providerIdCookie.value);
+    const providerSnap = await getDoc(providerDocRef);
+    if (!providerSnap.exists()) return [];
+    const provider = providerSnap.data();
+
     if (!provider || provider.role !== 'proveedor') return [];
     
     const creditsRef = collection(db, "credits");
@@ -215,7 +227,11 @@ export async function getCreditsByCobrador() {
     const cobradorIdCookie = cookies().get('loggedInUser');
     if (!cobradorIdCookie) return [];
 
-    const cobrador = await findUserById(cobradorIdCookie.value);
+    const cobradorDocRef = doc(db, "users", cobradorIdCookie.value);
+    const cobradorSnap = await getDoc(cobradorDocRef);
+    if (!cobradorSnap.exists()) return [];
+    const cobrador = cobradorSnap.data();
+    
     if (!cobrador || cobrador.role !== 'cobrador') return [];
     
     const creditsRef = collection(db, "credits");
@@ -239,7 +255,11 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
     if (!providerIdCookie) {
         return { error: "No se pudo identificar al proveedor." };
     }
-    const provider = await findUserById(providerIdCookie.value);
+    const providerDocRef = doc(db, "users", providerIdCookie.value);
+    const providerSnap = await getDoc(providerDocRef);
+    if (!providerSnap.exists()) return { error: "Proveedor no encontrado."};
+    const provider = providerSnap.data();
+
     if (!provider || provider.role !== 'proveedor') {
         return { error: "Acción no autorizada." };
     }
@@ -336,7 +356,11 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     const cobradorIdCookie = cookies().get('loggedInUser');
     if (!cobradorIdCookie) return { error: "No se pudo identificar al cobrador." };
 
-    const cobrador = await findUserById(cobradorIdCookie.value);
+    const cobradorDocRef = doc(db, "users", cobradorIdCookie.value);
+    const cobradorSnap = await getDoc(cobradorDocRef);
+    if (!cobradorSnap.exists()) return { error: "Cobrador no encontrado."};
+    const cobrador = cobradorSnap.data();
+
     if (!cobrador || cobrador.role !== 'cobrador') return { error: "Acción no autorizada." };
     
     const providerId = cobrador.providerId;
@@ -455,3 +479,5 @@ export async function updateCreditSignature(formData: FormData) {
     
     return { success: true };
 }
+
+    
