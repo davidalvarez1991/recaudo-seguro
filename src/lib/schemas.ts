@@ -91,7 +91,8 @@ export const EditCobradorSchema = z.object({
   }).optional().or(z.literal('')),
 });
 
-export const UpdateDocumentsSchema = z.object({
+
+export const UpdateDocumentsOnlySchema = z.object({
   creditId: z.string(),
   documents: z
     .array(z.instanceof(File))
@@ -99,5 +100,9 @@ export const UpdateDocumentsSchema = z.object({
     .optional()
     .refine((files) => !files || files.every((file) => file.size <= MAX_FILE_SIZE), 'El tamaño máximo por archivo es 50MB.')
     .refine((files) => !files || files.every((file) => ALLOWED_FILE_TYPES.includes(file.type)), 'Tipo de archivo no permitido.'),
-  signature: z.string().optional(),
+});
+
+export const UpdateSignatureOnlySchema = z.object({
+    creditId: z.string(),
+    signature: z.string().min(1, "La firma no puede estar vacía."),
 });

@@ -2,7 +2,7 @@
 "use server";
 
 import { z } from "zod";
-import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, UpdateDocumentsSchema } from "./schemas";
+import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, UpdateDocumentsOnlySchema, UpdateSignatureOnlySchema } from "./schemas";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
@@ -141,6 +141,9 @@ export async function getUserRole(userId: string) {
     if (cookieRole) {
       return cookieRole;
     }
+    // This part should ideally not be reached if login is working correctly,
+    // but as a fallback, we can fetch from DB.
+    // Avoid writing cookies here.
     const user = await findUserById(userId);
     return user?.role || null;
 }
@@ -387,19 +390,19 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     return { success: true, creditId: creditRef.id };
 }
 
-export async function updateCreditDocumentsAndSignature(formData: FormData) {
+export async function updateCreditDocuments(formData: FormData) {
     const rawData: {[k:string]: any} = Object.fromEntries(formData.entries());
     const documents = formData.getAll('documents').filter(f => (f as File).size > 0);
     rawData.documents = documents.length > 0 ? documents : undefined;
     
-    const validatedFields = UpdateDocumentsSchema.safeParse(rawData);
+    const validatedFields = UpdateDocumentsOnlySchema.safeParse(rawData);
     if (!validatedFields.success) {
         const errors = validatedFields.error.flatten().fieldErrors;
         const firstError = Object.values(errors)[0]?.[0] || "Datos de archivos inválidos.";
         return { error: firstError };
     }
     
-    const { creditId, signature } = validatedFields.data;
+    const { creditId } = validatedFields.data;
     const creditRef = doc(db, "credits", creditId);
     const creditSnap = await getDoc(creditRef);
 
@@ -418,6 +421,33 @@ export async function updateCreditDocumentsAndSignature(formData: FormData) {
         }
     }
     
+    await updateDoc(creditRef, {
+        documentUrls,
+    });
+    
+    return { success: true };
+}
+
+
+export async function updateCreditSignature(formData: FormData) {
+    const rawData: {[k:string]: any} = Object.fromEntries(formData.entries());
+    const validatedFields = UpdateSignatureOnlySchema.safeParse(rawData);
+
+    if (!validatedFields.success) {
+        const errors = validatedFields.error.flatten().fieldErrors;
+        const firstError = Object.values(errors)[0]?.[0] || "Datos de la firma inválidos.";
+        return { error: firstError };
+    }
+
+    const { creditId, signature } = validatedFields.data;
+    const creditRef = doc(db, "credits", creditId);
+    const creditSnap = await getDoc(creditRef);
+
+    if (!creditSnap.exists()) {
+        return { error: "El crédito no fue encontrado." };
+    }
+    const creditData = creditSnap.data();
+    
     let signatureUrl: string | null = creditData.signatureUrl || null;
     if (signature) {
         const signatureRef = ref(storage, `signatures/${creditData.providerId}/${creditData.clienteId}/${creditId}.png`);
@@ -426,7 +456,6 @@ export async function updateCreditDocumentsAndSignature(formData: FormData) {
     }
     
     await updateDoc(creditRef, {
-        documentUrls,
         signatureUrl,
     });
     

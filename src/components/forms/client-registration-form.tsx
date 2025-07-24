@@ -16,10 +16,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, DollarSign, UploadCloud, Eraser, FileText, X, ArrowRight } from "lucide-react";
+import { Loader2, DollarSign, UploadCloud, Eraser, FileText, X, ArrowRight, Save, StepForward } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ClientCreditSchema } from "@/lib/schemas";
-import { createClientAndCredit, updateCreditDocumentsAndSignature } from "@/lib/actions";
+import { createClientAndCredit, updateCreditDocuments, updateCreditSignature } from "@/lib/actions";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -136,33 +136,80 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     }
     setIsPending(false);
   };
+
+  const handleUploadAndContinue = async () => {
+      if (!createdCreditId || selectedFiles.length === 0) {
+        setStep(3); // Skip to signature if no files
+        return;
+      }
+      setIsPending(true);
+      setUploadProgress(0);
+
+      const formData = new FormData();
+      formData.append('creditId', createdCreditId);
+      selectedFiles.forEach(file => {
+          formData.append('documents', file);
+      });
+
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => (prev !== null ? Math.min(prev + 10, 90) : 0));
+      }, 200);
+
+      const result = await updateCreditDocuments(formData);
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+
+      if (result && result.success) {
+          toast({
+            title: "Documentos Guardados",
+            description: "Los archivos han sido subidos correctamente.",
+            variant: "default",
+          });
+          setStep(3);
+      } else if (result && result.error) {
+          toast({
+            title: "Error al guardar archivos",
+            description: result.error,
+            variant: "destructive",
+          });
+      }
+      setIsPending(false);
+      setTimeout(() => setUploadProgress(null), 500);
+  };
   
   const handleFinish = async () => {
     if (!createdCreditId) return;
 
-    setIsPending(true);
-    setUploadProgress(0);
-    
     let signatureDataUrl: string | undefined;
     if (sigPadRef.current && !sigPadRef.current.isEmpty()) {
       signatureDataUrl = sigPadRef.current.toDataURL('image/png');
+    } else {
+        // If no signature, just close the form.
+        toast({
+            title: "Registro Completado",
+            description: "El cliente y crédito han sido creados.",
+            variant: "default",
+            className: "bg-accent text-accent-foreground border-accent",
+        });
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('creditos-updated'));
+        }
+        onFormSubmit?.();
+        return;
     }
+
+    setIsPending(true);
+    setUploadProgress(0);
 
     const formData = new FormData();
     formData.append('creditId', createdCreditId);
-    if (signatureDataUrl) {
-        formData.append('signature', signatureDataUrl);
-    }
-    selectedFiles.forEach(file => {
-        formData.append('documents', file);
-    });
+    formData.append('signature', signatureDataUrl);
 
-    // Simulate upload progress
     const progressInterval = setInterval(() => {
         setUploadProgress(prev => (prev !== null ? Math.min(prev + 10, 90) : 0));
     }, 200);
 
-    const result = await updateCreditDocumentsAndSignature(formData);
+    const result = await updateCreditSignature(formData);
 
     clearInterval(progressInterval);
     setUploadProgress(100);
@@ -170,7 +217,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     if (result && result.success) {
       toast({
         title: "Registro Completado",
-        description: "El cliente, crédito y documentos han sido guardados.",
+        description: "El cliente, crédito y firma han sido guardados.",
         variant: "default",
         className: "bg-accent text-accent-foreground border-accent",
       });
@@ -180,7 +227,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       onFormSubmit?.();
     } else if (result && result.error) {
       toast({
-        title: "Error al guardar archivos",
+        title: "Error al guardar firma",
         description: result.error,
         variant: "destructive",
       });
@@ -424,7 +471,30 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                                 </FormItem>
                             )}
                         />
-                        <Separator className="my-6" />
+                    </div>
+                </ScrollArea>
+                {isPending && uploadProgress !== null && (
+                  <div className="space-y-2 pt-4">
+                    <Label>Subiendo archivos...</Label>
+                    <Progress value={uploadProgress} className="w-full" />
+                  </div>
+                )}
+                <div className="flex gap-2 mt-4">
+                    <Button type="button" variant="outline" onClick={() => setStep(1)} className="w-full" disabled={isPending}>
+                        Volver
+                    </Button>
+                    <Button type="button" onClick={handleUploadAndContinue} className="w-full" disabled={isPending}>
+                        {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <StepForward className="mr-2 h-4 w-4" />}
+                        {selectedFiles.length > 0 ? 'Cargar y Seguir' : 'Omitir y Seguir'}
+                    </Button>
+                </div>
+            </>
+        );
+      case 3:
+         return (
+            <>
+                <ScrollArea className="h-96 w-full pr-6">
+                    <div className="space-y-4">
                          <FormField
                             control={form.control}
                             name="signature"
@@ -466,17 +536,17 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 </ScrollArea>
                 {isPending && uploadProgress !== null && (
                   <div className="space-y-2 pt-4">
-                    <Label>Subiendo archivos y guardando...</Label>
+                    <Label>Guardando firma...</Label>
                     <Progress value={uploadProgress} className="w-full" />
                   </div>
                 )}
                 <div className="flex gap-2 mt-4">
-                    <Button type="button" variant="outline" onClick={() => setStep(1)} className="w-full" disabled={isPending}>
+                    <Button type="button" variant="outline" onClick={() => setStep(2)} className="w-full" disabled={isPending}>
                         Volver
                     </Button>
                     <Button type="button" onClick={handleFinish} className="w-full" disabled={isPending}>
-                        {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        Finalizar y Guardar
+                        {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        Finalizar y Guardar Firma
                     </Button>
                 </div>
             </>
@@ -485,7 +555,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         return null;
     }
   }
-
 
   return (
     <Form {...form}>
