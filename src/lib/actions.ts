@@ -34,7 +34,7 @@ async function ensureAdminUser() {
 
     if (querySnapshot.empty) {
         // Admin doesn't exist, create it. Use the ID number as the document ID for consistency.
-        const adminDocRef = doc(usersRef, adminId);
+        const adminDocRef = doc(db, "users", adminId);
         await setDoc(adminDocRef, {
             idNumber: adminId,
             password: hashedPassword,
@@ -178,7 +178,7 @@ export async function getCobradoresByProvider() {
     if (!provider || provider.role !== 'proveedor') return [];
 
     const cobradoresRef = collection(db, "users");
-    const q = query(cobradoresRef, where("role", "==", "cobrador"), where("providerId", "==", provider.idNumber));
+    const q = query(cobradoresRef, where("role", "==", "cobrador"), where("providerId", "==", providerIdCookie.value));
     const querySnapshot = await getDocs(q);
 
     return querySnapshot.docs.map(doc => {
@@ -203,21 +203,20 @@ export async function getCreditsByProvider() {
     const providerDocRef = doc(db, "users", providerIdCookie.value);
     const providerSnap = await getDoc(providerDocRef);
     if (!providerSnap.exists()) return [];
-    const provider = providerSnap.data();
-
-    if (!provider || provider.role !== 'proveedor') return [];
+    
+    if (providerSnap.data().role !== 'proveedor') return [];
     
     const creditsRef = collection(db, "credits");
-    const q = query(creditsRef, where("providerId", "==", provider.idNumber));
+    const q = query(creditsRef, where("providerId", "==", providerIdCookie.value));
     const querySnapshot = await getDocs(q);
     
     const credits = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
     for (const credit of credits) {
-        const cobrador = await findUserByIdNumber(credit.cobradorId as string);
-        const cliente = await findUserByIdNumber(credit.clienteId as string);
-        credit.cobradorName = cobrador?.name || 'No disponible';
-        credit.clienteName = cliente?.name || 'No disponible';
+        const cobradorData = await findUserByIdNumber(credit.cobradorId as string);
+        const clienteData = await findUserByIdNumber(credit.clienteId as string);
+        credit.cobradorName = cobradorData?.name || 'No disponible';
+        credit.clienteName = clienteData?.name || 'No disponible';
     }
     
     return credits;
@@ -275,7 +274,7 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
         name: values.name,
         password: hashedPassword,
         role: 'cobrador',
-        providerId: provider.idNumber,
+        providerId: providerIdCookie.value,
         createdAt: new Date().toISOString()
     });
 
@@ -417,32 +416,44 @@ export async function uploadSingleDocument(formData: FormData) {
         const validatedFields = UploadSingleDocumentSchema.safeParse(rawData);
         
         if (!validatedFields.success) {
-            return { error: "Archivo inválido o ID de crédito faltante." };
+            return { error: "Datos de subida inválidos." };
         }
         
         const { creditId, document } = validatedFields.data;
+
+        // 1. Get Credit Data
         const creditRef = doc(db, "credits", creditId);
         const creditSnap = await getDoc(creditRef);
-
         if (!creditSnap.exists()) {
             return { error: "El crédito no fue encontrado." };
         }
         const creditData = creditSnap.data();
         
-        const storageRef = ref(storage, `documents/${creditData.providerId}/${creditData.clienteId}/${Date.now()}_${document.name}`);
-        await uploadBytes(storageRef, document);
+        // 2. Get Provider ID
+        const providerId = creditData.providerId;
+        if (!providerId) {
+             return { error: "El crédito no tiene un proveedor asociado." };
+        }
+
+        // 3. Construct storage path and upload
+        const storageRef = ref(storage, `documents/${providerId}/${creditData.clienteId}/${Date.now()}_${document.name}`);
+        const buffer = await document.arrayBuffer();
+        await uploadBytes(storageRef, buffer);
         const url = await getDownloadURL(storageRef);
 
+        // 4. Update Firestore with the new URL
         const documentUrls = creditData.documentUrls || [];
         documentUrls.push(url);
-
         await updateDoc(creditRef, { documentUrls });
 
         return { success: true, url };
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Upload error:", error);
-        return { error: "No se pudo subir el archivo." };
+        if (error.code) { // Firebase storage errors have a code property
+            return { error: `Error de Firebase Storage: ${error.code}` };
+        }
+        return { error: "Error interno: no se pudo subir el archivo." };
     }
 }
 
@@ -479,5 +490,3 @@ export async function updateCreditSignature(formData: FormData) {
     
     return { success: true };
 }
-
-    
