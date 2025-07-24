@@ -2,7 +2,7 @@
 "use server";
 
 import { z } from "zod";
-import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, UpdateSignatureOnlySchema, UploadSingleDocumentSchema } from "./schemas";
+import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, UpdateSignatureOnlySchema, UploadSingleDocumentSchema, SavePaymentScheduleSchema } from "./schemas";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
@@ -417,6 +417,29 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     });
 
     return { success: true, creditId: creditRef.id };
+}
+
+export async function savePaymentSchedule(values: z.infer<typeof SavePaymentScheduleSchema>) {
+    const validatedFields = SavePaymentScheduleSchema.safeParse(values);
+    if (!validatedFields.success) {
+        return { error: "Datos del calendario inválidos." };
+    }
+
+    const { creditId, paymentFrequency, paymentDates } = validatedFields.data;
+    const creditRef = doc(db, "credits", creditId);
+
+    try {
+        await updateDoc(creditRef, {
+            paymentFrequency,
+            paymentDates, // Store dates as ISO strings
+            paymentScheduleSet: true,
+            updatedAt: Timestamp.now(),
+        });
+        return { success: true };
+    } catch (error) {
+        console.error("Error saving payment schedule:", error);
+        return { error: "No se pudo guardar el calendario de pagos." };
+    }
 }
 
 export async function uploadSingleDocument(formData: FormData) {

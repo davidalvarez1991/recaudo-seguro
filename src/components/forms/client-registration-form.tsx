@@ -16,17 +16,18 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, DollarSign, UploadCloud, Eraser, FileText, X, ArrowRight, Save, StepForward, CheckCircle2, AlertCircle, Upload } from "lucide-react";
+import { Loader2, DollarSign, UploadCloud, Eraser, FileText, X, Save, StepForward, CheckCircle2, AlertCircle, Upload, CalendarIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ClientCreditSchema, UpdateSignatureOnlySchema } from "@/lib/schemas";
-import { createClientAndCredit, updateCreditSignature, uploadSingleDocument } from "@/lib/actions";
+import { ClientCreditSchema } from "@/lib/schemas";
+import { createClientAndCredit, updateCreditSignature, uploadSingleDocument, savePaymentSchedule } from "@/lib/actions";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import SignatureCanvas from 'react-signature-canvas';
 import { cn } from "@/lib/utils";
-
+import { Calendar } from "@/components/ui/calendar";
+import { addDays, getDay, isSameDay, startOfDay } from 'date-fns';
 
 type ClientRegistrationFormProps = {
   onFormSubmit?: () => void;
@@ -39,6 +40,8 @@ type FileWithStatus = {
     error?: string;
 }
 
+type PaymentFrequency = 'diario' | 'semanal' | 'quincenal' | 'mensual';
+
 export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormProps) {
   const [step, setStep] = useState(1);
   const [isPending, setIsPending] = useState(false);
@@ -46,6 +49,11 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   const [requiresGuarantor, setRequiresGuarantor] = useState(false);
   const [filesToUpload, setFilesToUpload] = useState<FileWithStatus[]>([]);
   const [createdCreditId, setCreatedCreditId] = useState<string | null>(null);
+  
+  // State for payment schedule
+  const [paymentFrequency, setPaymentFrequency] = useState<PaymentFrequency>('diario');
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
+  const [month, setMonth] = useState(new Date());
 
   const { toast } = useToast();
   const sigPadRef = useRef<SignatureCanvas>(null);
@@ -96,7 +104,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
           }
           return combined;
       });
-      // Reset file input to allow selecting the same file again
       event.target.value = '';
     }
   };
@@ -142,6 +149,98 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     }
     setIsPending(false);
   };
+
+    const handleDateSelect = (date: Date | undefined) => {
+        if (!date) return;
+        const today = startOfDay(new Date());
+        if (date < today) return; // Prevent selecting past dates
+
+        const updateSelectedDates = (newDates: Date[]) => {
+             const installments = parseInt(form.getValues('installments') || '0', 10);
+             if (installments > 0 && newDates.length > installments) {
+                toast({
+                    title: "Límite de cuotas alcanzado",
+                    description: `No puedes seleccionar más de ${installments} fechas de pago.`,
+                    variant: "destructive",
+                });
+                return;
+            }
+             setSelectedDates(newDates);
+        };
+        
+        const dateWithoutTime = startOfDay(date);
+
+        if (paymentFrequency === 'semanal') {
+            const dayOfWeek = getDay(dateWithoutTime);
+            const firstDate = dateWithoutTime;
+            const newDates = [firstDate];
+            const installments = parseInt(form.getValues('installments') || '1', 10);
+            let currentDate = firstDate;
+            for (let i = 1; i < installments; i++) {
+                currentDate = addDays(currentDate, 7);
+                newDates.push(currentDate);
+            }
+            updateSelectedDates(newDates);
+        } else { // quincenal, mensual, or individual selection for diario
+            const existingIndex = selectedDates.findIndex(d => isSameDay(d, dateWithoutTime));
+            if (existingIndex > -1) {
+                updateSelectedDates(selectedDates.filter((_, i) => i !== existingIndex));
+            } else {
+                updateSelectedDates([...selectedDates, dateWithoutTime].sort((a,b) => a.getTime() - b.getTime()));
+            }
+        }
+    };
+    
+    useEffect(() => {
+        const installments = parseInt(form.getValues('installments') || '0', 10);
+        if (installments <= 0) {
+             setSelectedDates([]);
+             return;
+        }
+
+        const today = startOfDay(new Date());
+        let newDates: Date[] = [];
+        
+        if (paymentFrequency === 'diario') {
+            newDates = Array.from({ length: installments }, (_, i) => addDays(today, i));
+        } else if (paymentFrequency === 'quincenal') {
+            newDates = Array.from({ length: installments }, (_, i) => addDays(today, i * 15));
+        } else if (paymentFrequency === 'mensual') {
+            newDates = Array.from({ length: installments }, (_, i) => addDays(today, i * 30));
+        } else {
+             // For weekly, we clear dates and let the user select the first day
+             setSelectedDates([]);
+             return;
+        }
+        setSelectedDates(newDates);
+
+    }, [paymentFrequency, form.getValues('installments')]);
+
+    const handleSaveSchedule = async () => {
+        if (!createdCreditId || selectedDates.length === 0) {
+             toast({
+                title: "Información incompleta",
+                description: "Debes seleccionar las fechas de pago.",
+                variant: "destructive"
+            });
+            return;
+        }
+        
+        setIsPending(true);
+        const result = await savePaymentSchedule({
+            creditId: createdCreditId,
+            paymentFrequency,
+            paymentDates: selectedDates.map(d => d.toISOString())
+        });
+        
+        if (result.success) {
+            toast({ title: "Calendario Guardado", description: "El calendario de pagos se ha guardado correctamente." });
+            setStep(3); // Move to next step
+        } else {
+            toast({ title: "Error", description: result.error, variant: "destructive" });
+        }
+        setIsPending(false);
+    };
   
   const handleUploadAllFiles = async () => {
         if (!createdCreditId) return;
@@ -416,6 +515,63 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       case 2:
         return (
             <>
+                <ScrollArea className="h-[450px] w-full pr-6">
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                             <Label>Frecuencia de Pago</Label>
+                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                {(['diario', 'semanal', 'quincenal', 'mensual'] as PaymentFrequency[]).map((freq) => (
+                                <Button
+                                    key={freq}
+                                    type="button"
+                                    variant={paymentFrequency === freq ? "default" : "outline"}
+                                    onClick={() => setPaymentFrequency(freq)}
+                                    disabled={isPending}
+                                >
+                                    {freq.charAt(0).toUpperCase() + freq.slice(1)}
+                                </Button>
+                                ))}
+                            </div>
+                        </div>
+
+                         <div className="rounded-md border flex justify-center">
+                            <Calendar
+                                mode="multiple"
+                                selected={selectedDates}
+                                onSelect={handleDateSelect}
+                                month={month}
+                                onMonthChange={setMonth}
+                                fromDate={new Date()}
+                                disabled={(date) => date < startOfDay(new Date())}
+                                footer={
+                                     <p className="text-sm text-muted-foreground px-3 pt-2">
+                                        Has seleccionado {selectedDates.length} de {form.getValues('installments') || 0} cuotas.
+                                    </p>
+                                }
+                                modifiers={{
+                                    selected: selectedDates,
+                                }}
+                                modifiersClassNames={{
+                                    selected: 'bg-red-500 text-white hover:bg-red-600 focus:bg-red-600',
+                                }}
+                            />
+                        </div>
+                    </div>
+                </ScrollArea>
+                 <div className="flex gap-2 mt-4">
+                    <Button type="button" variant="outline" onClick={() => setStep(1)} className="w-full" disabled={isPending}>
+                        Volver
+                    </Button>
+                    <Button type="button" onClick={handleSaveSchedule} className="w-full" disabled={isPending || selectedDates.length === 0}>
+                        <Save className="mr-2 h-4 w-4" />
+                        {isPending ? 'Guardando...' : 'Guardar Calendario'}
+                    </Button>
+                </div>
+            </>
+        );
+      case 3:
+        return (
+            <>
                 <ScrollArea className="h-96 w-full pr-6">
                     <div className="space-y-4">
                         <Label>Cargar Documentos (Opcional, máx. 3)</Label>
@@ -479,17 +635,17 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     </div>
                 </ScrollArea>
                 <div className="flex gap-2 mt-4">
-                    <Button type="button" variant="outline" onClick={() => setStep(1)} className="w-full" disabled={isPending}>
+                    <Button type="button" variant="outline" onClick={() => setStep(2)} className="w-full" disabled={isPending}>
                         Volver
                     </Button>
-                    <Button type="button" onClick={() => setStep(3)} className="w-full" disabled={isPending || hasPendingUploads}>
+                    <Button type="button" onClick={() => setStep(4)} className="w-full" disabled={isPending || hasPendingUploads}>
                         <StepForward className="mr-2 h-4 w-4" />
                         Omitir y Seguir
                     </Button>
                 </div>
             </>
         );
-      case 3:
+      case 4:
          return (
             <>
                 <ScrollArea className="h-96 w-full pr-6">
@@ -540,7 +696,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                   </div>
                 )}
                 <div className="flex gap-2 mt-4">
-                    <Button type="button" variant="outline" onClick={() => setStep(2)} className="w-full" disabled={isPending}>
+                    <Button type="button" variant="outline" onClick={() => setStep(3)} className="w-full" disabled={isPending}>
                         Volver
                     </Button>
                     <Button type="button" onClick={handleFinish} className="w-full" disabled={isPending}>

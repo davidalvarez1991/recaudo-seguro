@@ -119,3 +119,9 @@ export const UpdateSignatureOnlySchema = z.object({
     creditId: z.string(),
     signature: z.string().min(1, "La firma no puede estar vacía."),
 });
+
+export const SavePaymentScheduleSchema = z.object({
+  creditId: z.string().min(1, "El ID del crédito es obligatorio."),
+  paymentFrequency: z.enum(['diario', 'semanal', 'quincenal', 'mensual']),
+  paymentDates: z.array(z.string().datetime()).min(1, "Se requiere al menos una fecha de pago."),
+});
