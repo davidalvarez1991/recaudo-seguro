@@ -34,7 +34,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   const [step, setStep] = useState(1);
   const [isPending, setIsPending] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-  const [requiresGuarantor, setRequiresGuarantor] = useState(true);
+  const [requiresGuarantor, setRequiresGuarantor] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [createdCreditId, setCreatedCreditId] = useState<string | null>(null);
 
@@ -55,21 +55,16 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       creditAmount: "",
       installments: "",
       documents: undefined,
-      requiresGuarantor: true,
+      requiresGuarantor: false,
       signature: "",
     },
     context: {
-        requiresGuarantor: true,
+        requiresGuarantor: false,
     }
   });
 
   useEffect(() => {
     form.setValue('requiresGuarantor', requiresGuarantor);
-    if (!requiresGuarantor) {
-      form.setValue('guarantorName', '');
-      form.setValue('guarantorPhone', '');
-      form.setValue('guarantorAddress', '');
-    }
     form.trigger(['guarantorName', 'guarantorPhone', 'guarantorAddress']);
   }, [requiresGuarantor, form]);
   
@@ -498,5 +493,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
+
+    
 
     
