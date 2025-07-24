@@ -386,11 +386,11 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     
     let existingClient = await findUserByIdNumber(idNumber);
     if (!existingClient) {
-        const defaultPassword = await bcrypt.hash('password123', 10);
+        const hashedPassword = await bcrypt.hash(idNumber, 10);
         await addDoc(collection(db, "users"),{
             idNumber,
             name,
-            password: defaultPassword,
+            password: hashedPassword,
             role: 'cliente',
             providerId,
             address,
@@ -496,4 +496,46 @@ export async function updateCreditSignature(formData: FormData) {
     return { success: true };
 }
 
+export async function registerPayment(creditId: string, amount: number) {
+    const cobradorIdCookie = cookies().get('loggedInUser');
+    if (!cobradorIdCookie) return { error: "Acceso no autorizado." };
+
+    const cobradorDocRef = doc(db, "users", cobradorIdCookie.value);
+    const cobradorSnap = await getDoc(cobradorDocRef);
+    if (!cobradorSnap.exists() || cobradorSnap.data().role !== 'cobrador') {
+        return { error: "Acción no autorizada." };
+    }
+    const cobradorId = cobradorSnap.data().idNumber;
+
+    const creditRef = doc(db, "credits", creditId);
+    const creditSnap = await getDoc(creditRef);
+    if (!creditSnap.exists()) {
+        return { error: "Crédito no encontrado." };
+    }
+    const creditData = creditSnap.data();
+
+    const paymentsRef = collection(db, "payments");
+    const q = query(paymentsRef, where("creditId", "==", creditId));
+    const paymentsSnapshot = await getDocs(q);
+    const paidInstallments = paymentsSnapshot.docs.length;
+    
+    if (paidInstallments >= creditData.cuotas) {
+        return { error: "Este crédito ya ha sido pagado en su totalidad." };
+    }
+
+    await addDoc(paymentsRef, {
+        creditId,
+        amount,
+        date: new Date().toISOString(),
+        cobradorId,
+        providerId: creditData.providerId,
+    });
+    
+    const newPaidInstallments = paidInstallments + 1;
+    if (newPaidInstallments >= creditData.cuotas) {
+        await updateDoc(creditRef, { estado: 'Pagado' });
+    }
+
+    return { success: `Pago de $${amount.toLocaleString('es-CO')} registrado.` };
+}
     
