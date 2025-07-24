@@ -2,7 +2,21 @@
 import { z } from "zod";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-const ALLOWED_FILE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf", "video/mp4", "video/quicktime", "video/x-msvideo", "video/x-matroska"];
+const ALLOWED_FILE_TYPES = [
+    "image/jpeg", 
+    "image/png", 
+    "image/webp", 
+    "image/gif", 
+    "image/heic",
+    "image/heif",
+    "application/pdf", 
+    "video/mp4", 
+    "video/quicktime", // .mov
+    "video/x-msvideo", // .avi
+    "video/x-matroska", // .mkv
+    "video/webm",
+    "video/3gpp" // .3gp
+];
 
 export const LoginSchema = z.object({
   idNumber: z.string().min(1, {

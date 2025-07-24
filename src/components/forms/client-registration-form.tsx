@@ -175,7 +175,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         setIsPending(false);
     };
 
-    const allUploadsDone = filesToUpload.every(f => f.status === 'completed' || f.status === 'pending');
     const hasPendingUploads = filesToUpload.some(f => f.status === 'pending' || f.status === 'error');
 
 
