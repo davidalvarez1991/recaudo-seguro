@@ -371,28 +371,26 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                                 <FormItem>
                                     <FormLabel>Cargar Documentos (Opcional, máx. 3)</FormLabel>
                                     <FormControl>
-                                        <>
-                                            <Input 
-                                                ref={fileInputRef}
-                                                type="file" 
-                                                multiple
-                                                className="hidden"
-                                                disabled={isPending || selectedFiles.length >= 3}
-                                                onChange={handleFileChange}
-                                                accept="image/*,video/*,application/pdf"
-                                            />
-                                            <Button
-                                              type="button"
-                                              variant="outline"
-                                              onClick={() => fileInputRef.current?.click()}
-                                              disabled={isPending || selectedFiles.length >= 3}
-                                              className="w-full"
-                                            >
-                                              <UploadCloud className="mr-2" />
-                                              Elegir archivos ({selectedFiles.length}/3)
-                                            </Button>
-                                        </>
+                                      <Input 
+                                          ref={fileInputRef}
+                                          type="file" 
+                                          multiple
+                                          className="hidden"
+                                          disabled={isPending || selectedFiles.length >= 3}
+                                          onChange={handleFileChange}
+                                          accept="image/*,video/*,application/pdf"
+                                      />
                                     </FormControl>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={() => fileInputRef.current?.click()}
+                                      disabled={isPending || selectedFiles.length >= 3}
+                                      className="w-full"
+                                    >
+                                      <UploadCloud className="mr-2" />
+                                      Elegir archivos ({selectedFiles.length}/3)
+                                    </Button>
                                     <FormMessage />
                                     {selectedFiles.length > 0 && (
                                       <div className="space-y-2 mt-2">
@@ -493,5 +491,3 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
-
-    
