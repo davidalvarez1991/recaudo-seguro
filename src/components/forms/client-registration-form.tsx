@@ -65,6 +65,11 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
 
   useEffect(() => {
     form.setValue('requiresGuarantor', requiresGuarantor);
+    if (!requiresGuarantor) {
+      form.setValue('guarantorName', '');
+      form.setValue('guarantorPhone', '');
+      form.setValue('guarantorAddress', '');
+    }
     form.trigger(['guarantorName', 'guarantorPhone', 'guarantorAddress']);
   }, [requiresGuarantor, form]);
   
@@ -493,3 +498,5 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
+
+    
