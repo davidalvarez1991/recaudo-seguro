@@ -2,7 +2,7 @@
 "use server";
 
 import { z } from "zod";
-import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema } from "./schemas";
+import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, UpdateDocumentsSchema } from "./schemas";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
@@ -33,14 +33,12 @@ const findUserById = async (id: string) => {
 
 async function ensureAdminUser() {
     const adminId = "0703091991";
-    const adminPassword = "19913030";
-    
     let adminUser = await findUserByIdNumber(adminId);
     
     if (!adminUser) {
+        const adminPassword = process.env.ADMIN_PASSWORD || "19913030";
         const hashedPassword = await bcrypt.hash(adminPassword, 10);
         const usersRef = collection(db, "users");
-        // Use the ID number as the document ID for the admin for predictability
         const adminDocRef = doc(usersRef, adminId); 
         
         await setDoc(adminDocRef, {
@@ -51,18 +49,7 @@ async function ensureAdminUser() {
             email: 'admin@recaudo.seguro',
             createdAt: new Date().toISOString()
         });
-    } else {
-        // If user exists, check if password needs to be hashed.
-        const isHashed = adminUser.password && adminUser.password.startsWith('$2a$');
-        if (!isHashed) {
-             const passwordsMatch = adminUser.password === adminPassword;
-             if (passwordsMatch) {
-                const hashedPassword = await bcrypt.hash(adminPassword, 10);
-                // Use the document ID fetched from the findUserByIdNumber query
-                const adminDocRef = doc(db, "users", adminUser.id);
-                await updateDoc(adminDocRef, { password: hashedPassword });
-             }
-        }
+        console.log("Admin user created.");
     }
 }
 
@@ -70,6 +57,8 @@ async function ensureAdminUser() {
 // --- Auth Actions ---
 export async function login(values: z.infer<typeof LoginSchema>) {
   try {
+    await ensureAdminUser();
+
     const validatedFields = LoginSchema.safeParse(values);
 
     if (!validatedFields.success) {
@@ -77,28 +66,28 @@ export async function login(values: z.infer<typeof LoginSchema>) {
     }
 
     const { idNumber, password } = validatedFields.data;
-
-    // Special handling for admin user to ensure it exists and password is correct
-    if (idNumber === "0703091991") {
-        await ensureAdminUser();
-    }
     
-    const existingUser = await findUserByIdNumber(idNumber);
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("idNumber", "==", idNumber));
+    const querySnapshot = await getDocs(q);
 
-    if (!existingUser || !existingUser.password) {
+    if (querySnapshot.empty) {
         return { error: "Cédula o contraseña incorrecta." };
     }
 
-    const passwordsMatch = await bcrypt.compare(password, existingUser.password);
+    const userDoc = querySnapshot.docs[0];
+    const userData = userDoc.data();
+
+    const passwordsMatch = await bcrypt.compare(password, userData.password);
 
     if (!passwordsMatch) {
       return { error: "Cédula o contraseña incorrecta." };
     }
     
-    // Use the actual document ID for the cookie
-    cookies().set('loggedInUser', existingUser.id, { httpOnly: true, path: '/' });
+    cookies().set('loggedInUser', userDoc.id, { httpOnly: true, path: '/' });
+    cookies().set('userRole', userData.role, { httpOnly: true, path: '/' });
 
-    return { successUrl: `/dashboard/${existingUser.role}` };
+    return { successUrl: `/dashboard/${userData.role}` };
 
   } catch (error) {
     console.error("Login error:", error);
@@ -134,20 +123,29 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: 'cl
     });
     
     cookies().set('loggedInUser', newUserRef.id, { httpOnly: true, path: '/' });
+    cookies().set('userRole', role, { httpOnly: true, path: '/' });
 
     return { successUrl: `/dashboard/${role}` };
 }
 
 export async function logout() {
   cookies().set('loggedInUser', '', { expires: new Date(0), path: '/' });
+  cookies().set('userRole', '', { expires: new Date(0), path: '/' });
   return { successUrl: '/login' };
 }
 
 // --- Data Fetching Actions ---
 
 export async function getUserRole(userId: string) {
+    const cookieRole = cookies().get('userRole')?.value;
+    if (cookieRole) return cookieRole;
+
     const user = await findUserById(userId);
-    return user?.role || null;
+    if (user?.role) {
+        cookies().set('userRole', user.role, { httpOnly: true, path: '/' });
+        return user.role;
+    }
+    return null;
 }
 
 export async function getUserData(userId: string) {
@@ -206,7 +204,6 @@ export async function getCreditsByProvider() {
     
     const credits = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    // Enhance credits with related data
     for (const credit of credits) {
         const cobrador = await findUserByIdNumber(credit.cobradorId as string);
         const cliente = await findUserByIdNumber(credit.clienteId as string);
@@ -324,13 +321,11 @@ export async function deleteCobrador(idNumber: string) {
 export async function deleteClientAndCredits(clienteId: string) {
     const batch = writeBatch(db);
 
-    // Delete client user
     const usersRef = collection(db, "users");
     const userQuery = query(usersRef, where("idNumber", "==", clienteId));
     const userSnapshot = await getDocs(userQuery);
     userSnapshot.forEach(doc => batch.delete(doc.ref));
 
-    // Delete associated credits
     const creditsRef = collection(db, "credits");
     const creditQuery = query(creditsRef, where("clienteId", "==", clienteId));
     const creditSnapshot = await getDocs(creditQuery);
@@ -340,7 +335,7 @@ export async function deleteClientAndCredits(clienteId: string) {
     return { success: true };
 }
 
-export async function createClientAndCredit(formData: FormData) {
+export async function createClientAndCredit(values: z.infer<typeof ClientCreditSchema>) {
     const cobradorIdCookie = cookies().get('loggedInUser');
     if (!cobradorIdCookie) return { error: "No se pudo identificar al cobrador." };
 
@@ -350,24 +345,15 @@ export async function createClientAndCredit(formData: FormData) {
     const providerId = cobrador.providerId;
     if(!providerId) return { error: "El cobrador no tiene un proveedor asociado." };
 
-    const rawData: {[k:string]: any} = Object.fromEntries(formData.entries());
-    // Convert requiresGuarantor to boolean
-    rawData.requiresGuarantor = rawData.requiresGuarantor === 'on';
-
-    // Handle documents
-    const documents = formData.getAll('documents').filter(f => (f as File).size > 0);
-    rawData.documents = documents.length > 0 ? documents : undefined;
-    
-    const validatedFields = ClientCreditSchema.safeParse(rawData);
+    const validatedFields = ClientCreditSchema.safeParse(values);
 
     if (!validatedFields.success) {
-        console.error(validatedFields.error.flatten().fieldErrors);
         const errors = validatedFields.error.flatten().fieldErrors;
         const firstError = Object.values(errors)[0]?.[0] || "Datos del formulario inválidos.";
         return { error: firstError };
     }
     
-    const { idNumber, name, address, contactPhone, guarantorName, guarantorPhone, guarantorAddress, creditAmount, installments, requiresGuarantor, signature } = validatedFields.data;
+    const { idNumber, name, address, contactPhone, guarantorName, guarantorPhone, guarantorAddress, creditAmount, installments, requiresGuarantor } = validatedFields.data;
     
     let existingClient = await findUserByIdNumber(idNumber);
     if (!existingClient) {
@@ -383,36 +369,17 @@ export async function createClientAndCredit(formData: FormData) {
             createdAt: new Date().toISOString()
         });
     }
-    
-    const documentUrls: string[] = [];
-    if (validatedFields.data.documents && validatedFields.data.documents.length > 0) {
-        for (const file of validatedFields.data.documents) {
-            const storageRef = ref(storage, `documents/${providerId}/${idNumber}/${file.name}`);
-            await uploadBytes(storageRef, file);
-            const url = await getDownloadURL(storageRef);
-            documentUrls.push(url);
-        }
-    }
-    
-    let signatureUrl: string | null = null;
-    if (signature) {
-        const signatureRef = ref(storage, `signatures/${providerId}/${idNumber}/signature.png`);
-        const snapshot = await uploadString(signatureRef, signature, 'data_url');
-        signatureUrl = await getDownloadURL(snapshot.ref);
-    }
 
-
-    await addDoc(collection(db, "credits"), {
+    const creditRef = await addDoc(collection(db, "credits"), {
         clienteId: idNumber,
-        clienteName: name,
         cobradorId: cobrador.idNumber,
         providerId,
         valor: parseFloat(creditAmount.replace(/\./g, '').replace(',', '.')),
         cuotas: parseInt(installments, 10),
         fecha: new Date().toISOString(),
         estado: 'Activo',
-        documentUrls,
-        signatureUrl,
+        documentUrls: [],
+        signatureUrl: null,
         guarantor: requiresGuarantor ? {
             name: guarantorName,
             phone: guarantorPhone,
@@ -420,5 +387,53 @@ export async function createClientAndCredit(formData: FormData) {
         } : null,
     });
 
+    return { success: true, creditId: creditRef.id };
+}
+
+export async function updateCreditDocumentsAndSignature(formData: FormData) {
+    const rawData: {[k:string]: any} = Object.fromEntries(formData.entries());
+    const documents = formData.getAll('documents').filter(f => (f as File).size > 0);
+    rawData.documents = documents.length > 0 ? documents : undefined;
+    
+    const validatedFields = UpdateDocumentsSchema.safeParse(rawData);
+    if (!validatedFields.success) {
+        const errors = validatedFields.error.flatten().fieldErrors;
+        const firstError = Object.values(errors)[0]?.[0] || "Datos de archivos inválidos.";
+        return { error: firstError };
+    }
+    
+    const { creditId, signature } = validatedFields.data;
+    const creditRef = doc(db, "credits", creditId);
+    const creditSnap = await getDoc(creditRef);
+
+    if (!creditSnap.exists()) {
+        return { error: "El crédito no fue encontrado." };
+    }
+    const creditData = creditSnap.data();
+
+    const documentUrls: string[] = creditData.documentUrls || [];
+    if (validatedFields.data.documents && validatedFields.data.documents.length > 0) {
+        for (const file of validatedFields.data.documents) {
+            const storageRef = ref(storage, `documents/${creditData.providerId}/${creditData.clienteId}/${file.name}`);
+            await uploadBytes(storageRef, file);
+            const url = await getDownloadURL(storageRef);
+            documentUrls.push(url);
+        }
+    }
+    
+    let signatureUrl: string | null = creditData.signatureUrl || null;
+    if (signature) {
+        const signatureRef = ref(storage, `signatures/${creditData.providerId}/${creditData.clienteId}/${creditId}.png`);
+        const snapshot = await uploadString(signatureRef, signature, 'data_url');
+        signatureUrl = await getDownloadURL(snapshot.ref);
+    }
+    
+    await updateDoc(creditRef, {
+        documentUrls,
+        signatureUrl,
+    });
+    
     return { success: true };
 }
+
+    

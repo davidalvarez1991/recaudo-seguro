@@ -61,11 +61,8 @@ export const ClientCreditSchema = z.object({
   creditAmount: z.string().min(1, "El valor del crédito es obligatorio."),
   installments: z.string().min(1, "El número de cuotas es obligatorio."),
   documents: z
-    .array(z.instanceof(File))
-    .max(3, 'No se pueden subir más de 3 archivos.')
-    .optional()
-    .refine((files) => !files || files.every((file) => file.size <= MAX_FILE_SIZE), 'El tamaño máximo por archivo es 50MB.')
-    .refine((files) => !files || files.every((file) => ALLOWED_FILE_TYPES.includes(file.type)), 'Tipo de archivo no permitido.'),
+    .array(z.any())
+    .optional(),
   signature: z.string().optional(),
 }).superRefine((data, ctx) => {
     if (data.requiresGuarantor) {
@@ -93,3 +90,16 @@ export const EditCobradorSchema = z.object({
     message: "La nueva contraseña debe tener al menos 6 caracteres.",
   }).optional().or(z.literal('')),
 });
+
+export const UpdateDocumentsSchema = z.object({
+  creditId: z.string(),
+  documents: z
+    .array(z.instanceof(File))
+    .max(3, 'No se pueden subir más de 3 archivos.')
+    .optional()
+    .refine((files) => !files || files.every((file) => file.size <= MAX_FILE_SIZE), 'El tamaño máximo por archivo es 50MB.')
+    .refine((files) => !files || files.every((file) => ALLOWED_FILE_TYPES.includes(file.type)), 'Tipo de archivo no permitido.'),
+  signature: z.string().optional(),
+});
+
+    
