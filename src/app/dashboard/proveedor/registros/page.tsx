@@ -33,6 +33,9 @@ type Registro = {
   cuotas: number;
   clienteAddress?: string;
   clientePhone?: string;
+  paidInstallments: number;
+  paidAmount: number;
+  remainingBalance: number;
 };
 
 const ADMIN_ID = "0703091991";
@@ -50,7 +53,7 @@ export default function RegistrosPage() {
   const fetchRecords = async () => {
     setLoading(true);
     try {
-      const allActivityRecords: Registro[] = await getCreditsByProvider();
+      const allActivityRecords: any[] = await getCreditsByProvider();
       const formattedRecords = allActivityRecords
         .filter(credito => credito.cobradorId !== ADMIN_ID)
         .map((credito) => ({
@@ -207,21 +210,41 @@ export default function RegistrosPage() {
             <DialogHeader>
                 <DialogTitle>Detalles del Crédito</DialogTitle>
                 <DialogDescription>
-                    Información completa del crédito y documentos de respaldo.
+                    Información completa del crédito, pagos y documentos de respaldo.
                 </DialogDescription>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto pr-4 -mr-2 space-y-6">
                 {selectedRegistro && (
                     <>
+                        <h4 className="font-semibold text-md">Información General</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div><span className="font-semibold text-muted-foreground">Cliente:</span> {selectedRegistro.clienteName}</div>
                             <div><span className="font-semibold text-muted-foreground">Cédula:</span> {selectedRegistro.clienteId}</div>
                             <div><span className="font-semibold text-muted-foreground">Dirección:</span> {selectedRegistro.clienteAddress || 'N/A'}</div>
                             <div><span className="font-semibold text-muted-foreground">Teléfono:</span> {selectedRegistro.clientePhone || 'N/A'}</div>
-                            <div><span className="font-semibold text-muted-foreground">Valor Crédito:</span> ${selectedRegistro.valor.toLocaleString('es-CO')}</div>
-                            <div><span className="font-semibold text-muted-foreground">Cuotas:</span> {selectedRegistro.cuotas}</div>
                             <div><span className="font-semibold text-muted-foreground">Cobrador:</span> {selectedRegistro.cobradorName}</div>
-                            <div><span className="font-semibold text-muted-foreground">Fecha:</span> {selectedRegistro.formattedDate}</div>
+                            <div><span className="font-semibold text-muted-foreground">Fecha Creación:</span> {selectedRegistro.formattedDate}</div>
+                        </div>
+
+                        <Separator />
+                        <h4 className="font-semibold text-md">Resumen del Crédito</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="p-3 bg-muted/50 rounded-md">
+                                <div className="text-sm text-muted-foreground">Valor del Crédito</div>
+                                <div className="text-lg font-bold">${selectedRegistro.valor.toLocaleString('es-CO')}</div>
+                            </div>
+                             <div className="p-3 bg-muted/50 rounded-md">
+                                <div className="text-sm text-muted-foreground">Cuotas</div>
+                                <div className="text-lg font-bold">{selectedRegistro.paidInstallments} / {selectedRegistro.cuotas}</div>
+                            </div>
+                            <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-md">
+                                <div className="text-sm text-green-800 dark:text-green-200">Total Pagado</div>
+                                <div className="text-lg font-bold text-green-900 dark:text-green-100">${selectedRegistro.paidAmount.toLocaleString('es-CO')}</div>
+                            </div>
+                             <div className="p-3 bg-red-100 dark:bg-red-900/50 rounded-md">
+                                <div className="text-sm text-red-800 dark:text-red-200">Saldo Pendiente</div>
+                                <div className="text-lg font-bold text-red-900 dark:text-red-100">${selectedRegistro.remainingBalance.toLocaleString('es-CO')}</div>
+                            </div>
                         </div>
 
                         {selectedRegistro.guarantor && (
@@ -244,13 +267,11 @@ export default function RegistrosPage() {
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                     {selectedRegistro.documentUrls.map((url, index) => (
                                         <div key={index} className="relative group border rounded-lg overflow-hidden">
-                                            {isMediaImage(url) && (
+                                            {isMediaImage(url) ? (
                                                 <Image src={url} alt={`Documento ${index + 1}`} width={200} height={200} className="w-full h-32 object-cover" />
-                                            )}
-                                            {isMediaVideo(url) && (
-                                                <video src={url} controls className="w-full h-32 object-cover" />
-                                            )}
-                                            {!isMediaImage(url) && !isMediaVideo(url) && (
+                                            ) : isMediaVideo(url) ? (
+                                                <video src={url} controls className="w-full h-32 object-cover bg-black" />
+                                            ) : (
                                                  <div className="w-full h-32 flex items-center justify-center bg-muted">
                                                     <ClipboardList className="w-10 h-10 text-muted-foreground" />
                                                  </div>
@@ -306,5 +327,7 @@ export default function RegistrosPage() {
     </>
   );
 }
+
+    
 
     

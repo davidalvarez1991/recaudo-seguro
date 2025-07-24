@@ -26,15 +26,13 @@ async function ensureAdminUser() {
     const adminId = "0703091991";
     const adminPassword = process.env.ADMIN_PASSWORD || "19913030";
     const hashedPassword = await bcrypt.hash(adminPassword, 10);
-    const usersRef = collection(db, "users");
     
-    // Check if admin exists by idNumber
-    const q = query(usersRef, where("idNumber", "==", adminId));
-    const querySnapshot = await getDocs(q);
+    // Use the ID number as the document ID for the admin user for predictable access.
+    const adminDocRef = doc(db, "users", adminId);
+    const adminSnap = await getDoc(adminDocRef);
 
-    if (querySnapshot.empty) {
-        // Admin doesn't exist, create it. Use the ID number as the document ID for consistency.
-        const adminDocRef = doc(db, "users", adminId);
+    if (!adminSnap.exists()) {
+        // Admin doesn't exist, create it.
         await setDoc(adminDocRef, {
             idNumber: adminId,
             password: hashedPassword,
@@ -46,11 +44,9 @@ async function ensureAdminUser() {
         console.log("Admin user created.");
     } else {
         // Admin exists, ensure password is correct.
-        const adminDocRef = querySnapshot.docs[0].ref;
         await updateDoc(adminDocRef, {
             password: hashedPassword
         });
-        console.log("Admin user password reset for safety.");
     }
 }
 
@@ -92,7 +88,7 @@ export async function login(values: z.infer<typeof LoginSchema>) {
   }
 }
 
-export async function register(values: z.infer<typeof RegisterSchema>, role: 'cliente' | 'proveedor') {
+export async function register(values: z.infer<typeof RegisterSchema>, role: 'proveedor') {
     const validatedFields = RegisterSchema.safeParse(values);
 
     if (!validatedFields.success) {
@@ -211,17 +207,29 @@ export async function getCreditsByProvider() {
     const querySnapshot = await getDocs(q);
     
     const creditsPromises = querySnapshot.docs.map(async (docSnapshot) => {
-        const creditData = { id: docSnapshot.id, ...docSnapshot.data() };
+        const creditData: any = { id: docSnapshot.id, ...docSnapshot.data() };
 
         const cobradorData = await findUserByIdNumber(creditData.cobradorId as string);
         const clienteData = await findUserByIdNumber(creditData.clienteId as string);
         
+        // Fetch payments for this credit
+        const paymentsRef = collection(db, "payments");
+        const paymentsQuery = query(paymentsRef, where("creditId", "==", creditData.id));
+        const paymentsSnapshot = await getDocs(paymentsQuery);
+        const payments = paymentsSnapshot.docs.map(p => p.data());
+
+        const paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
+        const remainingBalance = creditData.valor - paidAmount;
+
         return {
             ...creditData,
             cobradorName: cobradorData?.name || 'No disponible',
             clienteName: clienteData?.name || 'No disponible',
             clienteAddress: clienteData?.address || 'No disponible',
             clientePhone: clienteData?.contactPhone || 'No disponible',
+            paidInstallments: payments.length,
+            paidAmount: paidAmount,
+            remainingBalance: remainingBalance,
         };
     });
     
@@ -505,7 +513,7 @@ export async function registerPayment(creditId: string, amount: number) {
     if (!cobradorSnap.exists() || cobradorSnap.data().role !== 'cobrador') {
         return { error: "Acción no autorizada." };
     }
-    const cobradorId = cobradorSnap.data().idNumber;
+    const cobradorData = cobradorSnap.data();
 
     const creditRef = doc(db, "credits", creditId);
     const creditSnap = await getDoc(creditRef);
@@ -527,7 +535,7 @@ export async function registerPayment(creditId: string, amount: number) {
         creditId,
         amount,
         date: new Date().toISOString(),
-        cobradorId,
+        cobradorId: cobradorData.idNumber,
         providerId: creditData.providerId,
     });
     
@@ -538,4 +546,6 @@ export async function registerPayment(creditId: string, amount: number) {
 
     return { success: `Pago de $${amount.toLocaleString('es-CO')} registrado.` };
 }
+    
+
     
