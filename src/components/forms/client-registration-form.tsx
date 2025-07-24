@@ -16,26 +16,35 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, DollarSign, UploadCloud, Eraser, FileText, X, ArrowRight, Save, StepForward } from "lucide-react";
+import { Loader2, DollarSign, UploadCloud, Eraser, FileText, X, ArrowRight, Save, StepForward, CheckCircle2, AlertCircle, Upload } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ClientCreditSchema } from "@/lib/schemas";
-import { createClientAndCredit, updateCreditDocuments, updateCreditSignature } from "@/lib/actions";
+import { ClientCreditSchema, UpdateSignatureOnlySchema } from "@/lib/schemas";
+import { createClientAndCredit, updateCreditSignature, uploadSingleDocument } from "@/lib/actions";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import SignatureCanvas from 'react-signature-canvas';
+import { cn } from "@/lib/utils";
+
 
 type ClientRegistrationFormProps = {
   onFormSubmit?: () => void;
 };
+
+type FileWithStatus = {
+    file: File;
+    status: 'pending' | 'uploading' | 'completed' | 'error';
+    progress: number;
+    error?: string;
+}
 
 export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormProps) {
   const [step, setStep] = useState(1);
   const [isPending, setIsPending] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [requiresGuarantor, setRequiresGuarantor] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [filesToUpload, setFilesToUpload] = useState<FileWithStatus[]>([]);
   const [createdCreditId, setCreatedCreditId] = useState<string | null>(null);
 
   const { toast } = useToast();
@@ -54,7 +63,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       guarantorAddress: "",
       creditAmount: "",
       installments: "",
-      documents: undefined,
       requiresGuarantor: false,
       signature: "",
     },
@@ -73,15 +81,11 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     form.trigger(['guarantorName', 'guarantorPhone', 'guarantorAddress']);
   }, [requiresGuarantor, form]);
   
-  useEffect(() => {
-    form.setValue('documents', selectedFiles.length > 0 ? selectedFiles : undefined);
-  }, [selectedFiles, form]);
-
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
       const newFiles = Array.from(event.target.files);
-      setSelectedFiles((prevFiles) => {
-          const combined = [...prevFiles, ...newFiles];
+      setFilesToUpload((prevFiles) => {
+          const combined = [...prevFiles, ...newFiles.map(f => ({ file: f, status: 'pending' as const, progress: 0 }))];
           if (combined.length > 3) {
               toast({
                   title: "Límite de archivos alcanzado",
@@ -92,11 +96,13 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
           }
           return combined;
       });
+      // Reset file input to allow selecting the same file again
+      event.target.value = '';
     }
   };
 
   const removeFile = (indexToRemove: number) => {
-    setSelectedFiles((prevFiles) => prevFiles.filter((_, index) => index !== indexToRemove));
+    setFilesToUpload((prevFiles) => prevFiles.filter((_, index) => index !== indexToRemove));
   };
 
   const formatCurrency = (value: string) => {
@@ -136,47 +142,43 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     }
     setIsPending(false);
   };
-
-  const handleUploadAndContinue = async () => {
-      if (!createdCreditId || selectedFiles.length === 0) {
-        setStep(3); // Skip to signature if no files
-        return;
-      }
-      setIsPending(true);
-      setUploadProgress(0);
-
-      const formData = new FormData();
-      formData.append('creditId', createdCreditId);
-      selectedFiles.forEach(file => {
-          formData.append('documents', file);
-      });
-
-      const progressInterval = setInterval(() => {
-        setUploadProgress(prev => (prev !== null ? Math.min(prev + 10, 90) : 0));
-      }, 200);
-
-      const result = await updateCreditDocuments(formData);
-      clearInterval(progressInterval);
-      setUploadProgress(100);
-
-      if (result && result.success) {
-          toast({
-            title: "Documentos Guardados",
-            description: "Los archivos han sido subidos correctamente.",
-            variant: "default",
-          });
-          setStep(3);
-      } else if (result && result.error) {
-          toast({
-            title: "Error al guardar archivos",
-            description: result.error,
-            variant: "destructive",
-          });
-      }
-      setIsPending(false);
-      setTimeout(() => setUploadProgress(null), 500);
-  };
   
+  const handleUploadAllFiles = async () => {
+        if (!createdCreditId) return;
+        setIsPending(true);
+
+        for (let i = 0; i < filesToUpload.length; i++) {
+            const fileWithStatus = filesToUpload[i];
+            if (fileWithStatus.status === 'pending' || fileWithStatus.status === 'error') {
+                
+                setFilesToUpload(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'uploading' } : f));
+                
+                const formData = new FormData();
+                formData.append('creditId', createdCreditId);
+                formData.append('document', fileWithStatus.file);
+                
+                const result = await uploadSingleDocument(formData);
+                
+                if (result.success) {
+                    setFilesToUpload(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'completed' } : f));
+                } else {
+                    setFilesToUpload(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'error', error: result.error } : f));
+                    toast({
+                        title: `Error al subir ${fileWithStatus.file.name}`,
+                        description: result.error || "Inténtalo de nuevo.",
+                        variant: "destructive"
+                    });
+                    break; // Stop on first error
+                }
+            }
+        }
+        setIsPending(false);
+    };
+
+    const allUploadsDone = filesToUpload.every(f => f.status === 'completed' || f.status === 'pending');
+    const hasPendingUploads = filesToUpload.some(f => f.status === 'pending' || f.status === 'error');
+
+
   const handleFinish = async () => {
     if (!createdCreditId) return;
 
@@ -184,7 +186,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     if (sigPadRef.current && !sigPadRef.current.isEmpty()) {
       signatureDataUrl = sigPadRef.current.toDataURL('image/png');
     } else {
-        // If no signature, just close the form.
         toast({
             title: "Registro Completado",
             description: "El cliente y crédito han sido creados.",
@@ -408,7 +409,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
               </div>
             </ScrollArea>
             <Button type="button" onClick={handleNextStep} className="w-full mt-4" disabled={isPending}>
-              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
+              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               {isPending ? "Guardando..." : "Guardar y Siguiente"}
             </Button>
           </>
@@ -418,74 +419,73 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
             <>
                 <ScrollArea className="h-96 w-full pr-6">
                     <div className="space-y-4">
-                        <FormField
-                            control={form.control}
-                            name="documents"
-                            render={() => (
-                                <FormItem>
-                                    <FormLabel>Cargar Documentos (Opcional, máx. 3)</FormLabel>
-                                    <FormControl>
-                                      <Input 
-                                          ref={fileInputRef}
-                                          type="file" 
-                                          multiple
-                                          className="hidden"
-                                          disabled={isPending || selectedFiles.length >= 3}
-                                          onChange={handleFileChange}
-                                          accept="image/*,video/*,application/pdf"
-                                      />
-                                    </FormControl>
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      onClick={() => fileInputRef.current?.click()}
-                                      disabled={isPending || selectedFiles.length >= 3}
-                                      className="w-full"
-                                    >
-                                      <UploadCloud className="mr-2" />
-                                      Elegir archivos ({selectedFiles.length}/3)
-                                    </Button>
-                                    <FormMessage />
-                                    {selectedFiles.length > 0 && (
-                                      <div className="space-y-2 mt-2">
-                                        {selectedFiles.map((file, index) => (
-                                          <div key={index} className="flex items-center justify-between p-2 border rounded-md">
-                                            <div className="flex items-center gap-2 overflow-hidden">
-                                              <FileText className="h-5 w-5 shrink-0" />
-                                              <span className="text-sm truncate">{file.name}</span>
-                                            </div>
-                                            <Button
-                                              type="button"
-                                              variant="ghost"
-                                              size="icon"
-                                              className="h-6 w-6"
-                                              onClick={() => removeFile(index)}
-                                              disabled={isPending}
-                                            >
-                                              <X className="h-4 w-4" />
-                                            </Button>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                </FormItem>
-                            )}
+                        <Label>Cargar Documentos (Opcional, máx. 3)</Label>
+                        <Input 
+                            ref={fileInputRef}
+                            type="file" 
+                            multiple
+                            className="hidden"
+                            disabled={isPending || filesToUpload.length >= 3}
+                            onChange={handleFileChange}
+                            accept="image/*,video/*,application/pdf"
                         />
+                         <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isPending || filesToUpload.length >= 3}
+                            className="w-full"
+                         >
+                            <UploadCloud className="mr-2" />
+                            Elegir archivos ({filesToUpload.length}/3)
+                        </Button>
+                        {filesToUpload.length > 0 && (
+                            <div className="space-y-2 mt-2">
+                            {filesToUpload.map((fileWithStatus, index) => (
+                                <div key={index} className="flex items-center justify-between p-2 border rounded-md">
+                                <div className="flex items-center gap-2 overflow-hidden flex-1">
+                                    <FileText className="h-5 w-5 shrink-0" />
+                                    <span className="text-sm truncate">{fileWithStatus.file.name}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                     {fileWithStatus.status === 'uploading' && <Loader2 className="h-5 w-5 animate-spin text-blue-500" />}
+                                     {fileWithStatus.status === 'completed' && <CheckCircle2 className="h-5 w-5 text-green-500" />}
+                                     {fileWithStatus.status === 'error' && <AlertCircle className="h-5 w-5 text-red-500" />}
+                                     <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6"
+                                        onClick={() => removeFile(index)}
+                                        disabled={isPending}
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                                </div>
+                            ))}
+                            </div>
+                        )}
+                        {filesToUpload.length > 0 && (
+                            <Button
+                                type="button"
+                                onClick={handleUploadAllFiles}
+                                disabled={isPending || !hasPendingUploads}
+                                className="w-full"
+                            >
+                                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                                {isPending ? 'Subiendo...' : 'Iniciar Carga'}
+                            </Button>
+                        )}
                     </div>
                 </ScrollArea>
-                {isPending && uploadProgress !== null && (
-                  <div className="space-y-2 pt-4">
-                    <Label>Subiendo archivos...</Label>
-                    <Progress value={uploadProgress} className="w-full" />
-                  </div>
-                )}
                 <div className="flex gap-2 mt-4">
                     <Button type="button" variant="outline" onClick={() => setStep(1)} className="w-full" disabled={isPending}>
                         Volver
                     </Button>
-                    <Button type="button" onClick={handleUploadAndContinue} className="w-full" disabled={isPending}>
-                        {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <StepForward className="mr-2 h-4 w-4" />}
-                        {selectedFiles.length > 0 ? 'Cargar y Seguir' : 'Omitir y Seguir'}
+                    <Button type="button" onClick={() => setStep(3)} className="w-full" disabled={isPending || hasPendingUploads}>
+                        <StepForward className="mr-2 h-4 w-4" />
+                        Omitir y Seguir
                     </Button>
                 </div>
             </>

@@ -2,7 +2,7 @@
 "use server";
 
 import { z } from "zod";
-import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, UpdateDocumentsOnlySchema, UpdateSignatureOnlySchema } from "./schemas";
+import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, UpdateSignatureOnlySchema, UploadSingleDocumentSchema } from "./schemas";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
@@ -141,9 +141,6 @@ export async function getUserRole(userId: string) {
     if (cookieRole) {
       return cookieRole;
     }
-    // This part should ideally not be reached if login is working correctly,
-    // but as a fallback, we can fetch from DB.
-    // Avoid writing cookies here.
     const user = await findUserById(userId);
     return user?.role || null;
 }
@@ -390,42 +387,39 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     return { success: true, creditId: creditRef.id };
 }
 
-export async function updateCreditDocuments(formData: FormData) {
-    const rawData: {[k:string]: any} = Object.fromEntries(formData.entries());
-    const documents = formData.getAll('documents').filter(f => (f as File).size > 0);
-    rawData.documents = documents.length > 0 ? documents : undefined;
-    
-    const validatedFields = UpdateDocumentsOnlySchema.safeParse(rawData);
-    if (!validatedFields.success) {
-        const errors = validatedFields.error.flatten().fieldErrors;
-        const firstError = Object.values(errors)[0]?.[0] || "Datos de archivos inválidos.";
-        return { error: firstError };
-    }
-    
-    const { creditId } = validatedFields.data;
-    const creditRef = doc(db, "credits", creditId);
-    const creditSnap = await getDoc(creditRef);
-
-    if (!creditSnap.exists()) {
-        return { error: "El crédito no fue encontrado." };
-    }
-    const creditData = creditSnap.data();
-
-    const documentUrls: string[] = creditData.documentUrls || [];
-    if (validatedFields.data.documents && validatedFields.data.documents.length > 0) {
-        for (const file of validatedFields.data.documents) {
-            const storageRef = ref(storage, `documents/${creditData.providerId}/${creditData.clienteId}/${file.name}`);
-            await uploadBytes(storageRef, file);
-            const url = await getDownloadURL(storageRef);
-            documentUrls.push(url);
+export async function uploadSingleDocument(formData: FormData) {
+    try {
+        const rawData: {[k:string]: any} = Object.fromEntries(formData.entries());
+        const validatedFields = UploadSingleDocumentSchema.safeParse(rawData);
+        
+        if (!validatedFields.success) {
+            return { error: "Archivo inválido o ID de crédito faltante." };
         }
+        
+        const { creditId, document } = validatedFields.data;
+        const creditRef = doc(db, "credits", creditId);
+        const creditSnap = await getDoc(creditRef);
+
+        if (!creditSnap.exists()) {
+            return { error: "El crédito no fue encontrado." };
+        }
+        const creditData = creditSnap.data();
+        
+        const storageRef = ref(storage, `documents/${creditData.providerId}/${creditData.clienteId}/${Date.now()}_${document.name}`);
+        await uploadBytes(storageRef, document);
+        const url = await getDownloadURL(storageRef);
+
+        const documentUrls = creditData.documentUrls || [];
+        documentUrls.push(url);
+
+        await updateDoc(creditRef, { documentUrls });
+
+        return { success: true, url };
+
+    } catch (error) {
+        console.error("Upload error:", error);
+        return { error: "No se pudo subir el archivo." };
     }
-    
-    await updateDoc(creditRef, {
-        documentUrls,
-    });
-    
-    return { success: true };
 }
 
 

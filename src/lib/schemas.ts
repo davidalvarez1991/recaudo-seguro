@@ -60,9 +60,6 @@ export const ClientCreditSchema = z.object({
   guarantorAddress: z.string().optional(),
   creditAmount: z.string().min(1, "El valor del crédito es obligatorio."),
   installments: z.string().min(1, "El número de cuotas es obligatorio."),
-  documents: z
-    .array(z.any())
-    .optional(),
   signature: z.string().optional(),
 }).superRefine((data, ctx) => {
     if (data.requiresGuarantor) {
@@ -92,14 +89,16 @@ export const EditCobradorSchema = z.object({
 });
 
 
-export const UpdateDocumentsOnlySchema = z.object({
-  creditId: z.string(),
-  documents: z
-    .array(z.instanceof(File))
-    .max(3, 'No se pueden subir más de 3 archivos.')
-    .optional()
-    .refine((files) => !files || files.every((file) => file.size <= MAX_FILE_SIZE), 'El tamaño máximo por archivo es 50MB.')
-    .refine((files) => !files || files.every((file) => ALLOWED_FILE_TYPES.includes(file.type)), 'Tipo de archivo no permitido.'),
+export const UploadSingleDocumentSchema = z.object({
+    creditId: z.string(),
+    document: z
+      .instanceof(File)
+      .refine((file) => file.size > 0, 'El archivo no puede estar vacío.')
+      .refine((file) => file.size <= MAX_FILE_SIZE, `El tamaño máximo por archivo es 50MB.`)
+      .refine(
+        (file) => ALLOWED_FILE_TYPES.includes(file.type),
+        "Tipo de archivo no permitido."
+      ),
 });
 
 export const UpdateSignatureOnlySchema = z.object({
