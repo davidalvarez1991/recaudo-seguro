@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useState, useRef, useEffect, ChangeEvent } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, DollarSign, UploadCloud, Eraser, FileText, X, ArrowRight } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";

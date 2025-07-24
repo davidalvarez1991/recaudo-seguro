@@ -54,7 +54,7 @@ export const ClientCreditSchema = z.object({
   name: z.string().min(3, "El nombre completo es obligatorio."),
   address: z.string().min(5, "La dirección es obligatoria."),
   contactPhone: z.string().min(10, "El teléfono debe tener 10 dígitos."),
-  requiresGuarantor: z.boolean().default(true),
+  requiresGuarantor: z.boolean().default(false),
   guarantorName: z.string().optional(),
   guarantorPhone: z.string().optional(),
   guarantorAddress: z.string().optional(),
@@ -101,5 +101,3 @@ export const UpdateDocumentsSchema = z.object({
     .refine((files) => !files || files.every((file) => ALLOWED_FILE_TYPES.includes(file.type)), 'Tipo de archivo no permitido.'),
   signature: z.string().optional(),
 });
-
-    
