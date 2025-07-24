@@ -275,7 +275,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                                   <FormItem>
                                   <FormLabel>Nombre del Fiador</FormLabel>
                                   <FormControl>
-                                      <Input {...field} placeholder="Jane Smith" disabled={isPending} />
+                                      <Input {...field} value={field.value || ''} placeholder="Jane Smith" disabled={isPending} />
                                   </FormControl>
                                   <FormMessage />
                                   </FormItem>
@@ -288,7 +288,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                                   <FormItem>
                                   <FormLabel>Teléfono del Fiador</FormLabel>
                                   <FormControl>
-                                      <Input {...field} type="tel" placeholder="3017654321" disabled={isPending} />
+                                      <Input {...field} value={field.value || ''} type="tel" placeholder="3017654321" disabled={isPending} />
                                   </FormControl>
                                   <FormMessage />
                                   </FormItem>
@@ -301,7 +301,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                                   <FormItem>
                                   <FormLabel>Dirección del Fiador</FormLabel>
                                   <FormControl>
-                                      <Input {...field} placeholder="Calle Falsa 123" disabled={isPending} />
+                                      <Input {...field} value={field.value || ''} placeholder="Calle Falsa 123" disabled={isPending} />
                                   </FormControl>
                                   <FormMessage />
                                   </FormItem>
@@ -321,6 +321,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                               <FormControl>
                                   <Input
                                       {...field}
+                                      value={field.value || ''}
                                       type="text"
                                       placeholder="1.000.000" 
                                       disabled={isPending} 
@@ -341,7 +342,8 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                         <FormLabel>Cuotas a Diferir</FormLabel>
                         <FormControl>
                           <Input 
-                              {...field} 
+                              {...field}
+                              value={field.value || ''}
                               type="number" 
                               placeholder="12" 
                               disabled={isPending}
