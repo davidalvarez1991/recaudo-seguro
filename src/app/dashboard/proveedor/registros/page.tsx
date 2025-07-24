@@ -5,14 +5,17 @@ import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, MoreHorizontal, Trash2 } from "lucide-react";
+import { ArrowLeft, ClipboardList, MoreHorizontal, Trash2, Download, Eye } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getCreditsByProvider, deleteClientAndCredits } from "@/lib/actions";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { Separator } from "@/components/ui/separator";
 
 type Registro = {
   id: string;
@@ -24,6 +27,12 @@ type Registro = {
   valor: number;
   fecha: string;
   formattedDate?: string;
+  documentUrls?: string[];
+  signatureUrl?: string | null;
+  guarantor?: { name: string; phone: string; address: string } | null;
+  cuotas: number;
+  clienteAddress?: string;
+  clientePhone?: string;
 };
 
 const ADMIN_ID = "0703091991";
@@ -33,6 +42,7 @@ export default function RegistrosPage() {
   const [loading, setLoading] = useState(true);
   const [selectedRegistro, setSelectedRegistro] = useState<Registro | null>(null);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
@@ -42,7 +52,7 @@ export default function RegistrosPage() {
     try {
       const allActivityRecords: Registro[] = await getCreditsByProvider();
       const formattedRecords = allActivityRecords
-        .filter(credito => credito.cobradorId !== ADMIN_ID) // <-- Filtro para excluir al administrador
+        .filter(credito => credito.cobradorId !== ADMIN_ID)
         .map((credito) => ({
           ...credito,
           tipo: "Creación Crédito",
@@ -66,6 +76,11 @@ export default function RegistrosPage() {
   useEffect(() => {
     fetchRecords();
   }, []);
+
+  const handleViewDetails = (registro: Registro) => {
+    setSelectedRegistro(registro);
+    setIsDetailsModalOpen(true);
+  };
 
   const handleDelete = (registro: Registro) => {
     setSelectedRegistro(registro);
@@ -97,6 +112,9 @@ export default function RegistrosPage() {
     setSelectedRegistro(null);
   };
 
+  const isMediaImage = (url: string) => /\.(jpg|jpeg|png|gif|webp|heic|heif)$/i.test(url);
+  const isMediaVideo = (url: string) => /\.(mp4|mov|avi|mkv|webm|3gp)$/i.test(url);
+
   return (
     <>
       <Card>
@@ -105,7 +123,7 @@ export default function RegistrosPage() {
               <div className="space-y-1">
                   <CardTitle className="text-3xl">Registro de Actividad</CardTitle>
                   <CardDescription>
-                  Visualiza todas las acciones registradas por tus cobradores.
+                  Visualiza todas las acciones registradas por tus cobradores. Haz clic en una fila para ver los detalles.
                   </CardDescription>
               </div>
               <Button asChild variant="outline" className="w-full sm:w-auto">
@@ -133,7 +151,7 @@ export default function RegistrosPage() {
                 </TableHeader>
                 <TableBody>
                   {registros.map((registro) => (
-                    <TableRow key={registro.id}>
+                    <TableRow key={registro.id} onClick={() => handleViewDetails(registro)} className="cursor-pointer">
                       <TableCell>{registro.formattedDate}</TableCell>
                       <TableCell>
                           <div className="font-medium">{registro.cobradorName || 'Nombre no disponible'}</div>
@@ -154,11 +172,15 @@ export default function RegistrosPage() {
                       <TableCell className="text-right">
                          <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
                                     <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
+                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenuItem onClick={() => handleViewDetails(registro)}>
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    Ver Detalles
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleDelete(registro)} className="text-destructive focus:text-destructive">
                                     <Trash2 className="mr-2 h-4 w-4" />
                                     Eliminar Cliente
@@ -180,6 +202,91 @@ export default function RegistrosPage() {
         </CardContent>
       </Card>
       
+      <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+            <DialogHeader>
+                <DialogTitle>Detalles del Crédito</DialogTitle>
+                <DialogDescription>
+                    Información completa del crédito y documentos de respaldo.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto pr-4 -mr-2 space-y-6">
+                {selectedRegistro && (
+                    <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><span className="font-semibold text-muted-foreground">Cliente:</span> {selectedRegistro.clienteName}</div>
+                            <div><span className="font-semibold text-muted-foreground">Cédula:</span> {selectedRegistro.clienteId}</div>
+                            <div><span className="font-semibold text-muted-foreground">Dirección:</span> {selectedRegistro.clienteAddress || 'N/A'}</div>
+                            <div><span className="font-semibold text-muted-foreground">Teléfono:</span> {selectedRegistro.clientePhone || 'N/A'}</div>
+                            <div><span className="font-semibold text-muted-foreground">Valor Crédito:</span> ${selectedRegistro.valor.toLocaleString('es-CO')}</div>
+                            <div><span className="font-semibold text-muted-foreground">Cuotas:</span> {selectedRegistro.cuotas}</div>
+                            <div><span className="font-semibold text-muted-foreground">Cobrador:</span> {selectedRegistro.cobradorName}</div>
+                            <div><span className="font-semibold text-muted-foreground">Fecha:</span> {selectedRegistro.formattedDate}</div>
+                        </div>
+
+                        {selectedRegistro.guarantor && (
+                            <>
+                                <Separator />
+                                <h4 className="font-semibold text-md">Información del Fiador</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div><span className="font-semibold text-muted-foreground">Nombre:</span> {selectedRegistro.guarantor.name}</div>
+                                    <div><span className="font-semibold text-muted-foreground">Teléfono:</span> {selectedRegistro.guarantor.phone}</div>
+                                    <div className="md:col-span-2"><span className="font-semibold text-muted-foreground">Dirección:</span> {selectedRegistro.guarantor.address}</div>
+                                </div>
+                            </>
+                        )}
+                        
+                        <Separator />
+                        
+                        <div>
+                            <h4 className="font-semibold text-md mb-4">Documentos Adjuntos</h4>
+                            {(selectedRegistro.documentUrls && selectedRegistro.documentUrls.length > 0) ? (
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    {selectedRegistro.documentUrls.map((url, index) => (
+                                        <div key={index} className="relative group border rounded-lg overflow-hidden">
+                                            {isMediaImage(url) && (
+                                                <Image src={url} alt={`Documento ${index + 1}`} width={200} height={200} className="w-full h-32 object-cover" />
+                                            )}
+                                            {isMediaVideo(url) && (
+                                                <video src={url} controls className="w-full h-32 object-cover" />
+                                            )}
+                                            {!isMediaImage(url) && !isMediaVideo(url) && (
+                                                 <div className="w-full h-32 flex items-center justify-center bg-muted">
+                                                    <ClipboardList className="w-10 h-10 text-muted-foreground" />
+                                                 </div>
+                                            )}
+                                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Button asChild variant="secondary" size="sm">
+                                                    <a href={url} target="_blank" rel="noopener noreferrer" download>
+                                                        <Download className="mr-2 h-4 w-4" /> Descargar
+                                                    </a>
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (<p className="text-sm text-muted-foreground">No hay documentos adjuntos.</p>)}
+                        </div>
+
+                        <Separator />
+
+                        <div>
+                            <h4 className="font-semibold text-md mb-4">Firma del Cliente</h4>
+                            {selectedRegistro.signatureUrl ? (
+                                <div className="border rounded-lg p-2 bg-muted inline-block">
+                                    <Image src={selectedRegistro.signatureUrl} alt="Firma del cliente" width={300} height={150} className="bg-white" />
+                                </div>
+                            ) : (<p className="text-sm text-muted-foreground">No se registró firma.</p>)}
+                        </div>
+                    </>
+                )}
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsDetailsModalOpen(false)}>Cerrar</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -199,3 +306,5 @@ export default function RegistrosPage() {
     </>
   );
 }
+
+    

@@ -210,17 +210,26 @@ export async function getCreditsByProvider() {
     const q = query(creditsRef, where("providerId", "==", providerIdCookie.value));
     const querySnapshot = await getDocs(q);
     
-    const credits = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const creditsPromises = querySnapshot.docs.map(async (docSnapshot) => {
+        const creditData = { id: docSnapshot.id, ...docSnapshot.data() };
 
-    for (const credit of credits) {
-        const cobradorData = await findUserByIdNumber(credit.cobradorId as string);
-        const clienteData = await findUserByIdNumber(credit.clienteId as string);
-        credit.cobradorName = cobradorData?.name || 'No disponible';
-        credit.clienteName = clienteData?.name || 'No disponible';
-    }
+        const cobradorData = await findUserByIdNumber(creditData.cobradorId as string);
+        const clienteData = await findUserByIdNumber(creditData.clienteId as string);
+        
+        return {
+            ...creditData,
+            cobradorName: cobradorData?.name || 'No disponible',
+            clienteName: clienteData?.name || 'No disponible',
+            clienteAddress: clienteData?.address || 'No disponible',
+            clientePhone: clienteData?.contactPhone || 'No disponible',
+        };
+    });
+    
+    const credits = await Promise.all(creditsPromises);
     
     return credits;
 }
+
 
 export async function getCreditsByCobrador() {
     const cobradorIdCookie = cookies().get('loggedInUser');
@@ -421,7 +430,6 @@ export async function uploadSingleDocument(formData: FormData) {
         
         const { creditId, document } = validatedFields.data;
 
-        // 1. Get Credit Data
         const creditRef = doc(db, "credits", creditId);
         const creditSnap = await getDoc(creditRef);
         if (!creditSnap.exists()) {
@@ -429,19 +437,16 @@ export async function uploadSingleDocument(formData: FormData) {
         }
         const creditData = creditSnap.data();
         
-        // 2. Get Provider ID
         const providerId = creditData.providerId;
         if (!providerId) {
              return { error: "El crédito no tiene un proveedor asociado." };
         }
 
-        // 3. Construct storage path and upload
         const storageRef = ref(storage, `documents/${providerId}/${creditData.clienteId}/${Date.now()}_${document.name}`);
         const buffer = await document.arrayBuffer();
         await uploadBytes(storageRef, buffer);
         const url = await getDownloadURL(storageRef);
 
-        // 4. Update Firestore with the new URL
         const documentUrls = creditData.documentUrls || [];
         documentUrls.push(url);
         await updateDoc(creditRef, { documentUrls });
@@ -490,3 +495,5 @@ export async function updateCreditSignature(formData: FormData) {
     
     return { success: true };
 }
+
+    
