@@ -138,14 +138,14 @@ export async function logout() {
 
 export async function getUserRole(userId: string) {
     const cookieRole = cookies().get('userRole')?.value;
-    if (cookieRole) return cookieRole;
-
-    const user = await findUserById(userId);
-    if (user?.role) {
-        cookies().set('userRole', user.role, { httpOnly: true, path: '/' });
-        return user.role;
+    if (cookieRole) {
+      return cookieRole;
     }
-    return null;
+    // If the cookie is missing, we shouldn't try to set it here.
+    // The user should be redirected to login if critical info is missing.
+    // The layout will handle the redirection if this function returns null.
+    const user = await findUserById(userId);
+    return user?.role || null;
 }
 
 export async function getUserData(userId: string) {
