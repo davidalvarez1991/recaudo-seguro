@@ -62,6 +62,8 @@ export default function CreditosPage() {
   };
   
   const handleRegisterPayment = () => {
+    // Logic to register payment will be implemented here
+    // For now, it just closes the modal
     setIsModalOpen(false);
   };
 
