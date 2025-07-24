@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, ChangeEvent } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, DollarSign, UploadCloud, Eraser, FileText, X, ArrowRight } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -65,6 +65,11 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
 
   useEffect(() => {
     form.setValue('requiresGuarantor', requiresGuarantor);
+    if (!requiresGuarantor) {
+      form.setValue('guarantorName', '');
+      form.setValue('guarantorPhone', '');
+      form.setValue('guarantorAddress', '');
+    }
     form.trigger(['guarantorName', 'guarantorPhone', 'guarantorAddress']);
   }, [requiresGuarantor, form]);
   
@@ -357,7 +362,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
             </ScrollArea>
             <Button type="button" onClick={handleNextStep} className="w-full mt-4" disabled={isPending}>
               {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRight className="mr-2 h-4 w-4" />}
-              {isPending ? "Guardando..." : "Siguiente"}
+              {isPending ? "Guardando..." : "Guardar y Siguiente"}
             </Button>
           </>
         );
@@ -493,7 +498,3 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
-
-    
-
-    

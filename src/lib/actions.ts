@@ -141,9 +141,6 @@ export async function getUserRole(userId: string) {
     if (cookieRole) {
       return cookieRole;
     }
-    // If the cookie is missing, we shouldn't try to set it here.
-    // The user should be redirected to login if critical info is missing.
-    // The layout will handle the redirection if this function returns null.
     const user = await findUserById(userId);
     return user?.role || null;
 }
@@ -435,5 +432,3 @@ export async function updateCreditDocumentsAndSignature(formData: FormData) {
     
     return { success: true };
 }
-
-    
