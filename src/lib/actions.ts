@@ -25,14 +25,12 @@ const findUserByIdNumber = async (idNumber: string) => {
 async function ensureAdminUser() {
     const adminId = "0703091991";
     const adminPassword = process.env.ADMIN_PASSWORD || "19913030";
-    const hashedPassword = await bcrypt.hash(adminPassword, 10);
     
-    // Use the ID number as the document ID for the admin user for predictable access.
     const adminDocRef = doc(db, "users", adminId);
     const adminSnap = await getDoc(adminDocRef);
 
     if (!adminSnap.exists()) {
-        // Admin doesn't exist, create it.
+        const hashedPassword = await bcrypt.hash(adminPassword, 10);
         await setDoc(adminDocRef, {
             idNumber: adminId,
             password: hashedPassword,
@@ -42,11 +40,6 @@ async function ensureAdminUser() {
             createdAt: new Date().toISOString()
         });
         console.log("Admin user created.");
-    } else {
-        // Admin exists, ensure password is correct.
-        await updateDoc(adminDocRef, {
-            password: hashedPassword
-        });
     }
 }
 
@@ -66,21 +59,20 @@ export async function login(values: z.infer<typeof LoginSchema>) {
     
     const user = await findUserByIdNumber(idNumber);
 
-    if (!user) {
+    if (!user || !user.password) {
         return { error: "Cédula o contraseña incorrecta." };
     }
     
-    const userData: any = user; // To access password field
-    const passwordsMatch = await bcrypt.compare(password, userData.password);
+    const passwordsMatch = await bcrypt.compare(password, user.password);
 
     if (!passwordsMatch) {
       return { error: "Cédula o contraseña incorrecta." };
     }
     
     cookies().set('loggedInUser', user.id, { httpOnly: true, path: '/' });
-    cookies().set('userRole', userData.role, { httpOnly: true, path: '/' });
+    cookies().set('userRole', user.role, { httpOnly: true, path: '/' });
 
-    return { successUrl: `/dashboard/${userData.role}` };
+    return { successUrl: `/dashboard/${user.role}` };
 
   } catch (error) {
     console.error("Login error:", error);
@@ -546,6 +538,4 @@ export async function registerPayment(creditId: string, amount: number) {
 
     return { success: `Pago de $${amount.toLocaleString('es-CO')} registrado.` };
 }
-    
-
     
