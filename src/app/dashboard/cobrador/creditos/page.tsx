@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -257,7 +258,7 @@ export default function CreditosPage() {
                                 <p className="font-semibold flex-1">Pagar Cuota</p>
                                 <p className="font-bold text-lg">{formatCurrency((selectedCredit.valor / selectedCredit.cuotas) + selectedCredit.lateFee)}</p>
                             </div>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-xs text-muted-foreground">
                                 Incluye valor a capital ({formatCurrency(selectedCredit.valor / selectedCredit.cuotas)}) + intereses por mora ({formatCurrency(selectedCredit.lateFee)}).
                             </p>
                         </div>
@@ -271,7 +272,7 @@ export default function CreditosPage() {
                                 <p className="font-semibold flex-1">Pagar Valor Total</p>
                                  <p className="font-bold text-lg">{formatCurrency(selectedCredit.totalDebt)}</p>
                             </div>
-                            <p className="text-sm text-muted-foreground">
+                            <p className="text-xs text-muted-foreground">
                                 Liquida completamente el crédito. Incluye capital e intereses pendientes.
                             </p>
                         </div>
@@ -291,7 +292,7 @@ export default function CreditosPage() {
                                 </p>
                                <p className="font-bold text-lg">{formatCurrency(selectedCredit.lateFee)}</p>
                            </div>
-                           <p className="text-sm text-muted-foreground">
+                           <p className="text-xs text-muted-foreground">
                                 Paga únicamente los intereses generados por mora.
                            </p>
                         </div>
