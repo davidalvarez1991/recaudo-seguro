@@ -5,10 +5,10 @@ import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw } from "lucide-react";
+import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw, XCircle } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { getCreditsByCobrador, registerPayment } from "@/lib/actions";
+import { getCreditsByCobrador, registerPayment, registerMissedPayment } from "@/lib/actions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -34,6 +34,7 @@ type Credito = {
   remainingBalance: number;
   lateFee: number;
   totalDebt: number;
+  missedPaymentDays: number;
 };
 
 type PaymentType = "cuota" | "total" | "interes";
@@ -137,6 +138,28 @@ export default function CreditosPage() {
     setIsSubmitting(false);
   };
 
+  const handleMissedPayment = async () => {
+    if (!selectedCredit) return;
+    setIsSubmitting(true);
+    const result = await registerMissedPayment(selectedCredit.id);
+    if (result.success) {
+      toast({
+        title: "Día de Mora Registrado",
+        description: "Se ha registrado un día de mora para este crédito.",
+        className: "bg-accent text-accent-foreground border-accent",
+      });
+      setIsModalOpen(false);
+      fetchCredits(); // Refresh list
+    } else {
+      toast({
+        title: "Error",
+        description: result.error,
+        variant: "destructive",
+      });
+    }
+    setIsSubmitting(false);
+  };
+
   const getPaymentAmount = () => {
     if (!selectedCredit) return 0;
      const installmentAmount = (selectedCredit.valor / selectedCredit.cuotas) + selectedCredit.lateFee;
@@ -147,6 +170,8 @@ export default function CreditosPage() {
         default: return 0;
     }
   }
+
+  const hasInterestOption = (selectedCredit?.lateInterestRate ?? 0) > 0;
 
   return (
     <TooltipProvider>
@@ -225,11 +250,11 @@ export default function CreditosPage() {
             <div className="py-4 space-y-4">
                 <RadioGroup value={paymentType} onValueChange={(value: any) => setPaymentType(value)} className="gap-4">
                     {/* Pagar Cuota */}
-                    <Label htmlFor="payment-cuota" className="flex items-start gap-4 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                    <Label htmlFor="payment-cuota" className="flex items-center gap-4 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
                         <RadioGroupItem value="cuota" id="payment-cuota" className="mt-0.5" />
                         <div className="grid gap-1.5 w-full">
-                            <div className="flex justify-between items-center">
-                                <p className="font-semibold">Pagar Cuota</p>
+                            <div className="flex justify-between items-center w-full">
+                                <p className="font-semibold flex-1">Pagar Cuota</p>
                                 <p className="font-bold text-lg">{formatCurrency((selectedCredit.valor / selectedCredit.cuotas) + selectedCredit.lateFee)}</p>
                             </div>
                             <p className="text-sm text-muted-foreground">
@@ -239,11 +264,11 @@ export default function CreditosPage() {
                     </Label>
 
                     {/* Pagar Total */}
-                    <Label htmlFor="payment-total" className="flex items-start gap-4 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                    <Label htmlFor="payment-total" className="flex items-center gap-4 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
                         <RadioGroupItem value="total" id="payment-total" className="mt-0.5" />
                         <div className="grid gap-1.5 w-full">
-                            <div className="flex justify-between items-center">
-                                <p className="font-semibold">Pagar Valor Total</p>
+                            <div className="flex justify-between items-center w-full">
+                                <p className="font-semibold flex-1">Pagar Valor Total</p>
                                  <p className="font-bold text-lg">{formatCurrency(selectedCredit.totalDebt)}</p>
                             </div>
                             <p className="text-sm text-muted-foreground">
@@ -253,11 +278,11 @@ export default function CreditosPage() {
                     </Label>
 
                      {/* Abono Interes */}
-                    <Label htmlFor="payment-interes" className={`flex items-start gap-4 rounded-md border p-4 transition-colors ${selectedCredit.lateFee > 0 ? 'cursor-pointer hover:bg-muted/50' : 'opacity-50 cursor-not-allowed'}`}>
+                    <Label htmlFor="payment-interes" className={`flex items-center gap-4 rounded-md border p-4 transition-colors ${selectedCredit.lateFee > 0 ? 'cursor-pointer hover:bg-muted/50' : 'opacity-50 cursor-not-allowed'}`}>
                         <RadioGroupItem value="interes" id="payment-interes" disabled={selectedCredit.lateFee <= 0} className="mt-0.5" />
                         <div className="grid gap-1.5 w-full">
-                           <div className="flex justify-between items-center">
-                                <p className="font-semibold flex items-center gap-1">
+                           <div className="flex justify-between items-center w-full">
+                                <p className="font-semibold flex items-center gap-1 flex-1">
                                     Abono a Intereses
                                     <Tooltip>
                                         <TooltipTrigger asChild><Info className="w-4 h-4 text-muted-foreground" /></TooltipTrigger>
@@ -274,12 +299,23 @@ export default function CreditosPage() {
                 </RadioGroup>
             </div>
           )}
-          <DialogFooter>
-             <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancelar</Button>
-            <Button onClick={handleRegisterPayment} disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <HandCoins className="mr-2 h-4 w-4" />}
-              {isSubmitting ? 'Registrando...' : `Registrar Pago (${formatCurrency(getPaymentAmount())})`}
+          <DialogFooter className="sm:justify-between gap-2">
+            <Button
+                variant="destructive"
+                onClick={handleMissedPayment}
+                disabled={isSubmitting || !hasInterestOption}
+                className="w-full sm:w-auto order-last sm:order-first"
+              >
+              <XCircle className="mr-2 h-4 w-4" />
+              Hoy no pagó
             </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancelar</Button>
+              <Button onClick={handleRegisterPayment} disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <HandCoins className="mr-2 h-4 w-4" />}
+                {isSubmitting ? 'Registrando...' : `Registrar Pago (${formatCurrency(getPaymentAmount())})`}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

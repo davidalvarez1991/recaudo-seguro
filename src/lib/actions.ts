@@ -7,7 +7,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
 import { db, storage } from "./firebase";
-import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc, increment } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { startOfDay, differenceInDays } from 'date-fns';
 
@@ -190,29 +190,18 @@ export async function getCobradoresByProvider() {
 }
 
 const calculateLateFee = (credit: any) => {
-    if (!credit.paymentDates || credit.paymentDates.length === 0 || !credit.lateInterestRate || credit.lateInterestRate === 0) {
+    if (!credit.lateInterestRate || credit.lateInterestRate === 0) {
         return 0;
     }
-    const today = startOfDay(new Date());
-    let lateFee = 0;
-    const installmentValue = credit.valor / credit.cuotas;
-
-    // Filter for past due dates that have not been paid
-    const pastDueDates = credit.paymentDates
-        .slice(credit.paidInstallments, credit.cuotas) // Only look at unpaid installments
-        .map((d: string) => startOfDay(new Date(d)))
-        .filter((d: Date) => d < today);
-
-    pastDueDates.forEach((dueDate: Date) => {
-        const daysLate = differenceInDays(today, dueDate);
-        if (daysLate > 0) {
-            // Daily interest rate
-            const dailyRate = credit.lateInterestRate / 100;
-            // Simple interest calculation for each late installment
-            lateFee += installmentValue * dailyRate * daysLate;
-        }
-    });
-
+    const missedDays = credit.missedPaymentDays || 0;
+    if (missedDays <= 0) {
+        return 0;
+    }
+    
+    const dailyRate = credit.lateInterestRate / 100;
+    // Simple interest on the total loan amount for each missed day
+    const lateFee = credit.valor * dailyRate * missedDays;
+    
     return lateFee;
 };
 
@@ -509,6 +498,7 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
             phone: guarantorPhone,
             address: guarantorAddress
         } : null,
+        missedPaymentDays: 0,
     });
 
     return { success: true, creditId: creditRef.id };
@@ -543,6 +533,7 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
         guarantor: null, // Assuming renewal doesn't require guarantor re-entry for simplicity
         paymentFrequency,
         paymentScheduleSet: false, // Will need a schedule
+        missedPaymentDays: 0,
     });
 
     // 2. Mark the old credit as 'Renovado'
@@ -724,4 +715,19 @@ export async function saveProviderSettings(providerId: string, settings: { commi
   return { success: "Configuración guardada exitosamente." };
 }
 
-    
+export async function registerMissedPayment(creditId: string) {
+  const cobradorIdCookie = cookies().get('loggedInUser');
+  if (!cobradorIdCookie) return { error: "Acceso no autorizado." };
+
+  const creditRef = doc(db, "credits", creditId);
+  try {
+    await updateDoc(creditRef, {
+      missedPaymentDays: increment(1),
+      updatedAt: Timestamp.now()
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("Error registering missed payment:", error);
+    return { error: "No se pudo registrar el día de mora." };
+  }
+}
