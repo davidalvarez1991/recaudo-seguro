@@ -14,6 +14,8 @@ type UserData = {
 
 type ProviderData = {
     commissionPercentage?: number;
+    lateInterestRate?: number;
+    isLateInterestActive?: boolean;
     [key: string]: any;
 } | null;
 
@@ -23,6 +25,8 @@ export default async function CobradorDashboard() {
   
   let userName = "Cobrador";
   let commissionPercentage = 20; // Default value
+  let lateInterestRate = 0;
+  let isLateInterestActive = false;
 
   if (userId) {
     const userData: UserData = await getUserData(userId);
@@ -30,8 +34,10 @@ export default async function CobradorDashboard() {
         userName = userData.name;
         if (userData.providerId) {
             const providerData: ProviderData = await getUserData(userData.providerId);
-            if (providerData && providerData.commissionPercentage) {
-                commissionPercentage = providerData.commissionPercentage;
+            if (providerData) {
+                commissionPercentage = providerData.commissionPercentage || 20;
+                lateInterestRate = providerData.lateInterestRate || 0;
+                isLateInterestActive = providerData.isLateInterestActive || false;
             }
         }
     }
@@ -66,7 +72,11 @@ export default async function CobradorDashboard() {
           </p>
         </div>
 
-        <CreditSimulator commissionPercentage={commissionPercentage} />
+        <CreditSimulator 
+            commissionPercentage={commissionPercentage} 
+            lateInterestRate={lateInterestRate}
+            isLateInterestActive={isLateInterestActive}
+        />
         
       </CardContent>
     </Card>

@@ -15,26 +15,38 @@ import { Form, FormControl, FormField, FormItem, FormMessage } from '@/component
 const simulatorSchema = z.object({
   amount: z.string().min(1, 'El valor es requerido.'),
   installments: z.string().min(1, 'El número de cuotas es requerido.'),
+  lateDays: z.string().optional(),
 });
 
 type SimulatorFormValues = z.infer<typeof simulatorSchema>;
 
 type CreditSimulatorProps = {
   commissionPercentage: number;
+  lateInterestRate: number;
+  isLateInterestActive: boolean;
+};
+
+type SimulationResult = {
+    total: number;
+    installment: number;
+    baseAmount: number;
+    commissionAmount: number;
+    lateFee: number;
 };
 
 const formatCurrency = (value: number) => {
     return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 };
 
-export function CreditSimulator({ commissionPercentage }: CreditSimulatorProps) {
-  const [result, setResult] = useState<{ total: number; installment: number } | null>(null);
+export function CreditSimulator({ commissionPercentage, lateInterestRate, isLateInterestActive }: CreditSimulatorProps) {
+  const [result, setResult] = useState<SimulationResult | null>(null);
 
   const form = useForm<SimulatorFormValues>({
     resolver: zodResolver(simulatorSchema),
     defaultValues: {
       amount: '',
       installments: '',
+      lateDays: '0',
     },
   });
 
@@ -51,23 +63,37 @@ export function CreditSimulator({ commissionPercentage }: CreditSimulatorProps) 
   const onSubmit = (data: SimulatorFormValues) => {
     const amount = parseFloat(data.amount.replace(/\./g, ''));
     const installments = parseInt(data.installments, 10);
+    const lateDays = parseInt(data.lateDays || '0', 10);
 
     if (isNaN(amount) || isNaN(installments) || installments <= 0) {
       setResult(null);
       return;
     }
 
-    const totalToPay = amount * (1 + commissionPercentage / 100);
+    const commissionAmount = amount * (commissionPercentage / 100);
+    const baseTotal = amount + commissionAmount;
+    
+    let lateFee = 0;
+    if (isLateInterestActive && lateDays > 0 && lateInterestRate > 0) {
+        const dailyRate = lateInterestRate / 100;
+        // Simplified simulation: interest on the base loan amount for the number of late days.
+        lateFee = amount * dailyRate * lateDays;
+    }
+    
+    const totalToPay = baseTotal + lateFee;
     const installmentAmount = totalToPay / installments;
 
     setResult({
       total: totalToPay,
       installment: installmentAmount,
+      baseAmount: amount,
+      commissionAmount: commissionAmount,
+      lateFee: lateFee,
     });
   };
 
   const handleReset = () => {
-    form.reset({amount: '', installments: ''});
+    form.reset({amount: '', installments: '', lateDays: '0'});
     setResult(null);
   }
 
@@ -114,6 +140,26 @@ export function CreditSimulator({ commissionPercentage }: CreditSimulatorProps) 
                         )}
                     />
                 </div>
+                 {isLateInterestActive && (
+                    <FormField
+                        control={form.control}
+                        name="lateDays"
+                        render={({ field }) => (
+                            <FormItem>
+                                <Label htmlFor="sim-late-days">Días de Mora (Opcional)</Label>
+                                <FormControl>
+                                    <Input 
+                                        id="sim-late-days" 
+                                        type="number" 
+                                        placeholder="0" 
+                                        {...field} 
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                )}
                 <div className="flex flex-col sm:flex-row gap-2">
                     <Button type="submit" className="w-full sm:w-auto">
                         <Calculator className="mr-2 h-4 w-4" />
@@ -140,9 +186,12 @@ export function CreditSimulator({ commissionPercentage }: CreditSimulatorProps) 
                         <p className="text-2xl font-bold text-primary">{formatCurrency(result.total)}</p>
                     </div>
                 </div>
-                 <p className="text-xs text-center text-muted-foreground pt-2">
-                    Cálculo basado en una comisión del {commissionPercentage}%. Este valor es una simulación y puede estar sujeto a otros cargos.
-                </p>
+                <div className="text-xs text-muted-foreground space-y-1 text-center border-t pt-2 mt-2">
+                    <p>Desglose: {formatCurrency(result.baseAmount)} (Capital) + {formatCurrency(result.commissionAmount)} (Comisión) + {formatCurrency(result.lateFee)} (Mora)</p>
+                    <p>
+                        Cálculo basado en una comisión del {commissionPercentage}% y un interés de mora del {lateInterestRate}% diario.
+                    </p>
+                </div>
             </div>
         )}
 
