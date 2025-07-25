@@ -28,7 +28,6 @@ type Registro = {
   fecha: string;
   formattedDate?: string;
   documentUrls?: string[];
-  signatureUrl?: string | null;
   guarantor?: { name: string; phone: string; address: string } | null;
   cuotas: number;
   clienteAddress?: string;
@@ -292,12 +291,11 @@ export default function RegistrosPage() {
                         <Separator />
 
                         <div>
-                            <h4 className="font-semibold text-md mb-4">Firma del Cliente</h4>
-                            {selectedRegistro.signatureUrl ? (
-                                <div className="border rounded-lg p-2 bg-muted inline-block">
-                                    <Image src={selectedRegistro.signatureUrl} alt="Firma del cliente" width={300} height={150} className="bg-white" />
-                                </div>
-                            ) : (<p className="text-sm text-muted-foreground">No se registró firma.</p>)}
+                            <h4 className="font-semibold text-md mb-2">Firma y Aceptación</h4>
+                            <div className="border rounded-lg p-4 bg-muted/50">
+                                <p className="text-sm text-muted-foreground">El cliente ha aceptado los términos y condiciones del contrato.</p>
+                                <p className="font-semibold text-lg">{selectedRegistro.clienteName}</p>
+                            </div>
                         </div>
                     </>
                 )}
@@ -327,7 +325,5 @@ export default function RegistrosPage() {
     </>
   );
 }
-
-    
 
     

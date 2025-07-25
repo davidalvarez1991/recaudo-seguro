@@ -2,7 +2,7 @@
 "use server";
 
 import { z } from "zod";
-import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, UpdateSignatureOnlySchema, UploadSingleDocumentSchema, SavePaymentScheduleSchema } from "./schemas";
+import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, UploadSingleDocumentSchema, SavePaymentScheduleSchema } from "./schemas";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
@@ -408,7 +408,6 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
         fecha: new Date().toISOString(),
         estado: 'Activo',
         documentUrls: [],
-        signatureUrl: null,
         guarantor: requiresGuarantor ? {
             name: guarantorName,
             phone: guarantorPhone,
@@ -485,40 +484,6 @@ export async function uploadSingleDocument(formData: FormData) {
     }
 }
 
-
-export async function updateCreditSignature(formData: FormData) {
-    const rawData: {[k:string]: any} = Object.fromEntries(formData.entries());
-    const validatedFields = UpdateSignatureOnlySchema.safeParse(rawData);
-
-    if (!validatedFields.success) {
-        const errors = validatedFields.error.flatten().fieldErrors;
-        const firstError = Object.values(errors)[0]?.[0] || "Datos de la firma inválidos.";
-        return { error: firstError };
-    }
-
-    const { creditId, signature } = validatedFields.data;
-    const creditRef = doc(db, "credits", creditId);
-    const creditSnap = await getDoc(creditRef);
-
-    if (!creditSnap.exists()) {
-        return { error: "El crédito no fue encontrado." };
-    }
-    const creditData = creditSnap.data();
-    
-    let signatureUrl: string | null = creditData.signatureUrl || null;
-    if (signature) {
-        const signatureRef = ref(storage, `signatures/${creditData.providerId}/${creditData.clienteId}/${creditId}.png`);
-        const snapshot = await uploadString(signatureRef, signature, 'data_url');
-        signatureUrl = await getDownloadURL(snapshot.ref);
-    }
-    
-    await updateDoc(creditRef, {
-        signatureUrl,
-    });
-    
-    return { success: true };
-}
-
 export async function registerPayment(creditId: string, amount: number) {
     const cobradorIdCookie = cookies().get('loggedInUser');
     if (!cobradorIdCookie) return { error: "Acceso no autorizado." };
@@ -561,4 +526,5 @@ export async function registerPayment(creditId: string, amount: number) {
 
     return { success: `Pago de $${amount.toLocaleString('es-CO')} registrado.` };
 }
+
     

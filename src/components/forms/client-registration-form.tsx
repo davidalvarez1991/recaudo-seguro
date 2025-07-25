@@ -19,15 +19,15 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, DollarSign, UploadCloud, Eraser, FileText, X, Save, StepForward, CheckCircle2, AlertCircle, Upload, CalendarIcon } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ClientCreditSchema } from "@/lib/schemas";
-import { createClientAndCredit, updateCreditSignature, uploadSingleDocument, savePaymentSchedule } from "@/lib/actions";
+import { createClientAndCredit, uploadSingleDocument, savePaymentSchedule } from "@/lib/actions";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import SignatureCanvas from 'react-signature-canvas';
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { addDays, getDay, isSameDay, startOfDay } from 'date-fns';
+import { Checkbox } from "@/components/ui/checkbox";
 
 type ClientRegistrationFormProps = {
   onFormSubmit?: () => void;
@@ -45,10 +45,10 @@ type PaymentFrequency = 'diario' | 'semanal' | 'quincenal' | 'mensual';
 export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormProps) {
   const [step, setStep] = useState(1);
   const [isPending, setIsPending] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [requiresGuarantor, setRequiresGuarantor] = useState(false);
   const [filesToUpload, setFilesToUpload] = useState<FileWithStatus[]>([]);
   const [createdCreditId, setCreatedCreditId] = useState<string | null>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   
   // State for payment schedule
   const [paymentFrequency, setPaymentFrequency] = useState<PaymentFrequency>('diario');
@@ -56,7 +56,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   const [month, setMonth] = useState(new Date());
 
   const { toast } = useToast();
-  const sigPadRef = useRef<SignatureCanvas>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<z.infer<typeof ClientCreditSchema>>({
@@ -72,7 +71,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       creditAmount: "",
       installments: "",
       requiresGuarantor: false,
-      signature: "",
     },
     context: {
         requiresGuarantor: false,
@@ -123,11 +121,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     const value = e.target.value;
     const formattedValue = formatCurrency(value);
     form.setValue('creditAmount', formattedValue);
-  };
-
-  const clearSignature = () => {
-    sigPadRef.current?.clear();
-    form.setValue('signature', '');
   };
   
   const handleNextStep = async () => {
@@ -214,7 +207,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         }
         setSelectedDates(newDates);
 
-    }, [paymentFrequency, form.getValues('installments')]);
+    }, [paymentFrequency, form.watch('installments')]);
 
     const handleSaveSchedule = async () => {
         if (!createdCreditId || selectedDates.length === 0) {
@@ -246,32 +239,40 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         if (!createdCreditId) return;
         setIsPending(true);
 
-        for (let i = 0; i < filesToUpload.length; i++) {
-            const fileWithStatus = filesToUpload[i];
-            if (fileWithStatus.status === 'pending' || fileWithStatus.status === 'error') {
-                
-                setFilesToUpload(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'uploading' } : f));
+        const uploadPromises = filesToUpload
+            .filter(f => f.status === 'pending' || f.status === 'error')
+            .map(async (fileWithStatus, i) => {
+                setFilesToUpload(prev => prev.map((f, idx) => f.file.name === fileWithStatus.file.name ? { ...f, status: 'uploading' } : f));
                 
                 const formData = new FormData();
                 formData.append('creditId', createdCreditId);
                 formData.append('document', fileWithStatus.file);
-                
+
                 const result = await uploadSingleDocument(formData);
-                
+
                 if (result.success) {
-                    setFilesToUpload(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'completed' } : f));
+                    setFilesToUpload(prev => prev.map((f, idx) => f.file.name === fileWithStatus.file.name ? { ...f, status: 'completed' } : f));
                 } else {
-                    setFilesToUpload(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'error', error: result.error } : f));
-                    toast({
-                        title: `Error al subir ${fileWithStatus.file.name}`,
-                        description: result.error || "Inténtalo de nuevo.",
-                        variant: "destructive"
-                    });
-                    break; // Stop on first error
+                    setFilesToUpload(prev => prev.map((f, idx) => f.file.name === fileWithStatus.file.name ? { ...f, status: 'error', error: result.error } : f));
+                    throw new Error(result.error || `Error al subir ${fileWithStatus.file.name}`);
                 }
-            }
+            });
+
+        try {
+            await Promise.all(uploadPromises);
+            toast({
+                title: "Carga Completa",
+                description: "Todos los archivos se han subido correctamente.",
+            });
+        } catch (error: any) {
+            toast({
+                title: "Error en la carga",
+                description: error.message,
+                variant: "destructive",
+            });
+        } finally {
+            setIsPending(false);
         }
-        setIsPending(false);
     };
 
     const hasPendingUploads = filesToUpload.some(f => f.status === 'pending' || f.status === 'error');
@@ -280,60 +281,25 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   const handleFinish = async () => {
     if (!createdCreditId) return;
 
-    let signatureDataUrl: string | undefined;
-    if (sigPadRef.current && !sigPadRef.current.isEmpty()) {
-      signatureDataUrl = sigPadRef.current.toDataURL('image/png');
-    } else {
-        toast({
-            title: "Registro Completado",
-            description: "El cliente y crédito han sido creados.",
-            variant: "default",
-            className: "bg-accent text-accent-foreground border-accent",
-        });
-        if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('creditos-updated'));
+    // Check if there are pending files that haven't been uploaded.
+    if (filesToUpload.some(f => f.status !== 'completed')) {
+        const confirmFinish = confirm("Hay archivos pendientes o con errores. ¿Desea finalizar el registro de todos modos?");
+        if (!confirmFinish) {
+            return;
         }
-        onFormSubmit?.();
-        return;
     }
-
-    setIsPending(true);
-    setUploadProgress(0);
-
-    const formData = new FormData();
-    formData.append('creditId', createdCreditId);
-    formData.append('signature', signatureDataUrl);
-
-    const progressInterval = setInterval(() => {
-        setUploadProgress(prev => (prev !== null ? Math.min(prev + 10, 90) : 0));
-    }, 200);
-
-    const result = await updateCreditSignature(formData);
-
-    clearInterval(progressInterval);
-    setUploadProgress(100);
-
-    if (result && result.success) {
-      toast({
+    
+    toast({
         title: "Registro Completado",
-        description: "El cliente, crédito y firma han sido guardados.",
+        description: "El cliente y su crédito han sido creados exitosamente.",
         variant: "default",
         className: "bg-accent text-accent-foreground border-accent",
-      });
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('creditos-updated'));
-      }
-      onFormSubmit?.();
-    } else if (result && result.error) {
-      toast({
-        title: "Error al guardar firma",
-        description: result.error,
-        variant: "destructive",
-      });
-    }
+    });
 
-    setIsPending(false);
-    setTimeout(() => setUploadProgress(null), 500);
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('creditos-updated'));
+    }
+    onFormSubmit?.();
   }
 
   const renderStep = () => {
@@ -563,7 +529,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                         Volver
                     </Button>
                     <Button type="button" onClick={handleSaveSchedule} className="w-full" disabled={isPending || selectedDates.length === 0}>
-                        <Save className="mr-2 h-4 w-4" />
+                        {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                         {isPending ? 'Guardando...' : 'Guardar Calendario'}
                     </Button>
                 </div>
@@ -632,80 +598,34 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                                 {isPending ? 'Subiendo...' : 'Iniciar Carga'}
                             </Button>
                         )}
+                        <Separator className="my-4"/>
+                        <div className="items-top flex space-x-2">
+                            <Checkbox id="terms1" checked={termsAccepted} onCheckedChange={(checked) => setTermsAccepted(checked as boolean)} />
+                            <div className="grid gap-1.5 leading-none">
+                                <label
+                                htmlFor="terms1"
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                El cliente acepta los términos y condiciones del contrato.
+                                </label>
+                                <p className="text-sm text-muted-foreground">
+                                Al marcar esta casilla, se confirma que el cliente ha leído y aceptado el acuerdo.
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 </ScrollArea>
                 <div className="flex gap-2 mt-4">
                     <Button type="button" variant="outline" onClick={() => setStep(2)} className="w-full" disabled={isPending}>
                         Volver
                     </Button>
-                    <Button type="button" onClick={() => setStep(4)} className="w-full" disabled={isPending || hasPendingUploads}>
-                        <StepForward className="mr-2 h-4 w-4" />
-                        Omitir y Seguir
+                    <Button type="button" onClick={handleFinish} className="w-full" disabled={isPending || !termsAccepted}>
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        Finalizar Registro
                     </Button>
                 </div>
             </>
         );
-      case 4:
-         return (
-            <>
-                <ScrollArea className="h-96 w-full pr-6">
-                    <div className="space-y-4">
-                         <FormField
-                            control={form.control}
-                            name="signature"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Firma del Cliente (Opcional)</FormLabel>
-                                    <FormControl>
-                                        <div className="relative w-full aspect-[2/1] border border-input rounded-md bg-background">
-                                            <SignatureCanvas
-                                                ref={sigPadRef}
-                                                penColor="black"
-                                                canvasProps={{ className: "w-full h-full rounded-md" }}
-                                                onEnd={() => {
-                                                  if (sigPadRef.current) {
-                                                    field.onChange(sigPadRef.current.toDataURL('image/png'));
-                                                  }
-                                                }}
-                                                disabled={isPending}
-                                            />
-                                            <input type="hidden" {...field} />
-                                        </div>
-                                    </FormControl>
-                                    <Button 
-                                      type="button" 
-                                      variant="outline" 
-                                      size="sm" 
-                                      onClick={clearSignature}
-                                      disabled={isPending}
-                                      className="mt-2"
-                                    >
-                                        <Eraser className="mr-2 h-4 w-4" />
-                                        Limpiar Firma
-                                    </Button>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    </div>
-                </ScrollArea>
-                {isPending && uploadProgress !== null && (
-                  <div className="space-y-2 pt-4">
-                    <Label>Guardando firma...</Label>
-                    <Progress value={uploadProgress} className="w-full" />
-                  </div>
-                )}
-                <div className="flex gap-2 mt-4">
-                    <Button type="button" variant="outline" onClick={() => setStep(3)} className="w-full" disabled={isPending}>
-                        Volver
-                    </Button>
-                    <Button type="button" onClick={handleFinish} className="w-full" disabled={isPending}>
-                        {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                        Finalizar y Guardar Firma
-                    </Button>
-                </div>
-            </>
-        )
       default:
         return null;
     }
@@ -722,3 +642,5 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
+
+    
