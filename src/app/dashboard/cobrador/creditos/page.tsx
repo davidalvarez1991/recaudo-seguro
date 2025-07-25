@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info } from "lucide-react";
+import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getCreditsByCobrador, registerPayment } from "@/lib/actions";
@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { RenewCreditForm } from "@/components/forms/renew-credit-form";
 
 
 type Credito = {
@@ -46,6 +47,7 @@ export default function CreditosPage() {
   const [selectedCredit, setSelectedCredit] = useState<Credito | null>(null);
   const [paymentType, setPaymentType] = useState<PaymentType>("cuota");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -80,13 +82,19 @@ export default function CreditosPage() {
   }, []);
 
   const handleRowClick = (credito: Credito) => {
-    if (credito.estado === 'Pagado') {
-        toast({ title: "Crédito Completado", description: "Este crédito ya ha sido pagado en su totalidad." });
+    if (credito.estado === 'Renovado') {
+        toast({ title: "Crédito Renovado", description: "Este crédito ya ha sido renovado y reemplazado por uno nuevo." });
         return;
     }
+    
     setSelectedCredit(credito);
-    setPaymentType("cuota"); // Reset to default when opening
-    setIsModalOpen(true);
+
+    if (credito.estado === 'Pagado') {
+        setIsRenewModalOpen(true);
+    } else {
+        setPaymentType("cuota"); // Reset to default when opening
+        setIsModalOpen(true);
+    }
   };
   
   const handleRegisterPayment = async () => {
@@ -148,7 +156,7 @@ export default function CreditosPage() {
               <div className="space-y-1">
                   <CardTitle className="text-3xl">Listado de Créditos</CardTitle>
                   <CardDescription>
-                  Haz clic en un crédito para registrar un pago de cuota.
+                  Haz clic en un crédito para registrar un pago o renovar.
                   </CardDescription>
               </div>
               <Button asChild variant="outline" className="w-full sm:w-auto">
@@ -175,7 +183,7 @@ export default function CreditosPage() {
                   </TableHeader>
                   <TableBody>
                     {creditos.map((credito) => (
-                      <TableRow key={credito.id} onClick={() => handleRowClick(credito)} className={`cursor-pointer ${credito.estado === 'Pagado' ? 'opacity-50 hover:bg-transparent' : ''}`}>
+                      <TableRow key={credito.id} onClick={() => handleRowClick(credito)} className={`cursor-pointer ${credito.estado === 'Renovado' ? 'opacity-50 hover:bg-transparent' : ''}`}>
                         <TableCell>{credito.formattedDate}</TableCell>
                         <TableCell>
                           <div className="font-medium">{credito.clienteName || 'Nombre no disponible'}</div>
@@ -186,7 +194,7 @@ export default function CreditosPage() {
                         </TableCell>
                         <TableCell className="text-center">{credito.paidInstallments}/{credito.cuotas}</TableCell>
                         <TableCell>
-                          <Badge variant={credito.estado === 'Activo' ? 'default' : 'secondary'}>
+                           <Badge variant={credito.estado === 'Activo' ? 'default' : credito.estado === 'Pagado' ? 'secondary' : 'outline'}>
                             {credito.estado}
                           </Badge>
                         </TableCell>
@@ -204,6 +212,7 @@ export default function CreditosPage() {
         </CardContent>
       </Card>
 
+      {/* Payment Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent>
           <DialogHeader>
@@ -274,6 +283,28 @@ export default function CreditosPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Renew Credit Modal */}
+       <Dialog open={isRenewModalOpen} onOpenChange={setIsRenewModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Renovar Crédito</DialogTitle>
+              <DialogDescription>
+                Crear un nuevo crédito para el cliente <span className="font-semibold">{selectedCredit?.clienteName}</span>.
+              </DialogDescription>
+            </DialogHeader>
+            {selectedCredit && (
+              <RenewCreditForm
+                clienteId={selectedCredit.clienteId}
+                oldCreditId={selectedCredit.id}
+                onFormSubmit={() => {
+                  setIsRenewModalOpen(false);
+                  fetchCredits();
+                }}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
     </TooltipProvider>
   );
 }

@@ -2,7 +2,7 @@
 "use server";
 
 import { z } from "zod";
-import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, UploadSingleDocumentSchema, SavePaymentScheduleSchema } from "./schemas";
+import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, UploadSingleDocumentSchema, SavePaymentScheduleSchema, RenewCreditSchema } from "./schemas";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
@@ -330,7 +330,7 @@ export async function getCreditsByCobrador() {
         // Use paidCapital for remainingBalance calculation
         serializableData.remainingBalance = creditData.valor - paidCapital;
         
-        serializableData.lateInterestRate = providerSettings.lateInterestRate || 0;
+        serializableData.lateInterestRate = providerSettings.isLateInterestActive ? (providerSettings.lateInterestRate || 0) : 0;
 
         const lateFee = calculateLateFee(serializableData);
         serializableData.lateFee = lateFee;
@@ -514,6 +514,49 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     return { success: true, creditId: creditRef.id };
 }
 
+export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
+    const cobradorIdCookie = cookies().get('loggedInUser');
+    if (!cobradorIdCookie) return { error: "No se pudo identificar al cobrador." };
+
+    const cobradorDocRef = doc(db, "users", cobradorIdCookie.value);
+    const cobradorSnap = await getDoc(cobradorDocRef);
+    if (!cobradorSnap.exists() || cobradorSnap.data().role !== 'cobrador') {
+        return { error: "Acción no autorizada." };
+    }
+    const cobrador = cobradorSnap.data();
+
+    const providerId = cobrador.providerId;
+    if(!providerId) return { error: "El cobrador no tiene un proveedor asociado." };
+
+    const { clienteId, oldCreditId, creditAmount, installments, paymentFrequency } = values;
+
+    // 1. Create the new credit
+    const newCreditRef = await addDoc(collection(db, "credits"), {
+        clienteId,
+        cobradorId: cobrador.idNumber,
+        providerId,
+        valor: parseFloat(creditAmount.replace(/\./g, '').replace(',', '.')),
+        cuotas: parseInt(installments, 10),
+        fecha: Timestamp.now(),
+        estado: 'Activo',
+        documentUrls: [],
+        guarantor: null, // Assuming renewal doesn't require guarantor re-entry for simplicity
+        paymentFrequency,
+        paymentScheduleSet: false, // Will need a schedule
+    });
+
+    // 2. Mark the old credit as 'Renovado'
+    const oldCreditRef = doc(db, "credits", oldCreditId);
+    await updateDoc(oldCreditRef, {
+        estado: 'Renovado',
+        updatedAt: Timestamp.now(),
+        renewedWithCreditId: newCreditRef.id,
+    });
+
+    return { success: true, newCreditId: newCreditRef.id };
+}
+
+
 export async function savePaymentSchedule(values: z.infer<typeof SavePaymentScheduleSchema>) {
     const validatedFields = SavePaymentScheduleSchema.safeParse(values);
     if (!validatedFields.success) {
@@ -613,16 +656,35 @@ export async function registerPayment(creditId: string, amount: number, type: "c
     const q = query(paymentsRef, where("creditId", "==", creditId));
     const paymentsSnapshot = await getDocs(q);
     const allPayments = paymentsSnapshot.docs.map(doc => doc.data());
-    const paidInstallments = allPayments.filter(p => p.type === 'cuota').length;
     
     let isPaidOff = false;
     if (type === 'total') {
         isPaidOff = true;
     } else {
-        const paidCapitalPayments = allPayments.filter(p => p.type === 'cuota' || p.type ==='total');
-        const totalPaidCapital = paidCapitalPayments.reduce((sum, p) => sum + p.amount, 0);
-        if (totalPaidCapital >= creditData.valor || paidInstallments >= creditData.cuotas) {
-            isPaidOff = true;
+        const capitalPayments = allPayments.filter(p => p.type === 'cuota' || p.type === 'total');
+        const totalPaidCapital = capitalPayments.reduce((sum, p) => sum + p.amount, 0);
+
+        // Fetch the credit again to get the most up-to-date values
+        const freshCreditSnap = await getDoc(creditRef);
+        const freshCreditData = freshCreditSnap.data();
+        if (!freshCreditData) return { error: "Error al recargar el crédito." };
+
+        const providerDocRef = doc(db, "users", freshCreditData.providerId);
+        const providerSnap = await getDoc(providerDocRef);
+        const providerSettings = providerSnap.exists() ? providerSnap.data() : {};
+        const lateInterestRate = providerSettings.isLateInterestActive ? (providerSettings.lateInterestRate || 0) : 0;
+        
+        const lateFee = calculateLateFee({
+            ...freshCreditData,
+            paymentDates: (freshCreditData.paymentDates || []).map((d: any) => d.toDate().toISOString()),
+            paidInstallments: capitalPayments.length,
+            lateInterestRate,
+        });
+
+        const totalDebt = (freshCreditData.valor - totalPaidCapital) + lateFee;
+
+        if (totalDebt <= 0) {
+             isPaidOff = true;
         }
     }
 
