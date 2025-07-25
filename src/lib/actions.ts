@@ -9,6 +9,7 @@ import bcrypt from 'bcryptjs';
 import { db, storage } from "./firebase";
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { startOfDay, differenceInDays } from 'date-fns';
 
 // --- Utility Functions ---
 const findUserByIdNumber = async (idNumber: string) => {
@@ -19,36 +20,21 @@ const findUserByIdNumber = async (idNumber: string) => {
         return null;
     }
     const userDoc = querySnapshot.docs[0];
-    return { id: userDoc.id, ...userDoc.data() };
-};
-
-async function ensureAdminUser() {
-    const adminId = "0703091991";
-    const adminPassword = process.env.ADMIN_PASSWORD || "19913030";
-    
-    const adminDocRef = doc(db, "users", adminId);
-    const adminSnap = await getDoc(adminDocRef);
-
-    if (!adminSnap.exists()) {
-        const hashedPassword = await bcrypt.hash(adminPassword, 10);
-        await setDoc(adminDocRef, {
-            idNumber: adminId,
-            password: hashedPassword,
-            role: 'admin',
-            name: 'Administrador',
-            email: 'admin@recaudo.seguro',
-            createdAt: new Date().toISOString()
-        });
-        console.log("Admin user created.");
+    const data = userDoc.data();
+     const serializableData: { [key: string]: any } = { id: userDoc.id, ...data };
+    // Convert Timestamps to strings
+    if (data.createdAt && data.createdAt instanceof Timestamp) {
+        serializableData.createdAt = data.createdAt.toDate().toISOString();
     }
-}
-
+     if (data.updatedAt && data.updatedAt instanceof Timestamp) {
+        serializableData.updatedAt = data.updatedAt.toDate().toISOString();
+    }
+    return serializableData;
+};
 
 // --- Auth Actions ---
 export async function login(values: z.infer<typeof LoginSchema>) {
   try {
-    await ensureAdminUser();
-
     const validatedFields = LoginSchema.safeParse(values);
 
     if (!validatedFields.success) {
@@ -56,6 +42,13 @@ export async function login(values: z.infer<typeof LoginSchema>) {
     }
 
     const { idNumber, password } = validatedFields.data;
+    
+    // Check for a hardcoded admin user first
+    if (idNumber === "0703091991" && password === "19913030") {
+         cookies().set('loggedInUser', 'admin_0703091991', { httpOnly: true, path: '/' });
+         cookies().set('userRole', 'admin', { httpOnly: true, path: '/' });
+         return { successUrl: `/dashboard/admin` };
+    }
     
     const user = await findUserByIdNumber(idNumber);
 
@@ -122,6 +115,10 @@ export async function logout() {
 // --- Data Fetching Actions ---
 
 export async function getUserRole(userId: string) {
+    // Special case for hardcoded admin
+    if (userId === 'admin_0703091991') {
+        return 'admin';
+    }
     const cookieRole = cookies().get('userRole')?.value;
     if (cookieRole) {
       return cookieRole;
@@ -134,6 +131,14 @@ export async function getUserRole(userId: string) {
 }
 
 export async function getUserData(userId: string) {
+    // Special case for hardcoded admin
+    if (userId === 'admin_0703091991') {
+        return {
+            id: 'admin_0703091991',
+            name: 'Administrador',
+            role: 'admin'
+        };
+    }
     const userDocRef = doc(db, "users", userId);
     const userSnap = await getDoc(userDocRef);
     if (!userSnap.exists()) {
@@ -184,6 +189,33 @@ export async function getCobradoresByProvider() {
     });
 }
 
+const calculateLateFee = (credit: any) => {
+    if (!credit.paymentDates || credit.paymentDates.length === 0 || !credit.lateInterestRate || credit.lateInterestRate === 0) {
+        return 0;
+    }
+    const today = startOfDay(new Date());
+    let lateFee = 0;
+    const installmentValue = credit.valor / credit.cuotas;
+
+    // Filter for past due dates that have not been paid
+    const pastDueDates = credit.paymentDates
+        .slice(credit.paidInstallments, credit.cuotas) // Only look at unpaid installments
+        .map((d: string) => startOfDay(new Date(d)))
+        .filter((d: Date) => d < today);
+
+    pastDueDates.forEach((dueDate: Date) => {
+        const daysLate = differenceInDays(today, dueDate);
+        if (daysLate > 0) {
+            // Daily interest rate
+            const dailyRate = credit.lateInterestRate / 100;
+            // Simple interest calculation for each late installment
+            lateFee += installmentValue * dailyRate * daysLate;
+        }
+    });
+
+    return lateFee;
+};
+
 export async function getCreditsByProvider() {
     const providerIdCookie = cookies().get('loggedInUser');
     if (!providerIdCookie) return [];
@@ -211,15 +243,12 @@ export async function getCreditsByProvider() {
         if (creditData.fecha && creditData.fecha instanceof Timestamp) {
              creditData.fecha = creditData.fecha.toDate().toISOString();
         }
-        if (Array.isArray(creditData.paymentDates)) {
-            creditData.paymentDates = creditData.paymentDates.map((d: any) => {
-                if (d instanceof Timestamp) {
-                    return d.toDate().toISOString();
-                }
-                return d;
-            });
-        }
-
+        creditData.paymentDates = (creditData.paymentDates || []).map((d: any) => {
+            if (d instanceof Timestamp) {
+                return d.toDate().toISOString();
+            }
+            return d;
+        });
 
         const cobradorData = await findUserByIdNumber(creditData.cobradorId as string);
         const clienteData = await findUserByIdNumber(creditData.clienteId as string);
@@ -262,35 +291,50 @@ export async function getCreditsByCobrador() {
     
     if (!cobrador || cobrador.role !== 'cobrador') return [];
     
+    const providerDocRef = doc(db, "users", cobrador.providerId);
+    const providerSnap = await getDoc(providerDocRef);
+    const providerSettings = providerSnap.exists() ? providerSnap.data() : {};
+
     const creditsRef = collection(db, "credits");
     const q = query(creditsRef, where("cobradorId", "==", cobrador.idNumber));
     const querySnapshot = await getDocs(q);
 
     const creditsPromises = querySnapshot.docs.map(async (docSnapshot) => {
         const creditData = docSnapshot.data();
-        const serializableData: { [key: string]: any } = { id: docSnapshot.id, ...creditData };
-
-        // Convert Timestamps to strings
-        if (creditData.updatedAt && creditData.updatedAt instanceof Timestamp) {
-            serializableData.updatedAt = creditData.updatedAt.toDate().toISOString();
-        }
-        if (creditData.createdAt && creditData.createdAt instanceof Timestamp) {
-            serializableData.createdAt = creditData.createdAt.toDate().toISOString();
-        }
-        if (creditData.fecha && creditData.fecha instanceof Timestamp) {
-             serializableData.fecha = creditData.fecha.toDate().toISOString();
-        }
-        if (Array.isArray(creditData.paymentDates)) {
-            serializableData.paymentDates = creditData.paymentDates.map((d: any) => {
-                if (d instanceof Timestamp) {
-                    return d.toDate().toISOString();
-                }
-                return d;
-            });
-        }
         
+        const serializableData: { [key: string]: any } = { id: docSnapshot.id, ...creditData };
+        
+        // Convert Timestamps to strings
+        serializableData.paymentDates = (serializableData.paymentDates || []).map((d: any) => 
+            d instanceof Timestamp ? d.toDate().toISOString() : d
+        );
+        serializableData.fecha = serializableData.fecha instanceof Timestamp ? serializableData.fecha.toDate().toISOString() : serializableData.fecha;
+        serializableData.updatedAt = serializableData.updatedAt instanceof Timestamp ? serializableData.updatedAt.toDate().toISOString() : serializableData.updatedAt;
+        serializableData.createdAt = serializableData.createdAt instanceof Timestamp ? serializableData.createdAt.toDate().toISOString() : serializableData.createdAt;
+
         const cliente = await findUserByIdNumber(creditData.clienteId as string);
         serializableData.clienteName = cliente?.name || 'No disponible';
+
+        // Fetch payments for this credit
+        const paymentsRef = collection(db, "payments");
+        const paymentsQuery = query(paymentsRef, where("creditId", "==", serializableData.id));
+        const paymentsSnapshot = await getDocs(paymentsQuery);
+        const payments = paymentsSnapshot.docs.map(p => p.data());
+        
+        const capitalPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
+        const paidCapital = capitalPayments.reduce((sum, p) => sum + p.amount, 0);
+
+        serializableData.paidInstallments = payments.filter(p => p.type === 'cuota').length;
+        serializableData.paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
+        
+        // Use paidCapital for remainingBalance calculation
+        serializableData.remainingBalance = creditData.valor - paidCapital;
+        
+        serializableData.lateInterestRate = providerSettings.lateInterestRate || 0;
+
+        const lateFee = calculateLateFee(serializableData);
+        serializableData.lateFee = lateFee;
+        serializableData.totalDebt = serializableData.remainingBalance + lateFee;
         
         return serializableData;
     });
@@ -398,7 +442,15 @@ export async function deleteClientAndCredits(clienteId: string) {
     const creditsRef = collection(db, "credits");
     const creditQuery = query(creditsRef, where("clienteId", "==", clienteId));
     const creditSnapshot = await getDocs(creditQuery);
-    creditSnapshot.forEach(doc => batch.delete(doc.ref));
+    
+    // Also delete payments associated with each credit
+    for (const creditDoc of creditSnapshot.docs) {
+        const paymentsRef = collection(db, "payments");
+        const paymentsQuery = query(paymentsRef, where("creditId", "==", creditDoc.id));
+        const paymentsSnapshot = await getDocs(paymentsQuery);
+        paymentsSnapshot.forEach(paymentDoc => batch.delete(paymentDoc.ref));
+        batch.delete(creditDoc.ref);
+    }
     
     await batch.commit();
     return { success: true };
@@ -449,7 +501,7 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
         providerId,
         valor: parseFloat(creditAmount.replace(/\./g, '').replace(',', '.')),
         cuotas: parseInt(installments, 10),
-        fecha: new Date().toISOString(),
+        fecha: Timestamp.now(),
         estado: 'Activo',
         documentUrls: [],
         guarantor: requiresGuarantor ? {
@@ -528,7 +580,7 @@ export async function uploadSingleDocument(formData: FormData) {
     }
 }
 
-export async function registerPayment(creditId: string, amount: number) {
+export async function registerPayment(creditId: string, amount: number, type: "cuota" | "total" | "interes") {
     const cobradorIdCookie = cookies().get('loggedInUser');
     if (!cobradorIdCookie) return { error: "Acceso no autorizado." };
 
@@ -546,27 +598,66 @@ export async function registerPayment(creditId: string, amount: number) {
     }
     const creditData = creditSnap.data();
 
-    const paymentsRef = collection(db, "payments");
-    const q = query(paymentsRef, where("creditId", "==", creditId));
-    const paymentsSnapshot = await getDocs(q);
-    const paidInstallments = paymentsSnapshot.docs.length;
-    
-    if (paidInstallments >= creditData.cuotas) {
-        return { error: "Este crédito ya ha sido pagado en su totalidad." };
-    }
-
-    await addDoc(paymentsRef, {
+    // Add payment to payments collection
+    await addDoc(collection(db, "payments"), {
         creditId,
         amount,
-        date: new Date().toISOString(),
+        type,
+        date: Timestamp.now(),
         cobradorId: cobradorData.idNumber,
         providerId: creditData.providerId,
     });
     
-    const newPaidInstallments = paidInstallments + 1;
-    if (newPaidInstallments >= creditData.cuotas) {
-        await updateDoc(creditRef, { estado: 'Pagado' });
+    // Update credit status
+    const paymentsRef = collection(db, "payments");
+    const q = query(paymentsRef, where("creditId", "==", creditId));
+    const paymentsSnapshot = await getDocs(q);
+    const allPayments = paymentsSnapshot.docs.map(doc => doc.data());
+    const paidInstallments = allPayments.filter(p => p.type === 'cuota').length;
+    
+    let isPaidOff = false;
+    if (type === 'total') {
+        isPaidOff = true;
+    } else {
+        const paidCapitalPayments = allPayments.filter(p => p.type === 'cuota' || p.type ==='total');
+        const totalPaidCapital = paidCapitalPayments.reduce((sum, p) => sum + p.amount, 0);
+        if (totalPaidCapital >= creditData.valor || paidInstallments >= creditData.cuotas) {
+            isPaidOff = true;
+        }
     }
 
-    return { success: `Pago de $${amount.toLocaleString('es-CO')} registrado.` };
+    if (isPaidOff) {
+        await updateDoc(creditRef, { estado: 'Pagado', updatedAt: Timestamp.now() });
+    } else {
+         await updateDoc(creditRef, { updatedAt: Timestamp.now() });
+    }
+
+    return { success: `Pago de ${amount.toLocaleString('es-CO')} registrado.` };
+}
+
+
+export async function saveProviderSettings(providerId: string, settings: { commissionPercentage?: number, lateInterestRate?: number, isLateInterestActive?: boolean }) {
+  if (!providerId) return { error: "ID de proveedor no válido." };
+  
+  const providerRef = doc(db, "users", providerId);
+  const providerSnap = await getDoc(providerRef);
+  if(!providerSnap.exists() || providerSnap.data().role !== 'proveedor') {
+    return { error: "Proveedor no encontrado o no autorizado." };
+  }
+
+  const updateData: any = {};
+  if (settings.commissionPercentage !== undefined) {
+    updateData.commissionPercentage = settings.commissionPercentage;
+  }
+  if (settings.lateInterestRate !== undefined) {
+    updateData.lateInterestRate = settings.lateInterestRate;
+  }
+   if (settings.isLateInterestActive !== undefined) {
+    updateData.isLateInterestActive = settings.isLateInterestActive;
+  }
+  updateData.updatedAt = Timestamp.now();
+
+  await updateDoc(providerRef, updateData);
+
+  return { success: "Configuración guardada exitosamente." };
 }

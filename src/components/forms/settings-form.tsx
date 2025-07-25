@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { getUserData, saveProviderSettings } from "@/lib/actions";
 
 type SettingsFormProps = {
   providerId: string;
@@ -19,19 +20,26 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
   const [logo, setLogo] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [commissionPercentage, setCommissionPercentage] = useState("20%");
-  const [lateInterestRate, setLateInterestRate] = useState("2%");
+  const [commissionPercentage, setCommissionPercentage] = useState("20");
+  const [lateInterestRate, setLateInterestRate] = useState("2");
   const [isLateInterestActive, setIsLateInterestActive] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (providerId) {
-      const savedLogo = localStorage.getItem(`company-logo_${providerId}`);
-      if (savedLogo) {
-        setLogo(savedLogo);
+    const fetchUserData = async () => {
+      if (providerId) {
+        const userData = await getUserData(providerId);
+        if (userData) {
+          setLogo(userData.companyLogoUrl || null);
+          setCommissionPercentage((userData.commissionPercentage || 20).toString());
+          setLateInterestRate((userData.lateInterestRate || 2).toString());
+          setIsLateInterestActive(userData.isLateInterestActive || false);
+        }
       }
-    }
+    };
+    fetchUserData();
   }, [providerId]);
+
 
   const handleLogoChange = (event: ChangeEvent<HTMLInputElement>) => {
     if (!providerId) return;
@@ -60,22 +68,42 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
     fileInputRef.current?.click();
   };
   
-  const handleSaveCommission = () => {
-    toast({
-      title: "Porcentaje Guardado",
-      description: `El nuevo porcentaje de comisión (${commissionPercentage}) ha sido guardado.`,
-      variant: "default",
-      className: "bg-accent text-accent-foreground border-accent",
-    });
+  const handleSaveCommission = async () => {
+    const percentage = parseFloat(commissionPercentage);
+    if (isNaN(percentage)) {
+        toast({ title: "Error", description: "El porcentaje de comisión debe ser un número.", variant: "destructive" });
+        return;
+    }
+    const result = await saveProviderSettings(providerId, { commissionPercentage: percentage });
+     if (result.success) {
+      toast({
+        title: "Porcentaje Guardado",
+        description: `El nuevo porcentaje de comisión (${percentage}%) ha sido guardado.`,
+        variant: "default",
+        className: "bg-accent text-accent-foreground border-accent",
+      });
+    } else {
+       toast({ title: "Error", description: result.error, variant: "destructive" });
+    }
   };
 
-  const handleSaveLateInterest = () => {
-    toast({
-      title: "Configuración de Mora Guardada",
-      description: `Interés por mora ${isLateInterestActive ? `activado al ${lateInterestRate}` : 'desactivado'}.`,
-      variant: "default",
-      className: "bg-accent text-accent-foreground border-accent",
-    });
+  const handleSaveLateInterest = async () => {
+     const rate = parseFloat(lateInterestRate);
+     if (isNaN(rate)) {
+        toast({ title: "Error", description: "La tasa de interés debe ser un número.", variant: "destructive" });
+        return;
+    }
+    const result = await saveProviderSettings(providerId, { lateInterestRate: rate, isLateInterestActive });
+     if (result.success) {
+      toast({
+        title: "Configuración de Mora Guardada",
+        description: `Interés por mora ${isLateInterestActive ? `activado al ${rate}%` : 'desactivado'}.`,
+        variant: "default",
+        className: "bg-accent text-accent-foreground border-accent",
+      });
+    } else {
+        toast({ title: "Error", description: result.error, variant: "destructive" });
+    }
   };
 
   return (
@@ -134,12 +162,16 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
           </div>
           <div className="w-full sm:w-40 space-y-2">
             <Label htmlFor="commission-percentage">Porcentaje</Label>
-            <Input 
-                id="commission-percentage"
-                placeholder="20%"
-                value={commissionPercentage}
-                onChange={(e) => setCommissionPercentage(e.target.value)}
-            />
+             <div className="relative">
+                <Input 
+                    id="commission-percentage"
+                    placeholder="20"
+                    value={commissionPercentage}
+                    onChange={(e) => setCommissionPercentage(e.target.value)}
+                    className="pr-8"
+                />
+                <Percent className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              </div>
           </div>
         </div>
          <Button onClick={handleSaveCommission} className="w-full sm:w-auto">
@@ -175,13 +207,13 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
           <div className="relative">
             <Input 
               id="late-interest-rate"
-              placeholder="2%"
+              placeholder="2"
               value={lateInterestRate}
               onChange={(e) => setLateInterestRate(e.target.value)}
               disabled={!isLateInterestActive}
-              className="pl-8"
+              className="pr-8"
             />
-            <Percent className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Percent className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           </div>
         </div>
         
