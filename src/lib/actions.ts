@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
 import { db, storage } from "./firebase";
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, uploadString } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // --- Utility Functions ---
 const findUserByIdNumber = async (idNumber: string) => {
@@ -208,6 +208,18 @@ export async function getCreditsByProvider() {
         if (creditData.createdAt && creditData.createdAt instanceof Timestamp) {
             creditData.createdAt = creditData.createdAt.toDate().toISOString();
         }
+        if (creditData.fecha && creditData.fecha instanceof Timestamp) {
+             creditData.fecha = creditData.fecha.toDate().toISOString();
+        }
+        if (Array.isArray(creditData.paymentDates)) {
+            creditData.paymentDates = creditData.paymentDates.map((d: any) => {
+                if (d instanceof Timestamp) {
+                    return d.toDate().toISOString();
+                }
+                return d;
+            });
+        }
+
 
         const cobradorData = await findUserByIdNumber(creditData.cobradorId as string);
         const clienteData = await findUserByIdNumber(creditData.clienteId as string);
@@ -438,7 +450,7 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
     try {
         await updateDoc(creditRef, {
             paymentFrequency,
-            paymentDates, // Store dates as ISO strings
+            paymentDates: paymentDates.map(dateStr => Timestamp.fromDate(new Date(dateStr))),
             paymentScheduleSet: true,
             updatedAt: Timestamp.now(),
         });
