@@ -148,11 +148,11 @@ export async function getUserData(userId: string) {
     
     const serializableUser: { [key: string]: any } = { ...user };
     
-    if (user.createdAt && user.createdAt instanceof Timestamp) {
-        serializableUser.createdAt = user.createdAt.toDate().toISOString();
-    }
-     if (user.updatedAt && user.updatedAt instanceof Timestamp) {
-        serializableUser.updatedAt = user.updatedAt.toDate().toISOString();
+    // Convert Timestamps to ISO strings to make them serializable
+    for (const key in serializableUser) {
+        if (serializableUser[key] instanceof Timestamp) {
+            serializableUser[key] = serializableUser[key].toDate().toISOString();
+        }
     }
 
     return serializableUser;
@@ -723,3 +723,5 @@ export async function saveProviderSettings(providerId: string, settings: { commi
 
   return { success: "Configuración guardada exitosamente." };
 }
+
+    
