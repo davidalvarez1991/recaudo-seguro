@@ -508,7 +508,7 @@ export async function uploadSingleDocument(formData: FormData) {
              return { error: "El crédito no tiene un proveedor asociado." };
         }
 
-        const storageRef = ref(storage, `documents/${providerId}/${creditData.clienteId}/${Date.now()}_${document.name}`);
+        const storageRef = ref(storage, `clientes/${providerId}/${creditData.clienteId}/${Date.now()}_${document.name}`);
         const buffer = await document.arrayBuffer();
         await uploadBytes(storageRef, buffer);
         const url = await getDownloadURL(storageRef);
