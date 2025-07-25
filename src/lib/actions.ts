@@ -200,6 +200,14 @@ export async function getCreditsByProvider() {
     
     const creditsPromises = querySnapshot.docs.map(async (docSnapshot) => {
         const creditData: any = { id: docSnapshot.id, ...docSnapshot.data() };
+        
+        // Convert Timestamps to strings
+        if (creditData.updatedAt && creditData.updatedAt instanceof Timestamp) {
+            creditData.updatedAt = creditData.updatedAt.toDate().toISOString();
+        }
+        if (creditData.createdAt && creditData.createdAt instanceof Timestamp) {
+            creditData.createdAt = creditData.createdAt.toDate().toISOString();
+        }
 
         const cobradorData = await findUserByIdNumber(creditData.cobradorId as string);
         const clienteData = await findUserByIdNumber(creditData.clienteId as string);
