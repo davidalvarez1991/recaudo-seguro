@@ -27,7 +27,6 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { addDays, getDay, isSameDay, startOfDay } from 'date-fns';
-import { Checkbox } from "@/components/ui/checkbox";
 
 type ClientRegistrationFormProps = {
   onFormSubmit?: () => void;
@@ -48,7 +47,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   const [requiresGuarantor, setRequiresGuarantor] = useState(false);
   const [filesToUpload, setFilesToUpload] = useState<FileWithStatus[]>([]);
   const [createdCreditId, setCreatedCreditId] = useState<string | null>(null);
-  const [termsAccepted, setTermsAccepted] = useState(false);
   
   // State for payment schedule
   const [paymentFrequency, setPaymentFrequency] = useState<PaymentFrequency>('diario');
@@ -598,28 +596,13 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                                 {isPending ? 'Subiendo...' : 'Iniciar Carga'}
                             </Button>
                         )}
-                        <Separator className="my-4"/>
-                        <div className="items-top flex space-x-2">
-                            <Checkbox id="terms1" checked={termsAccepted} onCheckedChange={(checked) => setTermsAccepted(checked as boolean)} />
-                            <div className="grid gap-1.5 leading-none">
-                                <label
-                                htmlFor="terms1"
-                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                >
-                                El cliente acepta los términos y condiciones del contrato.
-                                </label>
-                                <p className="text-sm text-muted-foreground">
-                                Al marcar esta casilla, se confirma que el cliente ha leído y aceptado el acuerdo.
-                                </p>
-                            </div>
-                        </div>
                     </div>
                 </ScrollArea>
                 <div className="flex gap-2 mt-4">
                     <Button type="button" variant="outline" onClick={() => setStep(2)} className="w-full" disabled={isPending}>
                         Volver
                     </Button>
-                    <Button type="button" onClick={handleFinish} className="w-full" disabled={isPending || !termsAccepted}>
+                    <Button type="button" onClick={handleFinish} className="w-full" disabled={isPending}>
                         <CheckCircle2 className="mr-2 h-4 w-4" />
                         Finalizar Registro
                     </Button>

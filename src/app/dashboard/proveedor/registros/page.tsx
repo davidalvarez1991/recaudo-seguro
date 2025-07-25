@@ -287,16 +287,6 @@ export default function RegistrosPage() {
                                 </div>
                             ) : (<p className="text-sm text-muted-foreground">No hay documentos adjuntos.</p>)}
                         </div>
-
-                        <Separator />
-
-                        <div>
-                            <h4 className="font-semibold text-md mb-2">Firma y Aceptación</h4>
-                            <div className="border rounded-lg p-4 bg-muted/50">
-                                <p className="text-sm text-muted-foreground">El cliente ha aceptado los términos y condiciones del contrato.</p>
-                                <p className="font-semibold text-lg">{selectedRegistro.clienteName}</p>
-                            </div>
-                        </div>
                     </>
                 )}
             </div>
