@@ -301,21 +301,20 @@ export default function CreditosPage() {
             </div>
           )}
           <DialogFooter className="sm:justify-between gap-2">
-            <Button
-                variant="destructive"
-                onClick={handleMissedPayment}
-                disabled={isSubmitting || !hasInterestOption}
-                className="w-full sm:w-auto order-last sm:order-first"
-              >
-              <XCircle className="mr-2 h-4 w-4" />
-              Hoy no pagó
-            </Button>
+             <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancelar</Button>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancelar</Button>
-              <Button onClick={handleRegisterPayment} disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <HandCoins className="mr-2 h-4 w-4" />}
-                {isSubmitting ? 'Registrando...' : `Registrar Pago (${formatCurrency(getPaymentAmount())})`}
-              </Button>
+                <Button
+                    variant="destructive"
+                    onClick={handleMissedPayment}
+                    disabled={isSubmitting || !hasInterestOption}
+                  >
+                  <XCircle className="mr-2 h-4 w-4" />
+                  Hoy no pagó
+                </Button>
+                <Button onClick={handleRegisterPayment} disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <HandCoins className="mr-2 h-4 w-4" />}
+                  {isSubmitting ? 'Registrando...' : `Registrar Pago (${formatCurrency(getPaymentAmount())})`}
+                </Button>
             </div>
           </DialogFooter>
         </DialogContent>
