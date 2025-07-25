@@ -526,5 +526,3 @@ export async function registerPayment(creditId: string, amount: number) {
 
     return { success: `Pago de $${amount.toLocaleString('es-CO')} registrado.` };
 }
-
-    
