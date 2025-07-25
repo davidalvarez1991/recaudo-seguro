@@ -266,12 +266,36 @@ export async function getCreditsByCobrador() {
     const q = query(creditsRef, where("cobradorId", "==", cobrador.idNumber));
     const querySnapshot = await getDocs(q);
 
-    const credits = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data()}));
+    const creditsPromises = querySnapshot.docs.map(async (docSnapshot) => {
+        const creditData = docSnapshot.data();
+        const serializableData: { [key: string]: any } = { id: docSnapshot.id, ...creditData };
 
-     for (const credit of credits) {
-        const cliente = await findUserByIdNumber(credit.clienteId as string);
-        credit.clienteName = cliente?.name || 'No disponible';
-    }
+        // Convert Timestamps to strings
+        if (creditData.updatedAt && creditData.updatedAt instanceof Timestamp) {
+            serializableData.updatedAt = creditData.updatedAt.toDate().toISOString();
+        }
+        if (creditData.createdAt && creditData.createdAt instanceof Timestamp) {
+            serializableData.createdAt = creditData.createdAt.toDate().toISOString();
+        }
+        if (creditData.fecha && creditData.fecha instanceof Timestamp) {
+             serializableData.fecha = creditData.fecha.toDate().toISOString();
+        }
+        if (Array.isArray(creditData.paymentDates)) {
+            serializableData.paymentDates = creditData.paymentDates.map((d: any) => {
+                if (d instanceof Timestamp) {
+                    return d.toDate().toISOString();
+                }
+                return d;
+            });
+        }
+        
+        const cliente = await findUserByIdNumber(creditData.clienteId as string);
+        serializableData.clienteName = cliente?.name || 'No disponible';
+        
+        return serializableData;
+    });
+    
+    const credits = await Promise.all(creditsPromises);
 
     return credits;
 }
