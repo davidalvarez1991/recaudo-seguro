@@ -176,7 +176,7 @@ export function CreditSimulator({ commissionPercentage, lateInterestRate, isLate
         {result && (
             <div className="mt-6 space-y-4 rounded-lg border border-primary/20 bg-background p-4">
                  <h4 className="text-lg font-semibold text-center">Resultado de la Simulación</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-center">
+                <div className={`grid grid-cols-1 ${result.lateFee > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-4 text-center`}>
                     <div className="p-3 bg-muted rounded-md">
                         <p className="text-sm text-muted-foreground">Valor por Cuota</p>
                         <p className="text-2xl font-bold text-primary">{formatCurrency(result.installment)}</p>
@@ -185,6 +185,12 @@ export function CreditSimulator({ commissionPercentage, lateInterestRate, isLate
                         <p className="text-sm text-muted-foreground">Valor Total a Pagar</p>
                         <p className="text-2xl font-bold text-primary">{formatCurrency(result.total)}</p>
                     </div>
+                     {result.lateFee > 0 && (
+                        <div className="p-3 bg-red-100 dark:bg-red-900/50 rounded-md">
+                            <p className="text-sm text-red-800 dark:text-red-200">Valor por Mora</p>
+                            <p className="text-2xl font-bold text-destructive">{formatCurrency(result.lateFee)}</p>
+                        </div>
+                    )}
                 </div>
                 <div className="text-xs text-muted-foreground space-y-1 text-center border-t pt-2 mt-2">
                     <p>Desglose: {formatCurrency(result.baseAmount)} (Capital) + {formatCurrency(result.commissionAmount)} (Comisión) + {formatCurrency(result.lateFee)} (Mora)</p>
