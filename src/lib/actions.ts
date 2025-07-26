@@ -225,15 +225,17 @@ export async function getCreditsByProvider() {
     const creditsPromises = querySnapshot.docs.map(async (docSnapshot) => {
         const creditData: any = { id: docSnapshot.id, ...docSnapshot.data() };
         
-        // Convert Timestamps to strings
+        // Convert Timestamps to strings, preserving original 'fecha'
+        if (creditData.fecha instanceof Timestamp) {
+            creditData.fecha = creditData.fecha.toDate().toISOString();
+        }
+
+        // Convert other Timestamps
         if (creditData.updatedAt && creditData.updatedAt instanceof Timestamp) {
             creditData.updatedAt = creditData.updatedAt.toDate().toISOString();
         }
         if (creditData.createdAt && creditData.createdAt instanceof Timestamp) {
             creditData.createdAt = creditData.createdAt.toDate().toISOString();
-        }
-        if (creditData.fecha && creditData.fecha instanceof Timestamp) {
-             creditData.fecha = creditData.fecha.toDate().toISOString();
         }
         creditData.paymentDates = (creditData.paymentDates || []).map((d: any) => {
             if (d instanceof Timestamp) {
@@ -811,3 +813,5 @@ export async function registerMissedPayment(creditId: string) {
     return { error: "No se pudo registrar el día de mora." };
   }
 }
+
+    
