@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, MoreHorizontal, Trash2, Download, Eye, Pencil } from "lucide-react";
+import { ArrowLeft, ClipboardList, MoreHorizontal, Trash2, Download, Eye, Pencil, RefreshCcw, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getCreditsByProvider, deleteClientAndCredits } from "@/lib/actions";
@@ -148,12 +148,18 @@ export default function RegistrosPage() {
                   Visualiza todas las acciones registradas por tus cobradores. Haz clic en una fila para ver los detalles.
                   </CardDescription>
               </div>
-              <Button asChild variant="outline" className="w-full sm:w-auto">
-                  <Link href="/dashboard/proveedor">
-                      <ArrowLeft className="mr-2 h-4 w-4" />
-                      Volver al Panel
-                  </Link>
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                 <Button onClick={fetchRecords} disabled={loading} variant="outline" className="w-full sm:w-auto">
+                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCcw className="mr-2 h-4 w-4" />}
+                    Actualizar
+                 </Button>
+                <Button asChild variant="outline" className="w-full sm:w-auto">
+                    <Link href="/dashboard/proveedor">
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Volver al Panel
+                    </Link>
+                </Button>
+              </div>
           </div>
         </CardHeader>
         <CardContent className="pt-6">
