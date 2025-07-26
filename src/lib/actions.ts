@@ -250,11 +250,11 @@ export async function getCreditsByProvider() {
         
         const paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
         
-        // El capital pagado solo considera los tipos 'cuota' y 'total'
+        // Payments of type 'cuota' or 'total' reduce the principal debt. 'interes' does not.
         const capitalPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
-        const paidCapitalAndCommission = capitalPayments.reduce((sum,p) => sum + p.amount, 0);
+        const paidCapitalAndCommission = capitalPayments.reduce((sum, p) => sum + p.amount, 0);
 
-        const totalLoanAmount = (creditData.valor + creditData.commission);
+        const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
         const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
 
         const paidInstallments = payments.filter(p => p.type === 'cuota').length;
@@ -321,14 +321,14 @@ export async function getCreditsByCobrador() {
         
         const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
         
-        // El capital pagado solo considera los tipos 'cuota' y 'total'
+        // Payments of type 'cuota' or 'total' reduce the principal debt. 'interes' does not.
         const capitalPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
         const paidCapitalAndCommission = capitalPayments.reduce((sum, p) => sum + p.amount, 0);
 
         serializableData.paidInstallments = payments.filter(p => p.type === 'cuota').length;
         serializableData.paidAmount = totalPaid;
         
-        const totalLoanAmount = creditData.valor + creditData.commission;
+        const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
         const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
         serializableData.remainingBalance = remainingBalance;
         
@@ -693,7 +693,8 @@ export async function registerPayment(creditId: string, amount: number, type: "c
         const freshCreditData = freshCreditSnap.data();
         if (!freshCreditData) return { error: "Error al recargar el crédito." };
 
-        const totalLoanAmount = freshCreditData.valor + freshCreditData.commission;
+        const totalLoanAmount = (freshCreditData.valor || 0) + (freshCreditData.commission || 0);
+        
         const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
         
         const providerDocRef = doc(db, "users", freshCreditData.providerId);
