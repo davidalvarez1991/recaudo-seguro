@@ -117,6 +117,14 @@ export default function RegistrosPage() {
 
   const isMediaImage = (url: string) => /\.(jpg|jpeg|png|gif|webp|heic|heif)$/i.test(url);
   const isMediaVideo = (url: string) => /\.(mp4|mov|avi|mkv|webm|3gp)$/i.test(url);
+  
+  const formatCurrency = (value: number | undefined | null) => {
+      if (value === undefined || value === null || isNaN(value)) {
+          return "$0";
+      }
+      return `$${value.toLocaleString('es-CO')}`;
+  }
+
 
   return (
     <>
@@ -170,7 +178,7 @@ export default function RegistrosPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        {registro.valor > 0 ? `$${registro.valor.toLocaleString('es-CO')}` : '-'}
+                        {registro.valor > 0 ? formatCurrency(registro.valor) : '-'}
                       </TableCell>
                       <TableCell className="text-right">
                          <DropdownMenu>
@@ -231,15 +239,15 @@ export default function RegistrosPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="p-3 bg-muted/50 rounded-md">
                                 <div className="text-sm text-muted-foreground">Valor del Crédito</div>
-                                <div className="text-lg font-bold">${selectedRegistro.valor.toLocaleString('es-CO')}</div>
+                                <div className="text-lg font-bold">{formatCurrency(selectedRegistro.valor)}</div>
                             </div>
                             <div className="p-3 bg-muted/50 rounded-md">
                                 <div className="text-sm text-muted-foreground">Comisión</div>
-                                <div className="text-lg font-bold">${selectedRegistro.commission.toLocaleString('es-CO')}</div>
+                                <div className="text-lg font-bold">{formatCurrency(selectedRegistro.commission)}</div>
                             </div>
                              <div className="p-3 bg-muted/50 rounded-md col-span-full">
                                 <div className="text-sm text-muted-foreground">Total (Crédito + Comisión)</div>
-                                <div className="text-xl font-bold text-primary">${(selectedRegistro.valor + selectedRegistro.commission).toLocaleString('es-CO')}</div>
+                                <div className="text-xl font-bold text-primary">{formatCurrency((selectedRegistro.valor || 0) + (selectedRegistro.commission || 0))}</div>
                             </div>
                              <div className="p-3 bg-muted/50 rounded-md">
                                 <div className="text-sm text-muted-foreground">Cuotas</div>
@@ -247,11 +255,11 @@ export default function RegistrosPage() {
                             </div>
                             <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-md">
                                 <div className="text-sm text-green-800 dark:text-green-200">Total Pagado</div>
-                                <div className="text-lg font-bold text-green-900 dark:text-green-100">${selectedRegistro.paidAmount.toLocaleString('es-CO')}</div>
+                                <div className="text-lg font-bold text-green-900 dark:text-green-100">{formatCurrency(selectedRegistro.paidAmount)}</div>
                             </div>
                              <div className="p-3 bg-red-100 dark:bg-red-900/50 rounded-md">
                                 <div className="text-sm text-red-800 dark:text-red-200">Saldo Pendiente</div>
-                                <div className="text-lg font-bold text-red-900 dark:text-red-100">${selectedRegistro.remainingBalance.toLocaleString('es-CO')}</div>
+                                <div className="text-lg font-bold text-red-900 dark:text-red-100">{formatCurrency(selectedRegistro.remainingBalance)}</div>
                             </div>
                         </div>
 
@@ -324,5 +332,3 @@ export default function RegistrosPage() {
     </>
   );
 }
-
-    
