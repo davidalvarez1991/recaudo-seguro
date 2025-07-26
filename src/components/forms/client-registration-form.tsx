@@ -162,7 +162,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     };
     
     const handleSaveSchedule = async () => {
-        const validDates = selectedDates.filter(d => d instanceof Date);
+        const validDates = selectedDates.filter(d => d instanceof Date && !isNaN(d.getTime()));
 
         if (!createdCreditId || validDates.length === 0) {
              toast({
@@ -497,7 +497,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                                     .filter(date => date instanceof Date && !isNaN(date.getTime()))
                                     .map(date => (
                                         <div key={date.toISOString()}>
-                                            {format(date, "EEEE, dd 'de' MMMM 'de' yyyy", {locale: es})}
+                                            {format(date, "dd 'de' MMMM", {locale: es})}
                                         </div>
                                     ))
                                 }
@@ -611,5 +611,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
  
     
  
+
 
 
