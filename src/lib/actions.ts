@@ -100,10 +100,13 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: 'pr
         createdAt: new Date().toISOString()
     });
     
-    cookies().set('loggedInUser', newUserRef.id, { httpOnly: true, path: '/' });
-    cookies().set('userRole', role, { httpOnly: true, path: '/' });
-
-    return { successUrl: `/dashboard/${role}` };
+    if (newUserRef) {
+        cookies().set('loggedInUser', newUserRef.id, { httpOnly: true, path: '/' });
+        cookies().set('userRole', role, { httpOnly: true, path: '/' });
+        return { successUrl: `/dashboard/${role}` };
+    }
+    
+    return { error: "No se pudo crear el usuario."};
 }
 
 export async function logout() {
@@ -545,7 +548,7 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
     const provider = providerSnap.data();
     const commissionPercentage = provider.commissionPercentage || 20;
 
-    const { clienteId, oldCreditId, creditAmount, installments, paymentFrequency } = values;
+    const { clienteId, oldCreditId, creditAmount, installments } = values;
 
     const valor = parseFloat(creditAmount.replace(/\./g, '').replace(',', '.'));
     const commission = valor * (commissionPercentage / 100);
@@ -562,7 +565,6 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
         estado: 'Activo',
         documentUrls: [],
         guarantor: null, // Assuming renewal doesn't require guarantor re-entry for simplicity
-        paymentFrequency,
         paymentScheduleSet: false, // Will need a schedule
         missedPaymentDays: 0,
     });
@@ -769,4 +771,5 @@ export async function registerMissedPayment(creditId: string) {
     
 
     
+
 
