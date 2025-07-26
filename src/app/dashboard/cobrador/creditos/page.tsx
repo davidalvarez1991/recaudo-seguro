@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw, XCircle } from "lucide-react";
+import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw, XCircle, CalendarDays, CheckCircle2, Circle } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getCreditsByCobrador, registerPayment, registerMissedPayment } from "@/lib/actions";
@@ -16,6 +16,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { RenewCreditForm } from "@/components/forms/renew-credit-form";
+import { format, isBefore, startOfToday } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 
 type Credito = {
@@ -249,6 +253,29 @@ export default function CreditosPage() {
           </DialogHeader>
           {selectedCredit && (
             <div className="py-4 space-y-4">
+               {selectedCredit.paymentDates && selectedCredit.paymentDates.length > 0 && (
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                           <CalendarDays className="h-5 w-5 text-muted-foreground" />
+                           <h4 className="font-medium text-sm">Calendario de Pagos</h4>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-sm pl-2 max-h-24 overflow-y-auto">
+                            {selectedCredit.paymentDates
+                                .sort((a,b) => new Date(a).getTime() - new Date(b).getTime())
+                                .map((dateStr, index) => {
+                                const isPaid = index < selectedCredit.paidInstallments;
+                                const isNext = index === selectedCredit.paidInstallments;
+                                return (
+                                <div key={index} className={cn("flex items-center gap-2", { "text-muted-foreground": isPaid, "font-bold text-primary": isNext })}>
+                                    {isPaid ? <CheckCircle2 className="h-4 w-4 text-green-500"/> : <Circle className="h-4 w-4 text-muted-foreground/50"/>}
+                                    <span>{format(new Date(dateStr), "d 'de' MMMM", { locale: es })}</span>
+                                </div>
+                                );
+                            })}
+                        </div>
+                        <Separator className="mt-4" />
+                    </div>
+                )}
                 <RadioGroup value={paymentType} onValueChange={(value: any) => setPaymentType(value)} className="gap-4">
                     {/* Pagar Cuota */}
                     <Label htmlFor="payment-cuota" className="flex items-center gap-4 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
