@@ -497,13 +497,16 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                      {selectedDates.length > 0 && (
                         <div>
                              <Label>Fechas Seleccionadas</Label>
-                             <ScrollArea className="h-20 w-full rounded-md border p-2 mt-2">
-                                <div className="flex flex-wrap gap-2">
-                                    {selectedDates.filter(date => date instanceof Date && !isNaN(date.getTime())).map(date => (
-                                        <Badge key={date.toISOString()} variant="secondary">
-                                            {format(date, "EEE, dd 'de' MMMM", {locale: es})}
-                                        </Badge>
-                                    ))}
+                             <ScrollArea className="h-24 w-full rounded-md border p-2 mt-2">
+                                <div className="space-y-1 text-sm">
+                                    {selectedDates
+                                        .filter(date => date instanceof Date && !isNaN(date.getTime()))
+                                        .map(date => (
+                                            <div key={date.toISOString()}>
+                                                {format(date, "EEEE, dd 'de' MMMM 'de' yyyy", {locale: es})}
+                                            </div>
+                                        ))
+                                    }
                                 </div>
                             </ScrollArea>
                         </div>
