@@ -110,7 +110,8 @@ export default function CreditosPage() {
     
     setIsSubmitting(true);
     
-    const installmentAmount = ((selectedCredit.valor + selectedCredit.commission) / selectedCredit.cuotas);
+    const totalLoanAmount = selectedCredit.valor + selectedCredit.commission;
+    const installmentAmount = totalLoanAmount / selectedCredit.cuotas;
 
     let amountToPay = 0;
     switch (paymentType) {
@@ -169,7 +170,8 @@ export default function CreditosPage() {
 
   const getPaymentAmount = () => {
     if (!selectedCredit) return 0;
-    const installmentAmount = (selectedCredit.valor + selectedCredit.commission) / selectedCredit.cuotas;
+    const totalLoanAmount = selectedCredit.valor + selectedCredit.commission;
+    const installmentAmount = totalLoanAmount / selectedCredit.cuotas;
     switch (paymentType) {
         case "cuota": return installmentAmount + selectedCredit.lateFee;
         case "total": return selectedCredit.totalDebt;
@@ -384,3 +386,4 @@ export default function CreditosPage() {
     
 
     
+

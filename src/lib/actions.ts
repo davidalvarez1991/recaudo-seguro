@@ -249,8 +249,6 @@ export async function getCreditsByProvider() {
         const payments = paymentsSnapshot.docs.map(p => p.data());
         
         const paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
-        
-        // Payments of type 'cuota' or 'total' reduce the principal debt. 'interes' does not.
         const capitalPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
         const paidCapitalAndCommission = capitalPayments.reduce((sum, p) => sum + p.amount, 0);
 
@@ -321,7 +319,7 @@ export async function getCreditsByCobrador() {
         
         const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
         
-        // Payments of type 'cuota' or 'total' reduce the principal debt. 'interes' does not.
+        // Payments of type 'cuota' or 'total' reduce the principal debt (which includes commission). 'interes' does not.
         const capitalPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
         const paidCapitalAndCommission = capitalPayments.reduce((sum, p) => sum + p.amount, 0);
 
@@ -716,7 +714,7 @@ export async function registerPayment(creditId: string, amount: number, type: "c
     }
 
     if (isPaidOff) {
-        await updateDoc(creditRef, { estado: 'Pagado', updatedAt: Timestamp.now() });
+        await updateDoc(creditRef, { estado: 'Pagado', updatedAt: Timestamp.now(), missedPaymentDays: 0 });
     } else {
          await updateDoc(creditRef, { updatedAt: Timestamp.now(), missedPaymentDays: 0 }); // Reset missed days if a quota payment is made
     }
@@ -771,3 +769,4 @@ export async function registerMissedPayment(creditId: string) {
     
 
     
+
