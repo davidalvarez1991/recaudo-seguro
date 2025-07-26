@@ -495,20 +495,18 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                         />
                     </div>
                      {selectedDates.length > 0 && (
-                        <div>
+                        <div className="rounded-md border p-2 mt-2">
                              <Label>Fechas Seleccionadas</Label>
-                             <ScrollArea className="h-24 w-full rounded-md border p-2 mt-2">
-                                <div className="space-y-1 text-sm">
-                                    {selectedDates
-                                        .filter(date => date instanceof Date && !isNaN(date.getTime()))
-                                        .map(date => (
-                                            <div key={date.toISOString()}>
-                                                {format(date, "EEEE, dd 'de' MMMM 'de' yyyy", {locale: es})}
-                                            </div>
-                                        ))
-                                    }
-                                </div>
-                            </ScrollArea>
+                             <div className="space-y-1 text-sm mt-1">
+                                {selectedDates
+                                    .filter(date => date instanceof Date && !isNaN(date.getTime()))
+                                    .map(date => (
+                                        <div key={date.toISOString()}>
+                                            {format(date, "EEEE, dd 'de' MMMM 'de' yyyy", {locale: es})}
+                                        </div>
+                                    ))
+                                }
+                            </div>
                         </div>
                     )}
                 </div>
@@ -617,3 +615,4 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
 }
  
     
+ 
