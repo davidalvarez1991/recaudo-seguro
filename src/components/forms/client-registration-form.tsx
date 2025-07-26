@@ -140,36 +140,31 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     setIsPending(false);
   };
 
-    const handleDateSelect = (date: Date | undefined) => {
-        if (!date) return;
-        const today = startOfDay(new Date());
-        if (date < today) return; // Prevent selecting past dates
-
-        const updateSelectedDates = (newDates: Date[]) => {
-             const installments = parseInt(form.getValues('installments') || '0', 10);
-             if (installments > 0 && newDates.length > installments) {
-                toast({
-                    title: "Límite de cuotas alcanzado",
-                    description: `No puedes seleccionar más de ${installments} fechas de pago.`,
-                    variant: "destructive",
-                });
-                return;
-            }
-             setSelectedDates(newDates);
-        };
+    const handleDateSelect = (dates: Date[] | undefined) => {
+        if (!dates) return;
         
-        const dateWithoutTime = startOfDay(date);
+        const today = startOfDay(new Date());
+        const validDates = dates.filter(date => date && date >= today);
 
-        const existingIndex = selectedDates.findIndex(d => isSameDay(d, dateWithoutTime));
-        if (existingIndex > -1) {
-            updateSelectedDates(selectedDates.filter((_, i) => i !== existingIndex));
-        } else {
-            updateSelectedDates([...selectedDates, dateWithoutTime].sort((a,b) => a.getTime() - b.getTime()));
+        const installments = parseInt(form.getValues('installments') || '0', 10);
+        if (installments > 0 && validDates.length > installments) {
+            toast({
+                title: "Límite de cuotas alcanzado",
+                description: `No puedes seleccionar más de ${installments} fechas de pago.`,
+                variant: "destructive",
+            });
+            // Revert to the previous valid state
+            setSelectedDates(prevDates => prevDates);
+            return;
         }
+
+        setSelectedDates(validDates.sort((a,b) => a.getTime() - b.getTime()));
     };
     
     const handleSaveSchedule = async () => {
-        if (!createdCreditId || selectedDates.length === 0) {
+        const validDates = selectedDates.filter(d => d instanceof Date);
+
+        if (!createdCreditId || validDates.length === 0) {
              toast({
                 title: "Información incompleta",
                 description: "Debes seleccionar las fechas de pago.",
@@ -179,10 +174,10 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         }
         
         const installments = parseInt(form.getValues('installments') || '0', 10);
-        if (selectedDates.length !== installments) {
+        if (validDates.length !== installments) {
              toast({
                 title: "Fechas no coinciden",
-                description: `Debes seleccionar exactamente ${installments} fechas de pago. Has seleccionado ${selectedDates.length}.`,
+                description: `Debes seleccionar exactamente ${installments} fechas de pago. Has seleccionado ${validDates.length}.`,
                 variant: "destructive"
             });
             return;
@@ -192,7 +187,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         const result = await savePaymentSchedule({
             creditId: createdCreditId,
             paymentFrequency: 'diario', // Set a default or remove if not needed in the backend
-            paymentDates: selectedDates.map(d => d.toISOString())
+            paymentDates: validDates.map(d => d.toISOString())
         });
         
         if (result.success) {
@@ -475,7 +470,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                         <Calendar
                             mode="multiple"
                             selected={selectedDates}
-                            onSelect={handleDateSelect}
+                            onSelect={handleDateSelect as any}
                             month={month}
                             onMonthChange={setMonth}
                             fromDate={new Date()}
@@ -616,4 +611,5 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
  
     
  
+
 
