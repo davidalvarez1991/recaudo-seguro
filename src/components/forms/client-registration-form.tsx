@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, DollarSign, UploadCloud, Eraser, FileText, X, Save, StepForward, CheckCircle2, AlertCircle, Upload, CalendarIcon } from "lucide-react";
+import { Loader2, DollarSign, UploadCloud, Eraser, FileText, X, Save, StepForward, CheckCircle2, AlertCircle, Upload, CalendarIcon, RefreshCw } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ClientCreditSchema } from "@/lib/schemas";
 import { createClientAndCredit, uploadSingleDocument, savePaymentSchedule } from "@/lib/actions";
@@ -26,7 +26,9 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
-import { addDays, getDay, isSameDay, startOfDay } from 'date-fns';
+import { addDays, getDay, isSameDay, startOfDay, format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { Badge } from "@/components/ui/badge";
 
 type ClientRegistrationFormProps = {
   onFormSubmit?: () => void;
@@ -49,7 +51,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   const [createdCreditId, setCreatedCreditId] = useState<string | null>(null);
   
   // State for payment schedule
-  const [paymentFrequency, setPaymentFrequency] = useState<PaymentFrequency>('diario');
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [month, setMonth] = useState(new Date());
 
@@ -204,6 +205,14 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         }
         setIsPending(false);
     };
+
+    const handleResetDates = () => {
+      setSelectedDates([]);
+      toast({
+        title: "Selección reiniciada",
+        description: "Puedes volver a elegir las fechas de pago.",
+      });
+    }
   
   const handleUploadAllFiles = async () => {
         if (!createdCreditId) return;
@@ -451,39 +460,58 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       case 2:
         return (
             <>
-                <ScrollArea className="h-[450px] w-full pr-6">
-                    <div className="space-y-4">
-                        <div className="space-y-2">
+                <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <div className="space-y-1">
                             <Label>Seleccionar Fechas de Pago</Label>
                             <p className="text-sm text-muted-foreground">
-                                Haz clic en los días del calendario para establecer el cronograma de pagos.
+                                Haz clic en los días para establecer el cronograma.
                             </p>
                         </div>
-                        <div className="rounded-md border flex justify-center">
-                            <Calendar
-                                mode="multiple"
-                                selected={selectedDates}
-                                onSelect={handleDateSelect}
-                                month={month}
-                                onMonthChange={setMonth}
-                                fromDate={new Date()}
-                                disabled={(date) => date < startOfDay(new Date())}
-                                footer={
-                                    <p className="text-sm text-muted-foreground px-3 pt-2">
-                                        Has seleccionado {selectedDates.length} de {form.getValues('installments') || 0} cuotas.
-                                    </p>
-                                }
-                                modifiers={{
-                                    selected: selectedDates,
-                                }}
-                                modifiersClassNames={{
-                                    selected: 'bg-red-500 text-white hover:bg-red-600 focus:bg-red-600',
-                                }}
-                            />
-                        </div>
+                         <Button variant="ghost" size="icon" onClick={handleResetDates} disabled={isPending}>
+                            <RefreshCw className="h-4 w-4" />
+                            <span className="sr-only">Refrescar Selección</span>
+                         </Button>
                     </div>
-                </ScrollArea>
-                 <div className="flex gap-2 mt-4">
+                    <div className="rounded-md border flex justify-center">
+                        <Calendar
+                            mode="multiple"
+                            selected={selectedDates}
+                            onSelect={handleDateSelect}
+                            month={month}
+                            onMonthChange={setMonth}
+                            fromDate={new Date()}
+                            disabled={(date) => date < startOfDay(new Date())}
+                            locale={es}
+                            footer={
+                                <p className="text-sm text-muted-foreground px-3 pt-2">
+                                    Has seleccionado {selectedDates.length} de {form.getValues('installments') || 0} cuotas.
+                                </p>
+                            }
+                            modifiers={{
+                                selected: selectedDates,
+                            }}
+                            modifiersClassNames={{
+                                selected: 'bg-primary text-primary-foreground hover:bg-primary/90 focus:bg-primary/90',
+                            }}
+                        />
+                    </div>
+                     {selectedDates.length > 0 && (
+                        <div>
+                             <Label>Fechas Seleccionadas</Label>
+                             <ScrollArea className="h-20 w-full rounded-md border p-2 mt-2">
+                                <div className="flex flex-wrap gap-2">
+                                    {selectedDates.map(date => (
+                                        <Badge key={date.toISOString()} variant="secondary">
+                                            {format(date, "EEE, dd 'de' MMMM", {locale: es})}
+                                        </Badge>
+                                    ))}
+                                </div>
+                            </ScrollArea>
+                        </div>
+                    )}
+                </div>
+                 <div className="flex gap-2 mt-6">
                     <Button type="button" variant="outline" onClick={() => setStep(1)} className="w-full" disabled={isPending}>
                         Volver
                     </Button>
@@ -586,5 +614,3 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
-
-    
