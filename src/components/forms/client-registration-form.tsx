@@ -161,52 +161,14 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         
         const dateWithoutTime = startOfDay(date);
 
-        if (paymentFrequency === 'semanal') {
-            const dayOfWeek = getDay(dateWithoutTime);
-            const firstDate = dateWithoutTime;
-            const newDates = [firstDate];
-            const installments = parseInt(form.getValues('installments') || '1', 10);
-            let currentDate = firstDate;
-            for (let i = 1; i < installments; i++) {
-                currentDate = addDays(currentDate, 7);
-                newDates.push(currentDate);
-            }
-            updateSelectedDates(newDates);
-        } else { // quincenal, mensual, or individual selection for diario
-            const existingIndex = selectedDates.findIndex(d => isSameDay(d, dateWithoutTime));
-            if (existingIndex > -1) {
-                updateSelectedDates(selectedDates.filter((_, i) => i !== existingIndex));
-            } else {
-                updateSelectedDates([...selectedDates, dateWithoutTime].sort((a,b) => a.getTime() - b.getTime()));
-            }
+        const existingIndex = selectedDates.findIndex(d => isSameDay(d, dateWithoutTime));
+        if (existingIndex > -1) {
+            updateSelectedDates(selectedDates.filter((_, i) => i !== existingIndex));
+        } else {
+            updateSelectedDates([...selectedDates, dateWithoutTime].sort((a,b) => a.getTime() - b.getTime()));
         }
     };
     
-    useEffect(() => {
-        const installments = parseInt(form.getValues('installments') || '0', 10);
-        if (installments <= 0) {
-             setSelectedDates([]);
-             return;
-        }
-
-        const today = startOfDay(new Date());
-        let newDates: Date[] = [];
-        
-        if (paymentFrequency === 'diario') {
-            newDates = Array.from({ length: installments }, (_, i) => addDays(today, i));
-        } else if (paymentFrequency === 'quincenal') {
-            newDates = Array.from({ length: installments }, (_, i) => addDays(today, i * 15));
-        } else if (paymentFrequency === 'mensual') {
-            newDates = Array.from({ length: installments }, (_, i) => addDays(today, i * 30));
-        } else {
-             // For weekly, we clear dates and let the user select the first day
-             setSelectedDates([]);
-             return;
-        }
-        setSelectedDates(newDates);
-
-    }, [paymentFrequency, form.watch('installments')]);
-
     const handleSaveSchedule = async () => {
         if (!createdCreditId || selectedDates.length === 0) {
              toast({
@@ -217,10 +179,20 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
             return;
         }
         
+        const installments = parseInt(form.getValues('installments') || '0', 10);
+        if (selectedDates.length !== installments) {
+             toast({
+                title: "Fechas no coinciden",
+                description: `Debes seleccionar exactamente ${installments} fechas de pago. Has seleccionado ${selectedDates.length}.`,
+                variant: "destructive"
+            });
+            return;
+        }
+
         setIsPending(true);
         const result = await savePaymentSchedule({
             creditId: createdCreditId,
-            paymentFrequency,
+            paymentFrequency: 'diario', // Set a default or remove if not needed in the backend
             paymentDates: selectedDates.map(d => d.toISOString())
         });
         
@@ -482,23 +454,12 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 <ScrollArea className="h-[450px] w-full pr-6">
                     <div className="space-y-4">
                         <div className="space-y-2">
-                             <Label>Frecuencia de Pago</Label>
-                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                {(['diario', 'semanal', 'quincenal', 'mensual'] as PaymentFrequency[]).map((freq) => (
-                                <Button
-                                    key={freq}
-                                    type="button"
-                                    variant={paymentFrequency === freq ? "default" : "outline"}
-                                    onClick={() => setPaymentFrequency(freq)}
-                                    disabled={isPending}
-                                >
-                                    {freq.charAt(0).toUpperCase() + freq.slice(1)}
-                                </Button>
-                                ))}
-                            </div>
+                            <Label>Seleccionar Fechas de Pago</Label>
+                            <p className="text-sm text-muted-foreground">
+                                Haz clic en los días del calendario para establecer el cronograma de pagos.
+                            </p>
                         </div>
-
-                         <div className="rounded-md border flex justify-center">
+                        <div className="rounded-md border flex justify-center">
                             <Calendar
                                 mode="multiple"
                                 selected={selectedDates}
@@ -508,7 +469,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                                 fromDate={new Date()}
                                 disabled={(date) => date < startOfDay(new Date())}
                                 footer={
-                                     <p className="text-sm text-muted-foreground px-3 pt-2">
+                                    <p className="text-sm text-muted-foreground px-3 pt-2">
                                         Has seleccionado {selectedDates.length} de {form.getValues('installments') || 0} cuotas.
                                     </p>
                                 }
