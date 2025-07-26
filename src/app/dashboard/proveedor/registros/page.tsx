@@ -25,6 +25,7 @@ type Registro = {
   clienteName?: string;
   tipo: string;
   valor: number;
+  commission: number;
   fecha: string;
   formattedDate?: string;
   documentUrls?: string[];
@@ -231,6 +232,14 @@ export default function RegistrosPage() {
                             <div className="p-3 bg-muted/50 rounded-md">
                                 <div className="text-sm text-muted-foreground">Valor del Crédito</div>
                                 <div className="text-lg font-bold">${selectedRegistro.valor.toLocaleString('es-CO')}</div>
+                            </div>
+                            <div className="p-3 bg-muted/50 rounded-md">
+                                <div className="text-sm text-muted-foreground">Comisión</div>
+                                <div className="text-lg font-bold">${selectedRegistro.commission.toLocaleString('es-CO')}</div>
+                            </div>
+                             <div className="p-3 bg-muted/50 rounded-md col-span-full">
+                                <div className="text-sm text-muted-foreground">Total (Crédito + Comisión)</div>
+                                <div className="text-xl font-bold text-primary">${(selectedRegistro.valor + selectedRegistro.commission).toLocaleString('es-CO')}</div>
                             </div>
                              <div className="p-3 bg-muted/50 rounded-md">
                                 <div className="text-sm text-muted-foreground">Cuotas</div>

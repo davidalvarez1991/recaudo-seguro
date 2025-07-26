@@ -27,6 +27,7 @@ type Credito = {
   clienteId: string;
   clienteName?: string;
   valor: number;
+  commission: number;
   cuotas: number;
   fecha: string;
   estado: string;
@@ -108,12 +109,13 @@ export default function CreditosPage() {
     
     setIsSubmitting(true);
 
-    const installmentAmount = (selectedCredit.valor / selectedCredit.cuotas) + selectedCredit.lateFee;
+    const totalLoanAmount = (selectedCredit.valor + selectedCredit.commission);
+    const installmentAmount = (totalLoanAmount / selectedCredit.cuotas);
 
     let amountToPay = 0;
     switch (paymentType) {
         case "cuota":
-            amountToPay = installmentAmount;
+            amountToPay = installmentAmount + selectedCredit.lateFee;
             break;
         case "total":
             amountToPay = selectedCredit.totalDebt;
@@ -167,9 +169,10 @@ export default function CreditosPage() {
 
   const getPaymentAmount = () => {
     if (!selectedCredit) return 0;
-     const installmentAmount = (selectedCredit.valor / selectedCredit.cuotas) + selectedCredit.lateFee;
+    const totalLoanAmount = (selectedCredit.valor + selectedCredit.commission);
+    const installmentAmount = (totalLoanAmount / selectedCredit.cuotas);
     switch (paymentType) {
-        case "cuota": return installmentAmount;
+        case "cuota": return installmentAmount + selectedCredit.lateFee;
         case "total": return selectedCredit.totalDebt;
         case "interes": return selectedCredit.lateFee;
         default: return 0;
@@ -177,6 +180,13 @@ export default function CreditosPage() {
   }
 
   const hasInterestOption = (selectedCredit?.lateInterestRate ?? 0) > 0;
+  
+  const getInstallmentBreakdown = () => {
+    if (!selectedCredit) return { capital: 0, commission: 0 };
+    const capitalPerInstallment = selectedCredit.valor / selectedCredit.cuotas;
+    const commissionPerInstallment = selectedCredit.commission / selectedCredit.cuotas;
+    return { capital: capitalPerInstallment, commission: commissionPerInstallment };
+  }
 
   return (
     <TooltipProvider>
@@ -283,10 +293,10 @@ export default function CreditosPage() {
                         <div className="grid gap-1.5 w-full">
                             <div className="flex justify-between items-center w-full">
                                 <p className="font-semibold flex-1">Pagar Cuota</p>
-                                <p className="font-bold text-lg">{formatCurrency((selectedCredit.valor / selectedCredit.cuotas) + selectedCredit.lateFee)}</p>
+                                <p className="font-bold text-lg">{formatCurrency(((selectedCredit.valor + selectedCredit.commission) / selectedCredit.cuotas) + selectedCredit.lateFee)}</p>
                             </div>
                             <p className="text-xs text-muted-foreground">
-                                Incluye valor a capital ({formatCurrency(selectedCredit.valor / selectedCredit.cuotas)}) + intereses por mora ({formatCurrency(selectedCredit.lateFee)}).
+                                Incluye valor a capital ({formatCurrency(getInstallmentBreakdown().capital)}), comisión ({formatCurrency(getInstallmentBreakdown().commission)}) e intereses por mora ({formatCurrency(selectedCredit.lateFee)}).
                             </p>
                         </div>
                     </Label>
@@ -371,3 +381,5 @@ export default function CreditosPage() {
     </TooltipProvider>
   );
 }
+
+    

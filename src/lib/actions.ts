@@ -199,7 +199,7 @@ const calculateLateFee = (credit: any) => {
     }
     
     const dailyRate = credit.lateInterestRate / 100;
-    // Simple interest on the total loan amount for each missed day
+    // Simple interest on the base loan amount for each missed day
     const lateFee = credit.valor * dailyRate * missedDays;
     
     return lateFee;
@@ -247,9 +247,13 @@ export async function getCreditsByProvider() {
         const paymentsQuery = query(paymentsRef, where("creditId", "==", creditData.id));
         const paymentsSnapshot = await getDocs(paymentsQuery);
         const payments = paymentsSnapshot.docs.map(p => p.data());
+        
+        const capitalPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
+        const paidCapital = capitalPayments.reduce((sum, p) => sum + p.amount, 0);
 
         const paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
-        const remainingBalance = creditData.valor - paidAmount;
+        const remainingBalance = (creditData.valor + creditData.commission) - paidCapital;
+
 
         return {
             ...creditData,
@@ -257,7 +261,7 @@ export async function getCreditsByProvider() {
             clienteName: clienteData?.name || 'No disponible',
             clienteAddress: clienteData?.address || 'No disponible',
             clientePhone: clienteData?.contactPhone || 'No disponible',
-            paidInstallments: payments.length,
+            paidInstallments: capitalPayments.length,
             paidAmount: paidAmount,
             remainingBalance: remainingBalance,
         };
@@ -310,20 +314,21 @@ export async function getCreditsByCobrador() {
         const paymentsSnapshot = await getDocs(paymentsQuery);
         const payments = paymentsSnapshot.docs.map(p => p.data());
         
-        const capitalPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
-        const paidCapital = capitalPayments.reduce((sum, p) => sum + p.amount, 0);
+        const capitalPayments = payments.filter(p => p.type === 'cuota');
+        const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
 
-        serializableData.paidInstallments = payments.filter(p => p.type === 'cuota').length;
-        serializableData.paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
+        serializableData.paidInstallments = capitalPayments.length;
+        serializableData.paidAmount = totalPaid;
         
-        // Use paidCapital for remainingBalance calculation
-        serializableData.remainingBalance = creditData.valor - paidCapital;
+        const totalLoanAmount = creditData.valor + creditData.commission;
+        const remainingBalance = totalLoanAmount - totalPaid;
+        serializableData.remainingBalance = remainingBalance;
         
         serializableData.lateInterestRate = providerSettings.isLateInterestActive ? (providerSettings.lateInterestRate || 0) : 0;
 
         const lateFee = calculateLateFee(serializableData);
         serializableData.lateFee = lateFee;
-        serializableData.totalDebt = serializableData.remainingBalance + lateFee;
+        serializableData.totalDebt = remainingBalance + lateFee;
         
         return serializableData;
     });
@@ -459,6 +464,12 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     const providerId = cobrador.providerId;
     if(!providerId) return { error: "El cobrador no tiene un proveedor asociado." };
 
+    const providerDocRef = doc(db, "users", providerId);
+    const providerSnap = await getDoc(providerDocRef);
+    if (!providerSnap.exists()) return { error: "Proveedor no encontrado."};
+    const provider = providerSnap.data();
+    const commissionPercentage = provider.commissionPercentage || 20;
+
     const validatedFields = ClientCreditSchema.safeParse(values);
 
     if (!validatedFields.success) {
@@ -484,11 +495,15 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
         });
     }
 
+    const valor = parseFloat(creditAmount.replace(/\./g, '').replace(',', '.'));
+    const commission = valor * (commissionPercentage / 100);
+
     const creditRef = await addDoc(collection(db, "credits"), {
         clienteId: idNumber,
         cobradorId: cobrador.idNumber,
         providerId,
-        valor: parseFloat(creditAmount.replace(/\./g, '').replace(',', '.')),
+        valor,
+        commission,
         cuotas: parseInt(installments, 10),
         fecha: Timestamp.now(),
         estado: 'Activo',
@@ -517,15 +532,25 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
 
     const providerId = cobrador.providerId;
     if(!providerId) return { error: "El cobrador no tiene un proveedor asociado." };
+    
+    const providerDocRef = doc(db, "users", providerId);
+    const providerSnap = await getDoc(providerDocRef);
+    if (!providerSnap.exists()) return { error: "Proveedor no encontrado."};
+    const provider = providerSnap.data();
+    const commissionPercentage = provider.commissionPercentage || 20;
 
     const { clienteId, oldCreditId, creditAmount, installments, paymentFrequency } = values;
+
+    const valor = parseFloat(creditAmount.replace(/\./g, '').replace(',', '.'));
+    const commission = valor * (commissionPercentage / 100);
 
     // 1. Create the new credit
     const newCreditRef = await addDoc(collection(db, "credits"), {
         clienteId,
         cobradorId: cobrador.idNumber,
         providerId,
-        valor: parseFloat(creditAmount.replace(/\./g, '').replace(',', '.')),
+        valor,
+        commission,
         cuotas: parseInt(installments, 10),
         fecha: Timestamp.now(),
         estado: 'Activo',
@@ -652,14 +677,15 @@ export async function registerPayment(creditId: string, amount: number, type: "c
     if (type === 'total') {
         isPaidOff = true;
     } else {
-        const capitalPayments = allPayments.filter(p => p.type === 'cuota' || p.type === 'total');
-        const totalPaidCapital = capitalPayments.reduce((sum, p) => sum + p.amount, 0);
+        const totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
 
         // Fetch the credit again to get the most up-to-date values
         const freshCreditSnap = await getDoc(creditRef);
         const freshCreditData = freshCreditSnap.data();
         if (!freshCreditData) return { error: "Error al recargar el crédito." };
 
+        const totalLoanAmount = freshCreditData.valor + freshCreditData.commission;
+        
         const providerDocRef = doc(db, "users", freshCreditData.providerId);
         const providerSnap = await getDoc(providerDocRef);
         const providerSettings = providerSnap.exists() ? providerSnap.data() : {};
@@ -667,14 +693,13 @@ export async function registerPayment(creditId: string, amount: number, type: "c
         
         const lateFee = calculateLateFee({
             ...freshCreditData,
-            paymentDates: (freshCreditData.paymentDates || []).map((d: any) => d.toDate().toISOString()),
-            paidInstallments: capitalPayments.length,
             lateInterestRate,
         });
 
-        const totalDebt = (freshCreditData.valor - totalPaidCapital) + lateFee;
+        const totalDebt = (totalLoanAmount - totalPaid) + lateFee;
 
-        if (totalDebt <= 0) {
+        // Using a small threshold for floating point comparisons
+        if (totalDebt <= 1) {
              isPaidOff = true;
         }
     }
@@ -731,3 +756,5 @@ export async function registerMissedPayment(creditId: string) {
     return { error: "No se pudo registrar el día de mora." };
   }
 }
+
+    
