@@ -46,6 +46,7 @@ type Credito = {
 type PaymentType = "cuota" | "total" | "interes";
 
 const formatCurrency = (value: number) => {
+    if (isNaN(value)) return "$0";
     return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 };
 
@@ -108,9 +109,8 @@ export default function CreditosPage() {
     if (!selectedCredit) return;
     
     setIsSubmitting(true);
-
-    const totalLoanAmount = (selectedCredit.valor + selectedCredit.commission);
-    const installmentAmount = (totalLoanAmount / selectedCredit.cuotas);
+    
+    const installmentAmount = ((selectedCredit.valor + selectedCredit.commission) / selectedCredit.cuotas);
 
     let amountToPay = 0;
     switch (paymentType) {
@@ -169,8 +169,7 @@ export default function CreditosPage() {
 
   const getPaymentAmount = () => {
     if (!selectedCredit) return 0;
-    const totalLoanAmount = (selectedCredit.valor + selectedCredit.commission);
-    const installmentAmount = (totalLoanAmount / selectedCredit.cuotas);
+    const installmentAmount = (selectedCredit.valor + selectedCredit.commission) / selectedCredit.cuotas;
     switch (paymentType) {
         case "cuota": return installmentAmount + selectedCredit.lateFee;
         case "total": return selectedCredit.totalDebt;
@@ -381,5 +380,7 @@ export default function CreditosPage() {
     </TooltipProvider>
   );
 }
+
+    
 
     

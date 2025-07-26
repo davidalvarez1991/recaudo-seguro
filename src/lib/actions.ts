@@ -248,11 +248,16 @@ export async function getCreditsByProvider() {
         const paymentsSnapshot = await getDocs(paymentsQuery);
         const payments = paymentsSnapshot.docs.map(p => p.data());
         
-        const capitalPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
-        const paidCapital = capitalPayments.reduce((sum, p) => sum + p.amount, 0);
-
         const paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
-        const remainingBalance = (creditData.valor + creditData.commission) - paidCapital;
+        
+        // El capital pagado solo considera los tipos 'cuota' y 'total'
+        const capitalPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
+        const paidCapitalAndCommission = capitalPayments.reduce((sum,p) => sum + p.amount, 0);
+
+        const totalLoanAmount = (creditData.valor + creditData.commission);
+        const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
+
+        const paidInstallments = payments.filter(p => p.type === 'cuota').length;
 
 
         return {
@@ -261,7 +266,7 @@ export async function getCreditsByProvider() {
             clienteName: clienteData?.name || 'No disponible',
             clienteAddress: clienteData?.address || 'No disponible',
             clientePhone: clienteData?.contactPhone || 'No disponible',
-            paidInstallments: capitalPayments.length,
+            paidInstallments: paidInstallments,
             paidAmount: paidAmount,
             remainingBalance: remainingBalance,
         };
@@ -314,14 +319,17 @@ export async function getCreditsByCobrador() {
         const paymentsSnapshot = await getDocs(paymentsQuery);
         const payments = paymentsSnapshot.docs.map(p => p.data());
         
-        const capitalPayments = payments.filter(p => p.type === 'cuota');
         const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+        
+        // El capital pagado solo considera los tipos 'cuota' y 'total'
+        const capitalPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
+        const paidCapitalAndCommission = capitalPayments.reduce((sum, p) => sum + p.amount, 0);
 
-        serializableData.paidInstallments = capitalPayments.length;
+        serializableData.paidInstallments = payments.filter(p => p.type === 'cuota').length;
         serializableData.paidAmount = totalPaid;
         
         const totalLoanAmount = creditData.valor + creditData.commission;
-        const remainingBalance = totalLoanAmount - totalPaid;
+        const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
         serializableData.remainingBalance = remainingBalance;
         
         serializableData.lateInterestRate = providerSettings.isLateInterestActive ? (providerSettings.lateInterestRate || 0) : 0;
@@ -677,14 +685,16 @@ export async function registerPayment(creditId: string, amount: number, type: "c
     if (type === 'total') {
         isPaidOff = true;
     } else {
-        const totalPaid = allPayments.reduce((sum, p) => sum + p.amount, 0);
-
+        const capitalPayments = allPayments.filter(p => p.type === 'cuota' || p.type === 'total');
+        const paidCapitalAndCommission = capitalPayments.reduce((sum,p) => sum + p.amount, 0);
+        
         // Fetch the credit again to get the most up-to-date values
         const freshCreditSnap = await getDoc(creditRef);
         const freshCreditData = freshCreditSnap.data();
         if (!freshCreditData) return { error: "Error al recargar el crédito." };
 
         const totalLoanAmount = freshCreditData.valor + freshCreditData.commission;
+        const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
         
         const providerDocRef = doc(db, "users", freshCreditData.providerId);
         const providerSnap = await getDoc(providerDocRef);
@@ -696,7 +706,7 @@ export async function registerPayment(creditId: string, amount: number, type: "c
             lateInterestRate,
         });
 
-        const totalDebt = (totalLoanAmount - totalPaid) + lateFee;
+        const totalDebt = remainingBalance + lateFee;
 
         // Using a small threshold for floating point comparisons
         if (totalDebt <= 1) {
@@ -707,7 +717,7 @@ export async function registerPayment(creditId: string, amount: number, type: "c
     if (isPaidOff) {
         await updateDoc(creditRef, { estado: 'Pagado', updatedAt: Timestamp.now() });
     } else {
-         await updateDoc(creditRef, { updatedAt: Timestamp.now() });
+         await updateDoc(creditRef, { updatedAt: Timestamp.now(), missedPaymentDays: 0 }); // Reset missed days if a quota payment is made
     }
 
     return { success: `Pago de ${amount.toLocaleString('es-CO')} registrado.` };
@@ -756,5 +766,7 @@ export async function registerMissedPayment(creditId: string) {
     return { error: "No se pudo registrar el día de mora." };
   }
 }
+
+    
 
     
