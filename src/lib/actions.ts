@@ -252,8 +252,10 @@ export async function getCreditsByProvider() {
         const payments = paymentsSnapshot.docs.map(p => p.data());
         
         const paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
-        const capitalPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
-        const paidCapitalAndCommission = capitalPayments.reduce((sum, p) => sum + p.amount, 0);
+        
+        // Payments of type 'cuota' or 'total' reduce the principal debt (which includes commission). 'interes' does not.
+        const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
+        const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
 
         const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
         const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
@@ -323,8 +325,8 @@ export async function getCreditsByCobrador() {
         const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
         
         // Payments of type 'cuota' or 'total' reduce the principal debt (which includes commission). 'interes' does not.
-        const capitalPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
-        const paidCapitalAndCommission = capitalPayments.reduce((sum, p) => sum + p.amount, 0);
+        const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
+        const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
 
         serializableData.paidInstallments = payments.filter(p => p.type === 'cuota').length;
         serializableData.paidAmount = totalPaid;
@@ -587,12 +589,11 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
         return { error: "Datos del calendario inválidos." };
     }
 
-    const { creditId, paymentFrequency, paymentDates } = validatedFields.data;
+    const { creditId, paymentDates } = validatedFields.data;
     const creditRef = doc(db, "credits", creditId);
 
     try {
         await updateDoc(creditRef, {
-            paymentFrequency,
             paymentDates: paymentDates.map(dateStr => Timestamp.fromDate(new Date(dateStr))),
             paymentScheduleSet: true,
             updatedAt: Timestamp.now(),
@@ -685,8 +686,8 @@ export async function registerPayment(creditId: string, amount: number, type: "c
     if (type === 'total') {
         isPaidOff = true;
     } else {
-        const capitalPayments = allPayments.filter(p => p.type === 'cuota' || p.type === 'total');
-        const paidCapitalAndCommission = capitalPayments.reduce((sum,p) => sum + p.amount, 0);
+        const capitalAndCommissionPayments = allPayments.filter(p => p.type === 'cuota' || p.type === 'total');
+        const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum,p) => sum + p.amount, 0);
         
         // Fetch the credit again to get the most up-to-date values
         const freshCreditSnap = await getDoc(creditRef);
@@ -771,5 +772,6 @@ export async function registerMissedPayment(creditId: string) {
     
 
     
+
 
 

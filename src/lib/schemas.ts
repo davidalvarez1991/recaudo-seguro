@@ -116,7 +116,6 @@ export const UploadSingleDocumentSchema = z.object({
 
 export const SavePaymentScheduleSchema = z.object({
   creditId: z.string().min(1, "El ID del crédito es obligatorio."),
-  paymentFrequency: z.enum(['diario', 'semanal', 'quincenal', 'mensual']),
   paymentDates: z.array(z.string()).min(1, "Se requiere al menos una fecha de pago."),
 });
 
@@ -126,3 +125,4 @@ export const RenewCreditSchema = z.object({
   creditAmount: z.string().min(1, "El valor del crédito es obligatorio."),
   installments: z.string().min(1, "El número de cuotas es obligatorio."),
 });
+

@@ -23,7 +23,7 @@ type Registro = {
   cobradorName?: string;
   clienteId: string;
   clienteName?: string;
-  tipo: string;
+  estado: string; // Changed from 'tipo' to 'estado'
   valor: number;
   commission: number;
   fecha: string;
@@ -58,7 +58,6 @@ export default function RegistrosPage() {
         .filter(credito => credito.cobradorId !== ADMIN_ID)
         .map((credito) => ({
           ...credito,
-          tipo: "Creación Crédito",
           formattedDate: new Date(credito.fecha).toLocaleDateString('es-CO', {
             year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
           }),
@@ -155,7 +154,7 @@ export default function RegistrosPage() {
                     <TableHead>Fecha</TableHead>
                     <TableHead>Cobrador</TableHead>
                     <TableHead>Cliente</TableHead>
-                    <TableHead>Tipo de Registro</TableHead>
+                    <TableHead>Estado del Crédito</TableHead>
                     <TableHead className="text-right">Valor</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
@@ -173,8 +172,17 @@ export default function RegistrosPage() {
                           <div className="text-sm text-muted-foreground">CC: {registro.clienteId}</div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={'default'}>
-                          {registro.tipo}
+                        <Badge 
+                          variant={
+                            registro.estado === 'Pagado' ? 'secondary' : 
+                            registro.estado === 'Renovado' ? 'outline' : 
+                            'default'
+                          }
+                          className={
+                            registro.estado === 'Pagado' ? 'bg-green-100 text-green-800' : ''
+                          }
+                        >
+                          {registro.estado}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -332,3 +340,4 @@ export default function RegistrosPage() {
     </>
   );
 }
+
