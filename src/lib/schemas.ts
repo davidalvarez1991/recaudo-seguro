@@ -101,6 +101,14 @@ export const EditCobradorSchema = z.object({
   }).optional().or(z.literal('')),
 });
 
+export const EditClientSchema = z.object({
+  originalIdNumber: z.string(),
+  idNumber: z.string().min(6, { message: "La cédula debe tener al menos 6 caracteres." }),
+  name: z.string().min(3, { message: "El nombre completo es obligatorio." }),
+  address: z.string().min(5, { message: "La dirección es obligatoria." }),
+  contactPhone: z.string().min(10, { message: "El teléfono debe tener 10 dígitos." }),
+});
+
 
 export const UploadSingleDocumentSchema = z.object({
     creditId: z.string(),
@@ -125,4 +133,3 @@ export const RenewCreditSchema = z.object({
   creditAmount: z.string().min(1, "El valor del crédito es obligatorio."),
   installments: z.string().min(1, "El número de cuotas es obligatorio."),
 });
-

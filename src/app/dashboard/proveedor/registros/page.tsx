@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, MoreHorizontal, Trash2, Download, Eye } from "lucide-react";
+import { ArrowLeft, ClipboardList, MoreHorizontal, Trash2, Download, Eye, Pencil } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getCreditsByProvider, deleteClientAndCredits } from "@/lib/actions";
@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Separator } from "@/components/ui/separator";
+import { EditClientForm } from "@/components/forms/edit-client-form";
 
 type Registro = {
   id: string;
@@ -23,7 +24,7 @@ type Registro = {
   cobradorName?: string;
   clienteId: string;
   clienteName?: string;
-  estado: string; // Changed from 'tipo' to 'estado'
+  estado: string; 
   valor: number;
   commission: number;
   fecha: string;
@@ -46,6 +47,7 @@ export default function RegistrosPage() {
   const [selectedRegistro, setSelectedRegistro] = useState<Registro | null>(null);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
@@ -84,9 +86,19 @@ export default function RegistrosPage() {
     setIsDetailsModalOpen(true);
   };
 
+  const handleEdit = (registro: Registro) => {
+    setSelectedRegistro(registro);
+    setIsEditModalOpen(true);
+  };
+
   const handleDelete = (registro: Registro) => {
     setSelectedRegistro(registro);
     setIsDeleteAlertOpen(true);
+  };
+  
+  const handleFormSubmit = () => {
+    setIsEditModalOpen(false);
+    fetchRecords();
   };
 
   const confirmDelete = async () => {
@@ -199,6 +211,10 @@ export default function RegistrosPage() {
                                 <DropdownMenuItem onClick={() => handleViewDetails(registro)}>
                                     <Eye className="mr-2 h-4 w-4" />
                                     Ver Detalles
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleEdit(registro)}>
+                                  <Pencil className="mr-2 h-4 w-4" />
+                                  Editar Cliente
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleDelete(registro)} className="text-destructive focus:text-destructive">
                                     <Trash2 className="mr-2 h-4 w-4" />
@@ -320,6 +336,29 @@ export default function RegistrosPage() {
             </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Cliente</DialogTitle>
+            <DialogDescription>
+              Actualiza la información del cliente. Los cambios se reflejarán en todos sus registros.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedRegistro && (
+            <EditClientForm
+              cliente={{
+                id: selectedRegistro.clienteId,
+                name: selectedRegistro.clienteName || '',
+                idNumber: selectedRegistro.clienteId,
+                address: selectedRegistro.clienteAddress || '',
+                contactPhone: selectedRegistro.clientePhone || '',
+              }}
+              onFormSubmit={handleFormSubmit}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
       
       <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
         <AlertDialogContent>
@@ -340,4 +379,3 @@ export default function RegistrosPage() {
     </>
   );
 }
-

@@ -2,7 +2,7 @@
 "use server";
 
 import { z } from "zod";
-import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, UploadSingleDocumentSchema, SavePaymentScheduleSchema, RenewCreditSchema } from "./schemas";
+import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, UploadSingleDocumentSchema, SavePaymentScheduleSchema, RenewCreditSchema, EditClientSchema } from "./schemas";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
@@ -418,6 +418,49 @@ export async function updateCobrador(values: z.infer<typeof EditCobradorSchema>)
     return { success: "Cobrador actualizado exitosamente." };
 }
 
+export async function updateClient(values: z.infer<typeof EditClientSchema>) {
+    const { originalIdNumber, idNumber, name, address, contactPhone } = values;
+
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("idNumber", "==", originalIdNumber), where("role", "==", "cliente"));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+        return { error: "Cliente no encontrado." };
+    }
+
+    if (originalIdNumber !== idNumber && await findUserByIdNumber(idNumber)) {
+        return { error: "El nuevo número de identificación ya está en uso por otro usuario." };
+    }
+    
+    const userDoc = querySnapshot.docs[0];
+    const updateData: { [key: string]: any } = {
+        name,
+        idNumber,
+        address,
+        contactPhone,
+        updatedAt: Timestamp.now()
+    };
+
+    await updateDoc(doc(db, "users", userDoc.id), updateData);
+
+    // If idNumber changed, update all credits associated with this client
+    if (originalIdNumber !== idNumber) {
+        const creditsRef = collection(db, "credits");
+        const creditsQuery = query(creditsRef, where("clienteId", "==", originalIdNumber));
+        const creditsSnapshot = await getDocs(creditsQuery);
+        
+        const batch = writeBatch(db);
+        creditsSnapshot.forEach(creditDoc => {
+            batch.update(creditDoc.ref, { clienteId: idNumber });
+        });
+        await batch.commit();
+    }
+
+    return { success: "Cliente actualizado exitosamente." };
+}
+
+
 export async function deleteCobrador(idNumber: string) {
     const usersRef = collection(db, "users");
     const q = query(usersRef, where("idNumber", "==", idNumber), where("role", "==", "cobrador"));
@@ -768,10 +811,3 @@ export async function registerMissedPayment(creditId: string) {
     return { error: "No se pudo registrar el día de mora." };
   }
 }
-
-    
-
-    
-
-
-
