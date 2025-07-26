@@ -125,7 +125,4 @@ export const RenewCreditSchema = z.object({
   oldCreditId: z.string().min(1, "El ID del crédito anterior es obligatorio."),
   creditAmount: z.string().min(1, "El valor del crédito es obligatorio."),
   installments: z.string().min(1, "El número de cuotas es obligatorio."),
-  paymentFrequency: z.enum(['diario', 'semanal', 'quincenal', 'mensual'], {
-    required_error: "Debe seleccionar una frecuencia de pago."
-  }),
 });
