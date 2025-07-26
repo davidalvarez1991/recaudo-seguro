@@ -9,7 +9,7 @@ import Link from "next/link";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DateRange } from "react-day-picker";
-import { format } from "date-fns";
+import { format, endOfDay } from "date-fns";
 import { es } from "date-fns/locale";
 import { getCreditsByProvider } from "@/lib/actions";
 import * as XLSX from "xlsx";
@@ -49,10 +49,13 @@ export default function DescargasPage() {
             const allRecords: Registro[] = await getCreditsByProvider();
             
             const fromDate = dateRange.from;
-            const toDate = dateRange.to || dateRange.from;
+            // Adjust the toDate to include the whole day
+            const toDate = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
             
             const filteredRecords = allRecords.filter(record => {
                 const recordDate = new Date(record.fecha);
+                // The fromDate is already the start of the day.
+                // The toDate is now the end of the day.
                 return recordDate >= fromDate && recordDate <= toDate;
             });
 
@@ -62,6 +65,7 @@ export default function DescargasPage() {
                     description: "No se encontraron créditos en el rango de fechas seleccionado.",
                     variant: "default",
                 });
+                setLoading(false); // Stop loading indicator
                 return;
             }
 
