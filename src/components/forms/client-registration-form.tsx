@@ -41,8 +41,6 @@ type FileWithStatus = {
     error?: string;
 }
 
-type PaymentFrequency = 'diario' | 'semanal' | 'quincenal' | 'mensual';
-
 export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormProps) {
   const [step, setStep] = useState(1);
   const [isPending, setIsPending] = useState(false);
@@ -501,7 +499,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                              <Label>Fechas Seleccionadas</Label>
                              <ScrollArea className="h-20 w-full rounded-md border p-2 mt-2">
                                 <div className="flex flex-wrap gap-2">
-                                    {selectedDates.map(date => (
+                                    {selectedDates.filter(date => date instanceof Date && !isNaN(date.getTime())).map(date => (
                                         <Badge key={date.toISOString()} variant="secondary">
                                             {format(date, "EEE, dd 'de' MMMM", {locale: es})}
                                         </Badge>
@@ -614,3 +612,4 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
+ 
