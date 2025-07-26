@@ -27,12 +27,19 @@ type Registro = {
   commission: number;
   fecha: string;
   cuotas: number;
+  lateFee: number;
+  endDate?: string;
 };
 
 export default function DescargasPage() {
     const [dateRange, setDateRange] = useState<DateRange | undefined>();
     const [loading, setLoading] = useState(false);
     const { toast } = useToast();
+
+    const formatCurrency = (value: number) => {
+        if (isNaN(value)) return "$0";
+        return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    };
 
     const handleDownload = async () => {
         if (!dateRange || !dateRange.from) {
@@ -49,13 +56,10 @@ export default function DescargasPage() {
             const allRecords: Registro[] = await getCreditsByProvider();
             
             const fromDate = dateRange.from;
-            // Adjust the toDate to include the whole day
             const toDate = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
             
             const filteredRecords = allRecords.filter(record => {
                 const recordDate = new Date(record.fecha);
-                // The fromDate is already the start of the day.
-                // The toDate is now the end of the day.
                 return recordDate >= fromDate && recordDate <= toDate;
             });
 
@@ -65,7 +69,7 @@ export default function DescargasPage() {
                     description: "No se encontraron créditos en el rango de fechas seleccionado.",
                     variant: "default",
                 });
-                setLoading(false); // Stop loading indicator
+                setLoading(false);
                 return;
             }
 
@@ -73,9 +77,11 @@ export default function DescargasPage() {
                 "Nombre Cliente": r.clienteName,
                 "Cédula Cliente": r.clienteId,
                 "Fecha Crédito": format(new Date(r.fecha), "dd/MM/yyyy HH:mm"),
+                "Fecha Fin de Crédito": r.endDate ? format(new Date(r.endDate), "dd/MM/yyyy") : 'N/A',
                 "Cuotas": r.cuotas,
                 "Valor Crédito": r.valor,
                 "Ganancia (Comisión)": r.commission,
+                "Valor Mora": r.lateFee,
                 "Nombre Cobrador": r.cobradorName,
                 "Cédula Cobrador": r.cobradorId,
             }));

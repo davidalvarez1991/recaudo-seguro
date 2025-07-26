@@ -214,9 +214,10 @@ export async function getCreditsByProvider() {
     
     const providerDocRef = doc(db, "users", providerIdCookie.value);
     const providerSnap = await getDoc(providerDocRef);
-    if (!providerSnap.exists()) return [];
-    
-    if (providerSnap.data().role !== 'proveedor') return [];
+    if (!providerSnap.exists() || providerSnap.data().role !== 'proveedor') {
+        return [];
+    }
+    const providerSettings = providerSnap.data();
     
     const creditsRef = collection(db, "credits");
     const q = query(creditsRef, where("providerId", "==", providerIdCookie.value));
@@ -225,29 +226,21 @@ export async function getCreditsByProvider() {
     const creditsPromises = querySnapshot.docs.map(async (docSnapshot) => {
         const creditData: any = { id: docSnapshot.id, ...docSnapshot.data() };
         
-        // Convert Timestamps to strings, preserving original 'fecha'
         if (creditData.fecha instanceof Timestamp) {
-            creditData.fecha = creditData.fecha.toDate().toISOString();
+            creditData.formattedDate = creditData.fecha.toDate().toISOString(); // Keep original fecha for UI
         }
+        
+        creditData.fecha = creditData.fecha instanceof Timestamp ? creditData.fecha.toDate().toISOString() : creditData.fecha;
+        creditData.updatedAt = creditData.updatedAt instanceof Timestamp ? creditData.updatedAt.toDate().toISOString() : creditData.updatedAt;
+        creditData.createdAt = creditData.createdAt instanceof Timestamp ? creditData.createdAt.toDate().toISOString() : creditData.createdAt;
 
-        // Convert other Timestamps
-        if (creditData.updatedAt && creditData.updatedAt instanceof Timestamp) {
-            creditData.updatedAt = creditData.updatedAt.toDate().toISOString();
-        }
-        if (creditData.createdAt && creditData.createdAt instanceof Timestamp) {
-            creditData.createdAt = creditData.createdAt.toDate().toISOString();
-        }
-        creditData.paymentDates = (creditData.paymentDates || []).map((d: any) => {
-            if (d instanceof Timestamp) {
-                return d.toDate().toISOString();
-            }
-            return d;
-        });
+        creditData.paymentDates = (creditData.paymentDates || []).map((d: any) => 
+            d instanceof Timestamp ? d.toDate().toISOString() : d
+        );
 
         const cobradorData = await findUserByIdNumber(creditData.cobradorId as string);
         const clienteData = await findUserByIdNumber(creditData.clienteId as string);
         
-        // Fetch payments for this credit
         const paymentsRef = collection(db, "payments");
         const paymentsQuery = query(paymentsRef, where("creditId", "==", creditData.id));
         const paymentsSnapshot = await getDocs(paymentsQuery);
@@ -255,15 +248,25 @@ export async function getCreditsByProvider() {
         
         const paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
         
-        // Payments of type 'cuota' or 'total' reduce the principal debt (which includes commission). 'interes' does not.
         const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
         const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
 
         const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
         const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
-
         const paidInstallments = payments.filter(p => p.type === 'cuota').length;
 
+        // Calculate late fee
+        const lateFee = calculateLateFee({
+            ...creditData,
+            lateInterestRate: providerSettings.isLateInterestActive ? (providerSettings.lateInterestRate || 0) : 0,
+        });
+
+        // Get end date
+        let endDate: string | undefined = undefined;
+        if (creditData.paymentDates && creditData.paymentDates.length > 0) {
+            const sortedDates = [...creditData.paymentDates].sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
+            endDate = sortedDates[sortedDates.length - 1];
+        }
 
         return {
             ...creditData,
@@ -271,15 +274,15 @@ export async function getCreditsByProvider() {
             clienteName: clienteData?.name || 'No disponible',
             clienteAddress: clienteData?.address || 'No disponible',
             clientePhone: clienteData?.contactPhone || 'No disponible',
-            paidInstallments: paidInstallments,
-            paidAmount: paidAmount,
-            remainingBalance: remainingBalance,
+            paidInstallments,
+            paidAmount,
+            remainingBalance,
+            lateFee,
+            endDate,
         };
     });
     
-    const credits = await Promise.all(creditsPromises);
-    
-    return credits;
+    return await Promise.all(creditsPromises);
 }
 
 
