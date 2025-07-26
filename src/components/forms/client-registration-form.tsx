@@ -495,9 +495,9 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                         />
                     </div>
                      {selectedDates.length > 0 && (
-                        <div className="rounded-md border p-4 mt-2">
+                        <div className="rounded-md border p-4 mt-2 h-24 overflow-y-auto">
                              <Label>Fechas Seleccionadas</Label>
-                             <div className="space-y-1 text-sm mt-2 text-foreground">
+                             <div className="space-y-1 text-sm mt-2 text-[#0B025E]">
                                 {selectedDates
                                     .filter(date => date instanceof Date && !isNaN(date.getTime()))
                                     .map(date => (
@@ -616,3 +616,4 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
  
     
  
+
