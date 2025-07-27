@@ -9,7 +9,7 @@ import bcrypt from 'bcryptjs';
 import { db, storage } from "./firebase";
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc, increment, orderBy, limit } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { startOfDay, differenceInDays } from 'date-fns';
+import { startOfDay, differenceInDays, endOfDay } from 'date-fns';
 
 const ADMIN_ID = "admin_0703091991";
 
@@ -521,7 +521,8 @@ export async function getHistoricalCreditsByCliente() {
             estado: creditData.estado,
             providerId: creditData.providerId,
             providerName,
-            clienteName: clienteData.name, // Add client name
+            clienteId: clienteData.idNumber,
+            clienteName: clienteData.name,
         };
     });
 
@@ -553,6 +554,53 @@ export async function getPaymentsByCreditId(creditId: string) {
 
     // Sort the results in application code
     return payments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+}
+
+export async function getDailyCollectionSummary() {
+    const providerIdCookie = cookies().get('loggedInUser');
+    if (!providerIdCookie) {
+        return { summary: [], totalCollected: 0 };
+    }
+    const providerId = providerIdCookie.value;
+
+    const todayStart = startOfDay(new Date());
+    const todayEnd = endOfDay(new Date());
+    
+    const paymentsRef = collection(db, "payments");
+    const paymentsQuery = query(
+        paymentsRef,
+        where("providerId", "==", providerId),
+        where("date", ">=", Timestamp.fromDate(todayStart)),
+        where("date", "<=", Timestamp.fromDate(todayEnd))
+    );
+    
+    const paymentsSnapshot = await getDocs(paymentsQuery);
+    if (paymentsSnapshot.empty) {
+        return { summary: [], totalCollected: 0 };
+    }
+
+    const cobradores = await getCobradoresByProvider();
+    const cobradoresMap = new Map(cobradores.map(c => [c.idNumber, c.name]));
+
+    const summaryMap = new Map<string, number>();
+    let totalCollected = 0;
+
+    paymentsSnapshot.forEach(doc => {
+        const payment = doc.data();
+        const amount = payment.amount || 0;
+        const cobradorId = payment.cobradorId;
+        
+        summaryMap.set(cobradorId, (summaryMap.get(cobradorId) || 0) + amount);
+        totalCollected += amount;
+    });
+    
+    const summary = Array.from(summaryMap.entries()).map(([cobradorId, collectedAmount]) => ({
+        cobradorId,
+        cobradorName: cobradoresMap.get(cobradorId) || `Cobrador (${cobradorId})`,
+        collectedAmount,
+    }));
+
+    return { summary, totalCollected };
 }
 
 

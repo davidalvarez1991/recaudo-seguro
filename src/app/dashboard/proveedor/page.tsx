@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { UserPlus, Eye } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
-import { getCobradoresByProvider, getUserData } from "@/lib/actions";
+import { getCobradoresByProvider, getUserData, getDailyCollectionSummary } from "@/lib/actions";
 import { CobradorRegistrationModal } from "@/components/proveedor/cobrador-registration-modal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cookies } from "next/headers";
+import { DailySummary } from "@/components/proveedor/daily-summary";
 
 type UserData = {
     companyName?: string;
@@ -29,6 +30,8 @@ export default async function ProveedorDashboard() {
   const cobradores = await getCobradoresByProvider();
   const cobradoresCount = cobradores.length;
   const canCreateCobrador = cobradoresCount < 30;
+
+  const dailySummaryData = await getDailyCollectionSummary();
 
   const CreateButton = () => {
     if (canCreateCobrador) {
@@ -74,11 +77,13 @@ export default async function ProveedorDashboard() {
       </CardHeader>
       <CardContent className="space-y-8">
         <div>
-            <h3 className="text-lg font-medium">Resumen</h3>
+            <h3 className="text-lg font-medium">Resumen del Día</h3>
             <p className="text-sm text-muted-foreground">
-                Desde aquí puedes gestionar tus productos, servicios y visualizar tus recaudos.
+                Visualiza el total recaudado hoy por tus cobradores en tiempo real.
             </p>
         </div>
+
+        <DailySummary summary={dailySummaryData.summary} total={dailySummaryData.totalCollected} />
 
         <Separator />
         
