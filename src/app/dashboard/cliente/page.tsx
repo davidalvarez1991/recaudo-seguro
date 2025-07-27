@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { getCreditsByCliente } from "@/lib/actions";
-import { Loader2, CheckCircle2, Circle, Wallet, HandCoins, FileText, User, Fingerprint } from "lucide-react";
+import { Loader2, CheckCircle2, Circle, Wallet, HandCoins, FileText, User, Fingerprint, Coins, Landmark } from "lucide-react";
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
@@ -82,10 +82,16 @@ export default function ClienteDashboard() {
           </div>
         ) : credit ? (
           <div className="space-y-8">
-            {/* Total Credit Amount */}
-            <div className="text-center bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-6">
-              <p className="text-sm font-medium text-green-700 dark:text-green-300">VALOR TOTAL DEL CRÉDITO</p>
-              <p className="text-5xl font-bold text-green-600 dark:text-green-400 tracking-tight">{formatCurrency(credit.totalLoanAmount)}</p>
+            {/* Credit Amounts */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="text-center bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
+                  <p className="text-sm font-medium text-blue-700 dark:text-blue-300 flex items-center justify-center gap-1.5"><Coins className="h-4 w-4"/> VALOR SOLICITADO</p>
+                  <p className="text-4xl font-bold text-blue-600 dark:text-blue-400 tracking-tight">{formatCurrency(credit.valor)}</p>
+                </div>
+                <div className="text-center bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-6">
+                  <p className="text-sm font-medium text-green-700 dark:text-green-300 flex items-center justify-center gap-1.5"><Landmark className="h-4 w-4"/> TOTAL A PAGAR</p>
+                  <p className="text-4xl font-bold text-green-600 dark:text-green-400 tracking-tight">{formatCurrency(credit.totalLoanAmount)}</p>
+                </div>
             </div>
             
             {/* Financial Summary */}
@@ -101,14 +107,14 @@ export default function ClienteDashboard() {
                         </div>
                     </div>
                 </div>
-                 <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg border border-blue-100 dark:border-blue-900">
+                 <div className="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg border border-green-100 dark:border-green-900">
                     <div className="flex items-center gap-3">
                         <div className="p-3 bg-white rounded-full border shadow-sm">
-                           <HandCoins className="w-6 h-6 text-blue-500" />
+                           <HandCoins className="w-6 h-6 text-green-500" />
                         </div>
                         <div>
-                            <div className="text-sm text-blue-600 dark:text-blue-300">Total Pagado</div>
-                            <div className="text-2xl font-bold text-blue-700 dark:text-blue-200">{formatCurrency(credit.paidAmount)}</div>
+                            <div className="text-sm text-green-600 dark:text-green-300">Total Pagado</div>
+                            <div className="text-2xl font-bold text-green-700 dark:text-green-200">{formatCurrency(credit.paidAmount)}</div>
                         </div>
                     </div>
                 </div>
