@@ -27,7 +27,7 @@ type SettingsFormProps = {
 };
 
 const formatCurrencyForInput = (value: number | string): string => {
-    if (value === undefined || value === null) return "";
+    if (value === undefined || value === null || value === 0 || value === "0") return "";
     if (typeof value === 'number') {
         value = value.toString();
     }
@@ -111,8 +111,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
   };
   
   const handleCommissionTierChange = (index: number, field: keyof CommissionTier, value: string) => {
-    const numericValue = parseFloat(value.replace(/\./g, ''));
-    if (isNaN(numericValue) && value !== '') return;
+    const numericValue = parseInt(value.replace(/\D/g, ''), 10);
     
     const newTiers = [...commissionTiers];
     newTiers[index] = { ...newTiers[index], [field]: isNaN(numericValue) ? 0 : numericValue };
@@ -139,7 +138,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
   const handleSaveCommissions = async () => {
     // Basic validation
     for (const tier of commissionTiers) {
-      if (tier.minAmount >= tier.maxAmount) {
+      if (tier.minAmount >= tier.maxAmount && tier.maxAmount !== 0) {
         toast({ title: "Error de validación", description: `El monto mínimo (${formatCurrencyForInput(tier.minAmount)}) debe ser menor que el máximo (${formatCurrencyForInput(tier.maxAmount)}) en un tramo.`, variant: "destructive" });
         return;
       }
@@ -262,7 +261,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
                     <Input
                       id={`percentage-${index}`}
                       type="number"
-                      value={tier.percentage}
+                      value={tier.percentage === 0 ? "" : tier.percentage}
                       onChange={(e) => handleCommissionTierChange(index, 'percentage', e.target.value)}
                       className="pr-8"
                       placeholder="20"
