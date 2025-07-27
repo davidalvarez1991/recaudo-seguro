@@ -28,7 +28,7 @@ export default async function ProveedorDashboard() {
 
   const cobradores = await getCobradoresByProvider();
   const cobradoresCount = cobradores.length;
-  const canCreateCobrador = cobradoresCount < 5;
+  const canCreateCobrador = cobradoresCount < 30;
 
   const CreateButton = () => {
     if (canCreateCobrador) {
@@ -54,7 +54,7 @@ export default async function ProveedorDashboard() {
             </span>
           </TooltipTrigger>
           <TooltipContent>
-            <p>Has alcanzado el límite de 5 cobradores.</p>
+            <p>Has alcanzado el límite de 30 cobradores.</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -84,7 +84,7 @@ export default async function ProveedorDashboard() {
         
         <div className="space-y-6">
           <div>
-            <h3 className="text-lg font-medium">Gestión de Cobradores ({cobradoresCount}/5)</h3>
+            <h3 className="text-lg font-medium">Gestión de Cobradores ({cobradoresCount}/30)</h3>
             <p className="text-sm text-muted-foreground">Crea nuevas cuentas o visualiza tus cobradores existentes.</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
