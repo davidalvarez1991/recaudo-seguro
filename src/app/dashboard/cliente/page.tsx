@@ -90,7 +90,8 @@ export default function ClienteDashboard() {
     try {
         const canvas = await html2canvas(elementToCapture, { 
             useCORS: true,
-            backgroundColor: window.getComputedStyle(document.body).backgroundColor // Use page background
+            scale: 2, // Increase scale for better quality
+            backgroundColor: '#FFFFFF', // Set a solid background color
         });
         const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
         
