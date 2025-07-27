@@ -29,6 +29,7 @@ type HistoricalCredit = {
   estado: string;
   providerId: string;
   providerName: string;
+  clienteName: string;
   commission: number;
 };
 
@@ -60,6 +61,8 @@ export default function HistorialClientePage() {
   const handleDownloadPDF = async (credit: HistoricalCredit) => {
     try {
         const doc = new jsPDF();
+        const today = new Date();
+        const formattedToday = format(today, "d 'de' MMMM, yyyy", { locale: es });
 
         const providerData = await getUserData(credit.providerId);
         const providerName = providerData?.companyName || credit.providerName || 'N/A';
@@ -71,7 +74,7 @@ export default function HistorialClientePage() {
         doc.text("Paz y Salvo de Crédito", 105, 20, { align: 'center' });
         doc.setFontSize(10);
         doc.setTextColor(100);
-        doc.text(`ID del Crédito: ${credit.id}`, 105, 27, { align: 'center' });
+        doc.text(`Cliente: ${credit.clienteName}`, 105, 27, { align: 'center' });
 
         // Watermark
         doc.setFontSize(72);
@@ -84,7 +87,7 @@ export default function HistorialClientePage() {
         
         const mainDetailsBody = [
             ['Empresa Prestadora', providerName],
-            ['Fecha de Liquidación', format(new Date(), "d 'de' MMMM, yyyy", { locale: es })],
+            ['Fecha de Liquidación', formattedToday],
             ['Fecha de Inicio Crédito', format(new Date(credit.fecha), "d 'de' MMMM, yyyy", { locale: es })],
             ['Valor Solicitado', formatCurrency(credit.valor)],
             ['Número de Cuotas', credit.cuotas.toString()],
@@ -122,7 +125,9 @@ export default function HistorialClientePage() {
         doc.text("Este documento certifica que el crédito referenciado ha sido cancelado en su totalidad.", 14, (doc as any).lastAutoTable.finalY + 20);
         doc.text("Generado por Recaudo Seguro.", 14, (doc as any).lastAutoTable.finalY + 25);
 
-        doc.save(`Paz_y_Salvo_${credit.id}.pdf`);
+        const fileName = `Paz_y_Salvo_${credit.clienteName.replace(/ /g, '_')}_${format(today, 'yyyy-MM-dd')}.pdf`;
+        doc.save(fileName);
+        
         toast({
             title: "Descarga Iniciada",
             description: "El paz y salvo se ha generado correctamente."

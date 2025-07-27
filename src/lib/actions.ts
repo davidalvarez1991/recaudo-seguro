@@ -470,9 +470,13 @@ export async function getCreditsByCliente() {
     const allCredits = await Promise.all(creditsPromises);
     // Sort credits by most recent first, using the credit ID which is a timestamp
     const sortedCredits = allCredits.sort((a,b) => {
-        const dateA = new Date(a.id).getTime();
-        const dateB = new Date(b.id).getTime();
-        return dateB - dateA;
+        // This assumes credit IDs are sortable timestamps, which might not be the case.
+        // A better approach is to sort by creation date if available.
+        const dateA = new Date(a.id).getTime(); // Risky if ID is not a date
+        const dateB = new Date(b.id).getTime(); // Risky
+        // Let's rely on Firestore's default ordering for now or add an explicit `createdAt` field.
+        // For now, no client-side sort to avoid issues.
+        return allCredits;
     });
 
     return sortedCredits;
@@ -517,6 +521,7 @@ export async function getHistoricalCreditsByCliente() {
             estado: creditData.estado,
             providerId: creditData.providerId,
             providerName,
+            clienteName: clienteData.name, // Add client name
         };
     });
 
