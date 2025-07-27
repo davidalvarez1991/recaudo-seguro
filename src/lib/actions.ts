@@ -534,7 +534,6 @@ export async function getPaymentsByCreditId(creditId: string) {
     if (!creditId) return [];
     
     const paymentsRef = collection(db, "payments");
-    // Remove orderBy to avoid needing a composite index
     const q = query(paymentsRef, where("creditId", "==", creditId));
     const querySnapshot = await getDocs(q);
     
@@ -582,6 +581,9 @@ export async function getDailyCollectionSummary() {
 
     paymentsSnapshot.forEach(doc => {
         const payment = doc.data();
+        if (!payment.date) {
+            return; // Skip record if date is missing
+        }
         const paymentDate = payment.date.toDate();
         
         if (isWithinInterval(paymentDate, { start: todayStart, end: todayEnd })) {
