@@ -27,11 +27,11 @@ type SettingsFormProps = {
 };
 
 const formatCurrencyForInput = (value: number | string): string => {
+    if (value === undefined || value === null) return "";
     if (typeof value === 'number') {
-        return value.toString();
+        value = value.toString();
     }
-    if (!value) return "";
-    const numberValue = parseInt(value.replace(/\D/g, ""), 10);
+    const numberValue = parseInt(value.replace(/\D/g, ''), 10);
     if (isNaN(numberValue)) return "";
     return new Intl.NumberFormat('es-CO').format(numberValue);
 };
