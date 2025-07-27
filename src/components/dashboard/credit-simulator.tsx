@@ -20,8 +20,14 @@ const simulatorSchema = z.object({
 
 type SimulatorFormValues = z.infer<typeof simulatorSchema>;
 
+type CommissionTier = {
+  minAmount: number;
+  maxAmount: number;
+  percentage: number;
+};
+
 type CreditSimulatorProps = {
-  commissionPercentage: number;
+  commissionTiers: CommissionTier[];
   lateInterestRate: number;
   isLateInterestActive: boolean;
 };
@@ -32,13 +38,29 @@ type SimulationResult = {
     baseAmount: number;
     commissionAmount: number;
     lateFee: number;
+    appliedCommission: number;
 };
 
 const formatCurrency = (value: number) => {
     return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 };
 
-export function CreditSimulator({ commissionPercentage, lateInterestRate, isLateInterestActive }: CreditSimulatorProps) {
+const calculateCommission = (amount: number, tiers: CommissionTier[]): { commission: number; percentage: number } => {
+    if (!tiers || tiers.length === 0) {
+        return { commission: amount * 0.20, percentage: 20 };
+    }
+    const sortedTiers = [...tiers].sort((a, b) => a.minAmount - b.minAmount);
+    const applicableTier = sortedTiers.find(tier => amount >= tier.minAmount && amount <= tier.maxAmount);
+
+    if (applicableTier) {
+        return { commission: amount * (applicableTier.percentage / 100), percentage: applicableTier.percentage };
+    }
+    const fallbackPercentage = sortedTiers[0]?.percentage || 20;
+    return { commission: amount * (fallbackPercentage / 100), percentage: fallbackPercentage };
+};
+
+
+export function CreditSimulator({ commissionTiers, lateInterestRate, isLateInterestActive }: CreditSimulatorProps) {
   const [result, setResult] = useState<SimulationResult | null>(null);
 
   const form = useForm<SimulatorFormValues>({
@@ -70,7 +92,7 @@ export function CreditSimulator({ commissionPercentage, lateInterestRate, isLate
       return;
     }
 
-    const commissionAmount = amount * (commissionPercentage / 100);
+    const { commission: commissionAmount, percentage: appliedCommission } = calculateCommission(amount, commissionTiers);
     const baseTotal = amount + commissionAmount;
     
     let lateFee = 0;
@@ -89,6 +111,7 @@ export function CreditSimulator({ commissionPercentage, lateInterestRate, isLate
       baseAmount: amount,
       commissionAmount: commissionAmount,
       lateFee: lateFee,
+      appliedCommission: appliedCommission,
     });
   };
 
@@ -195,7 +218,7 @@ export function CreditSimulator({ commissionPercentage, lateInterestRate, isLate
                 <div className="text-xs text-muted-foreground space-y-1 text-center border-t pt-2 mt-2">
                     <p>Desglose: {formatCurrency(result.baseAmount)} (Capital) + {formatCurrency(result.commissionAmount)} (Comisión) + {formatCurrency(result.lateFee)} (Mora)</p>
                     <p>
-                        Cálculo basado en una comisión del {commissionPercentage}% y un interés de mora del {lateInterestRate}% diario.
+                        Cálculo basado en una comisión del {result.appliedCommission}% y un interés de mora del {lateInterestRate}% diario.
                     </p>
                 </div>
             </div>

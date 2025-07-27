@@ -13,6 +13,12 @@ import { startOfDay, differenceInDays } from 'date-fns';
 
 const ADMIN_ID = "admin_0703091991";
 
+type CommissionTier = {
+  minAmount: number;
+  maxAmount: number;
+  percentage: number;
+};
+
 // --- Utility Functions ---
 const findUserByIdNumber = async (idNumber: string) => {
     const usersRef = collection(db, "users");
@@ -32,6 +38,26 @@ const findUserByIdNumber = async (idNumber: string) => {
         serializableData.updatedAt = data.updatedAt.toDate().toISOString();
     }
     return serializableData;
+};
+
+const calculateCommission = (amount: number, tiers: CommissionTier[] | undefined): number => {
+    if (!tiers || tiers.length === 0) {
+        // Fallback to a default 20% if no tiers are set
+        return amount * 0.20;
+    }
+    
+    // Sort tiers by minAmount to ensure correct matching
+    const sortedTiers = [...tiers].sort((a, b) => a.minAmount - b.minAmount);
+    
+    const applicableTier = sortedTiers.find(tier => amount >= tier.minAmount && amount <= tier.maxAmount);
+
+    if (applicableTier) {
+        return amount * (applicableTier.percentage / 100);
+    }
+
+    // If no tier matches (e.g., gaps in ranges), fallback to the first tier's percentage or a default
+    const fallbackPercentage = sortedTiers[0]?.percentage || 20;
+    return amount * (fallbackPercentage / 100);
 };
 
 // --- Auth Actions ---
@@ -698,8 +724,7 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     const providerSnap = await getDoc(providerDocRef);
     if (!providerSnap.exists()) return { error: "Proveedor no encontrado."};
     const provider = providerSnap.data();
-    const commissionPercentage = provider.commissionPercentage || 20;
-
+    
     const validatedFields = ClientCreditSchema.safeParse(values);
 
     if (!validatedFields.success) {
@@ -726,7 +751,7 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     }
 
     const valor = parseFloat(creditAmount.replace(/\./g, '').replace(',', '.'));
-    const commission = valor * (commissionPercentage / 100);
+    const commission = calculateCommission(valor, provider.commissionTiers);
 
     const creditRef = await addDoc(collection(db, "credits"), {
         clienteId: idNumber,
@@ -767,12 +792,11 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
     const providerSnap = await getDoc(providerDocRef);
     if (!providerSnap.exists()) return { error: "Proveedor no encontrado."};
     const provider = providerSnap.data();
-    const commissionPercentage = provider.commissionPercentage || 20;
 
     const { clienteId, oldCreditId, creditAmount, installments } = values;
 
     const valor = parseFloat(creditAmount.replace(/\./g, '').replace(',', '.'));
-    const commission = valor * (commissionPercentage / 100);
+    const commission = calculateCommission(valor, provider.commissionTiers);
 
     // 1. Create the new credit
     const newCreditRef = await addDoc(collection(db, "credits"), {
@@ -950,7 +974,7 @@ export async function registerPayment(creditId: string, amount: number, type: "c
 }
 
 
-export async function saveProviderSettings(providerId: string, settings: { commissionPercentage?: number, lateInterestRate?: number, isLateInterestActive?: boolean, companyLogoUrl?: string }) {
+export async function saveProviderSettings(providerId: string, settings: { commissionTiers?: CommissionTier[], lateInterestRate?: number, isLateInterestActive?: boolean, companyLogoUrl?: string }) {
   if (!providerId) return { error: "ID de proveedor no válido." };
   
   const providerRef = doc(db, "users", providerId);
@@ -960,8 +984,8 @@ export async function saveProviderSettings(providerId: string, settings: { commi
   }
 
   const updateData: any = {};
-  if (settings.commissionPercentage !== undefined) {
-    updateData.commissionPercentage = settings.commissionPercentage;
+  if (settings.commissionTiers !== undefined) {
+    updateData.commissionTiers = settings.commissionTiers;
   }
   if (settings.lateInterestRate !== undefined) {
     updateData.lateInterestRate = settings.lateInterestRate;

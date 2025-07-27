@@ -6,6 +6,12 @@ import { getUserData } from "@/lib/actions";
 import { cookies } from "next/headers";
 import { Separator } from "@/components/ui/separator";
 
+type CommissionTier = {
+  minAmount: number;
+  maxAmount: number;
+  percentage: number;
+};
+
 type UserData = {
     name: string;
     providerId?: string;
@@ -13,7 +19,8 @@ type UserData = {
 } | null;
 
 type ProviderData = {
-    commissionPercentage?: number;
+    commissionTiers?: CommissionTier[];
+    commissionPercentage?: number; // Keep for fallback
     lateInterestRate?: number;
     isLateInterestActive?: boolean;
     [key: string]: any;
@@ -24,7 +31,7 @@ export default async function CobradorDashboard() {
   const userId = cookieStore.get('loggedInUser')?.value;
   
   let userName = "Cobrador";
-  let commissionPercentage = 20; // Default value
+  let commissionTiers: CommissionTier[] = [{ minAmount: 0, maxAmount: 50000000, percentage: 20 }]; // Default tier
   let lateInterestRate = 0;
   let isLateInterestActive = false;
 
@@ -35,7 +42,12 @@ export default async function CobradorDashboard() {
         if (userData.providerId) {
             const providerData: ProviderData = await getUserData(userData.providerId);
             if (providerData) {
-                commissionPercentage = providerData.commissionPercentage || 20;
+                if (providerData.commissionTiers && providerData.commissionTiers.length > 0) {
+                    commissionTiers = providerData.commissionTiers;
+                } else if (providerData.commissionPercentage) {
+                    // Fallback for old single percentage system
+                    commissionTiers = [{ minAmount: 0, maxAmount: 50000000, percentage: providerData.commissionPercentage }];
+                }
                 lateInterestRate = providerData.lateInterestRate || 0;
                 isLateInterestActive = providerData.isLateInterestActive || false;
             }
@@ -73,7 +85,7 @@ export default async function CobradorDashboard() {
         </div>
 
         <CreditSimulator 
-            commissionPercentage={commissionPercentage} 
+            commissionTiers={commissionTiers} 
             lateInterestRate={lateInterestRate}
             isLateInterestActive={isLateInterestActive}
         />
