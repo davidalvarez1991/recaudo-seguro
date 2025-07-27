@@ -1,16 +1,18 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getCreditsByCliente } from "@/lib/actions";
-import { Loader2, CheckCircle2, Circle, Wallet, HandCoins, FileText, User, Fingerprint, Coins, Landmark, Building, RefreshCcw } from "lucide-react";
+import { Loader2, CheckCircle2, Circle, Wallet, HandCoins, FileText, User, Fingerprint, Coins, Landmark, Building, RefreshCcw, Share2 } from "lucide-react";
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import html2canvas from "html2canvas";
+import { useToast } from "@/hooks/use-toast";
 
 type CreditData = {
   id: string;
@@ -42,6 +44,10 @@ export default function ClienteDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [clientInfo, setClientInfo] = useState<{ name: string, id: string } | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("");
+  const { toast } = useToast();
+  
+  const contentRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const fetchCreditData = useCallback(async () => {
     try {
@@ -51,6 +57,7 @@ export default function ClienteDashboard() {
       if (data && data.length > 0) {
           setCredits(data);
           setClientInfo({ name: data[0].clienteName || 'Cliente', id: data[0].clienteId || '' });
+          setActiveTab(data[0].id);
       } else {
           setCredits([]);
       }
@@ -71,6 +78,43 @@ export default function ClienteDashboard() {
     return name.substring(0, 2).toUpperCase();
   }
 
+  const handleShare = async () => {
+    const elementToCapture = contentRefs.current[activeTab];
+    if (!elementToCapture) {
+      toast({ title: "Error", description: "No se pudo encontrar el contenido para compartir.", variant: "destructive" });
+      return;
+    }
+
+    toast({ title: "Preparando imagen...", description: "Por favor espera un momento." });
+
+    try {
+        const canvas = await html2canvas(elementToCapture, { 
+            useCORS: true,
+            backgroundColor: window.getComputedStyle(document.body).backgroundColor // Use page background
+        });
+        const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+        
+        if (!blob) {
+            throw new Error("No se pudo generar la imagen.");
+        }
+
+        const file = new File([blob], 'estado-de-cuenta.png', { type: 'image/png' });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+                files: [file],
+                title: 'Estado de Cuenta',
+                text: `Aquí está el estado de cuenta de ${clientInfo?.name || 'Cliente'}.`,
+            });
+        } else {
+           toast({ title: "No se puede compartir", description: "Tu navegador no soporta la función de compartir archivos.", variant: "destructive" });
+        }
+    } catch (e) {
+        console.error("Error al compartir:", e);
+        toast({ title: "Error", description: "Ocurrió un error al intentar compartir la imagen.", variant: "destructive" });
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -85,10 +129,16 @@ export default function ClienteDashboard() {
                 {clientInfo ? `CC: ${clientInfo.id}` : 'Consulta el estado actual de tus créditos.'}
             </CardDescription>
           </div>
-          <Button variant="outline" size="icon" onClick={fetchCreditData} disabled={loading}>
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
-            <span className="sr-only">Actualizar</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={handleShare} disabled={loading || credits.length === 0}>
+                <Share2 className="h-4 w-4" />
+                <span className="sr-only">Compartir</span>
+            </Button>
+            <Button variant="outline" size="icon" onClick={fetchCreditData} disabled={loading}>
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                <span className="sr-only">Actualizar</span>
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -102,7 +152,7 @@ export default function ClienteDashboard() {
             <p>{error}</p>
           </div>
         ) : credits.length > 0 ? (
-          <Tabs defaultValue={credits[0].id} className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3 h-auto">
               {credits.map((credit) => (
                 <TabsTrigger key={credit.id} value={credit.id} className="flex flex-col h-auto items-start p-2 text-left">
@@ -118,8 +168,13 @@ export default function ClienteDashboard() {
               ))}
             </TabsList>
             {credits.map((credit) => (
-              <TabsContent key={credit.id} value={credit.id} className="mt-6">
-                <div className="space-y-8">
+              <TabsContent 
+                key={credit.id} 
+                value={credit.id} 
+                className="mt-6"
+                ref={(el) => { contentRefs.current[credit.id] = el; }}
+              >
+                <div className="space-y-8 p-4 bg-background">
                     {/* Credit Amounts */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="text-center bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
