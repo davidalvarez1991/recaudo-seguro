@@ -498,6 +498,28 @@ export async function getHistoricalCreditsByCliente() {
     return allCredits.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 }
 
+export async function getPaymentsByCreditId(creditId: string) {
+    if (!creditId) return [];
+    
+    const paymentsRef = collection(db, "payments");
+    const q = query(paymentsRef, where("creditId", "==", creditId), orderBy("date", "asc"));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+        return [];
+    }
+    
+    return querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            amount: data.amount,
+            date: data.date instanceof Timestamp ? data.date.toDate().toISOString() : data.date,
+            type: data.type,
+        };
+    });
+}
+
 
 // --- Data Mutation Actions ---
 

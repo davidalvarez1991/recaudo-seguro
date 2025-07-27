@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getHistoricalCreditsByCliente, getUserData } from "@/lib/actions";
+import { getHistoricalCreditsByCliente, getUserData, getPaymentsByCreditId } from "@/lib/actions";
 import { Loader2, History, ArrowLeft, ClipboardList, Download } from "lucide-react";
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -63,8 +63,8 @@ export default function HistorialClientePage() {
 
         const providerData = await getUserData(credit.providerId);
         const providerName = providerData?.companyName || credit.providerName || 'N/A';
-        const providerId = providerData?.idNumber || 'N/A';
-        
+        const paymentRecords = await getPaymentsByCreditId(credit.id);
+
         // Header
         doc.setFontSize(22);
         doc.setTextColor(41, 98, 255);
@@ -78,26 +78,45 @@ export default function HistorialClientePage() {
         doc.setTextColor(200);
         doc.text("PAGADO", 105, 160, { angle: 45, align: 'center' });
         
-        // Body
+        // Body - Main Details
         doc.setFontSize(12);
         doc.setTextColor(0);
+        
+        const mainDetailsBody = [
+            ['Empresa Prestadora', providerName],
+            ['Fecha de Liquidación', format(new Date(), "d 'de' MMMM, yyyy", { locale: es })],
+            ['Fecha de Inicio Crédito', format(new Date(credit.fecha), "d 'de' MMMM, yyyy", { locale: es })],
+            ['Valor Solicitado', formatCurrency(credit.valor)],
+            ['Número de Cuotas', credit.cuotas.toString()],
+        ];
+
         doc.autoTable({
             startY: 40,
             head: [['Concepto', 'Detalle']],
-            body: [
-                ['Empresa Prestadora', providerName],
-                ['NIT/C.C. Empresa', providerId],
-                ['Fecha de Liquidación', format(new Date(), "d 'de' MMMM, yyyy", { locale: es })],
-                ['Fecha de Inicio Crédito', format(new Date(credit.fecha), "d 'de' MMMM, yyyy", { locale: es })],
-                ['Valor Solicitado', formatCurrency(credit.valor)],
-                ['Comisión', formatCurrency(credit.commission)],
-                ['Total Pagado', formatCurrency(credit.valor + credit.commission)],
-                ['Número de Cuotas', credit.cuotas.toString()],
-            ],
+            body: mainDetailsBody,
             theme: 'striped',
             headStyles: { fillColor: [41, 98, 255] },
             styles: { fontSize: 11 },
         });
+
+        // Body - Payment History
+        if (paymentRecords.length > 0) {
+            const paymentHistoryBody = paymentRecords.map((payment, index) => [
+                (index + 1).toString(),
+                format(new Date(payment.date), "d 'de' MMMM, yyyy", { locale: es }),
+                payment.type === 'interes' ? 'Abono a Interés' : 'Pago a Cuota'
+            ]);
+            
+            doc.autoTable({
+                startY: (doc as any).lastAutoTable.finalY + 10,
+                head: [['#', 'Fecha de Pago', 'Tipo']],
+                body: paymentHistoryBody,
+                theme: 'grid',
+                headStyles: { fillColor: [41, 98, 255] },
+                styles: { fontSize: 10 },
+            });
+        }
+
 
         doc.setFontSize(10);
         doc.text("Este documento certifica que el crédito referenciado ha sido cancelado en su totalidad.", 14, (doc as any).lastAutoTable.finalY + 20);
