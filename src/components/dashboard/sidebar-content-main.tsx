@@ -158,15 +158,6 @@ export function SidebarContentMain({ role }: SidebarContentMainProps) {
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
-        
-        <SidebarMenuItem>
-           <SidebarMenuButton asChild isActive={isActive(`/dashboard/cliente/settings`)} tooltip="Configuración" onClick={handleLinkClick}>
-            <Link href={`/dashboard/cliente/settings`}>
-                <Settings />
-                <span>Configuración</span>
-            </Link>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
       </SidebarMenu>
     </SidebarContent>
   );
