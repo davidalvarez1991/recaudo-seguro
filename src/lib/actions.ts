@@ -221,8 +221,8 @@ export async function getCreditsByProvider() {
     const creditsRef = collection(db, "credits");
     
     if (userRole === 'admin') {
-        // Admin sees all credits except their own (if any)
-        creditsQuery = query(creditsRef, where("cobradorId", "!=", "0703091991"));
+        // Admin sees all credits
+        creditsQuery = query(creditsRef);
     } else if (userRole === 'proveedor') {
         // Provider sees only their credits
         creditsQuery = query(creditsRef, where("providerId", "==", userId));
@@ -240,8 +240,10 @@ export async function getCreditsByProvider() {
     const creditsPromises = querySnapshot.docs.map(async (docSnapshot) => {
         const creditData: any = { id: docSnapshot.id, ...docSnapshot.data() };
         
+        // Use a new field for formatted date and keep original for sorting
         creditData.formattedDate = creditData.fecha instanceof Timestamp ? creditData.fecha.toDate().toLocaleString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date(creditData.fecha).toLocaleString('es-CO');
-
+        
+        // Ensure original date field is a serializable ISO string for filtering
         creditData.fecha = creditData.fecha instanceof Timestamp ? creditData.fecha.toDate().toISOString() : creditData.fecha;
         creditData.updatedAt = creditData.updatedAt instanceof Timestamp ? creditData.updatedAt.toDate().toISOString() : creditData.updatedAt;
         creditData.createdAt = creditData.createdAt instanceof Timestamp ? creditData.createdAt.toDate().toISOString() : creditData.createdAt;
@@ -267,17 +269,16 @@ export async function getCreditsByProvider() {
         const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
         const paidInstallments = payments.filter(p => p.type === 'cuota').length;
         
-        // Use the fetched provider data
         const providerSettings = providersMap.get(creditData.providerId) || {};
 
         const lateFee = calculateLateFee({
             ...creditData,
             lateInterestRate: providerSettings.isLateInterestActive ? (providerSettings.lateInterestRate || 0) : 0,
         });
-
+        
         let endDate: string | undefined = undefined;
         if (creditData.paymentDates && creditData.paymentDates.length > 0) {
-            const sortedDates = [...creditData.paymentDates].sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
+            const sortedDates = [...creditData.paymentDates].sort((a:string,b:string) => new Date(a).getTime() - new Date(b).getTime());
             endDate = sortedDates[sortedDates.length - 1];
         }
 
@@ -295,7 +296,12 @@ export async function getCreditsByProvider() {
         };
     });
     
-    return await Promise.all(creditsPromises);
+    // Filter out admin's "own" records if any exist.
+    const allCredits = await Promise.all(creditsPromises);
+    if (userRole === 'admin') {
+      return allCredits.filter(c => c.cobradorId !== ADMIN_ID);
+    }
+    return allCredits;
 }
 
 
@@ -380,20 +386,22 @@ export async function getCreditsByCliente() {
     const clienteData = clienteSnap.data();
 
     const creditsRef = collection(db, "credits");
-    const q = query(
-        creditsRef, 
-        where("clienteId", "==", clienteData.idNumber),
-        orderBy("fecha", "desc"),
-        limit(1)
-    );
-
+    // This query is simple and won't require a composite index.
+    const q = query(creditsRef, where("clienteId", "==", clienteData.idNumber));
     const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) {
         return null;
     }
 
-    const creditDoc = querySnapshot.docs[0];
+    // Sort the documents by date in memory after fetching
+    const sortedDocs = querySnapshot.docs.sort((a, b) => {
+        const dateA = (a.data().fecha as Timestamp).toDate();
+        const dateB = (b.data().fecha as Timestamp).toDate();
+        return dateB.getTime() - dateA.getTime();
+    });
+    
+    const creditDoc = sortedDocs[0]; // Get the most recent one
     const creditData = creditDoc.data();
 
     const paymentsRef = collection(db, "payments");
