@@ -376,64 +376,72 @@ export async function getCreditsByCobrador() {
 
 export async function getCreditsByCliente() {
     const clienteIdCookie = cookies().get('loggedInUser');
-    if (!clienteIdCookie) return null;
+    if (!clienteIdCookie) return [];
 
     const clienteDocRef = doc(db, "users", clienteIdCookie.value);
     const clienteSnap = await getDoc(clienteDocRef);
     if (!clienteSnap.exists() || clienteSnap.data().role !== 'cliente') {
-        return null;
+        return [];
     }
     const clienteData = clienteSnap.data();
 
     const creditsRef = collection(db, "credits");
-    // This query is simple and won't require a composite index.
-    const q = query(creditsRef, where("clienteId", "==", clienteData.idNumber));
+    const q = query(creditsRef, where("clienteId", "==", clienteData.idNumber), where("estado", "in", ["Activo", "Pagado"]));
     const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) {
-        return null;
+        return [];
     }
 
-    // Sort the documents by date in memory after fetching
-    const sortedDocs = querySnapshot.docs.sort((a, b) => {
-        const dateA = (a.data().fecha as Timestamp).toDate();
-        const dateB = (b.data().fecha as Timestamp).toDate();
-        return dateB.getTime() - dateA.getTime();
+    const creditsPromises = querySnapshot.docs.map(async (creditDoc) => {
+        const creditData = creditDoc.data();
+
+        // Fetch provider data for each credit
+        let providerName = "Proveedor Desconocido";
+        if (creditData.providerId) {
+            const providerDoc = await getDoc(doc(db, "users", creditData.providerId));
+            if (providerDoc.exists()) {
+                providerName = providerDoc.data().companyName || providerDoc.data().name || providerName;
+            }
+        }
+
+        const paymentsRef = collection(db, "payments");
+        const paymentsQuery = query(paymentsRef, where("creditId", "==", creditDoc.id));
+        const paymentsSnapshot = await getDocs(paymentsQuery);
+        const payments = paymentsSnapshot.docs.map(p => p.data());
+            
+        const paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
+        const paidInstallments = payments.filter(p => p.type === 'cuota').length;
+        
+        const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
+        const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
+
+        const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
+        const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
+
+        return {
+            id: creditDoc.id,
+            clienteName: clienteData.name,
+            clienteId: clienteData.idNumber,
+            providerName: providerName,
+            valor: creditData.valor,
+            commission: creditData.commission,
+            cuotas: creditData.cuotas,
+            paidInstallments,
+            paymentDates: (creditData.paymentDates || []).map((d: any) => d instanceof Timestamp ? d.toDate().toISOString() : d).sort((a: string, b: string) => new Date(a).getTime() - new Date(b).getTime()),
+            totalLoanAmount,
+            installmentAmount: totalLoanAmount / creditData.cuotas,
+            remainingBalance,
+            paidAmount,
+            estado: creditData.estado,
+        };
     });
     
-    const creditDoc = sortedDocs[0]; // Get the most recent one
-    const creditData = creditDoc.data();
-
-    const paymentsRef = collection(db, "payments");
-    const paymentsQuery = query(paymentsRef, where("creditId", "==", creditDoc.id));
-    const paymentsSnapshot = await getDocs(paymentsQuery);
-    const payments = paymentsSnapshot.docs.map(p => p.data());
-        
-    const paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
-    const paidInstallments = payments.filter(p => p.type === 'cuota').length;
-    
-    const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
-    const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
-
-    const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
-    const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
-
-    return {
-        id: creditDoc.id,
-        clienteName: clienteData.name,
-        clienteId: clienteData.idNumber,
-        valor: creditData.valor,
-        commission: creditData.commission,
-        cuotas: creditData.cuotas,
-        paidInstallments,
-        paymentDates: (creditData.paymentDates || []).map((d: any) => d instanceof Timestamp ? d.toDate().toISOString() : d).sort((a: string, b: string) => new Date(a).getTime() - new Date(b).getTime()),
-        totalLoanAmount,
-        installmentAmount: totalLoanAmount / creditData.cuotas,
-        remainingBalance,
-        paidAmount,
-        estado: creditData.estado,
-    };
+    const allCredits = await Promise.all(creditsPromises);
+    // Sort credits by most recent first
+    return allCredits.sort((a,b) => new Date(b.id).getTime() - new Date(a.id).getTime());
 }
+
 
 
 // --- Data Mutation Actions ---
