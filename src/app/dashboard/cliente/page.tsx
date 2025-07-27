@@ -1,15 +1,16 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getCreditsByCliente } from "@/lib/actions";
-import { Loader2, CheckCircle2, Circle, Wallet, HandCoins, FileText, User, Fingerprint, Coins, Landmark, Building } from "lucide-react";
+import { Loader2, CheckCircle2, Circle, Wallet, HandCoins, FileText, User, Fingerprint, Coins, Landmark, Building, RefreshCcw } from "lucide-react";
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 
 type CreditData = {
   id: string;
@@ -42,27 +43,28 @@ export default function ClienteDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [clientInfo, setClientInfo] = useState<{ name: string, id: string } | null>(null);
 
-  useEffect(() => {
-    const fetchCreditData = async () => {
-      try {
-        setLoading(true);
-        const data = await getCreditsByCliente();
-        if (data && data.length > 0) {
-            setCredits(data);
-            setClientInfo({ name: data[0].clienteName || 'Cliente', id: data[0].clienteId || '' });
-        } else {
-            setCredits([]);
-        }
-      } catch (err) {
-        setError("No se pudo cargar la información de tus créditos. Por favor, intenta de nuevo más tarde.");
-        console.error(err);
-      } finally {
-        setLoading(false);
+  const fetchCreditData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await getCreditsByCliente();
+      if (data && data.length > 0) {
+          setCredits(data);
+          setClientInfo({ name: data[0].clienteName || 'Cliente', id: data[0].clienteId || '' });
+      } else {
+          setCredits([]);
       }
-    };
-
-    fetchCreditData();
+    } catch (err) {
+      setError("No se pudo cargar la información de tus créditos. Por favor, intenta de nuevo más tarde.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchCreditData();
+  }, [fetchCreditData]);
   
   const getAvatarFallback = (name?: string) => {
     if (!name) return 'P';
@@ -83,10 +85,14 @@ export default function ClienteDashboard() {
                 {clientInfo ? `CC: ${clientInfo.id}` : 'Consulta el estado actual de tus créditos.'}
             </CardDescription>
           </div>
+          <Button variant="outline" size="icon" onClick={fetchCreditData} disabled={loading}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+            <span className="sr-only">Actualizar</span>
+          </Button>
         </div>
       </CardHeader>
       <CardContent>
-        {loading ? (
+        {loading && credits.length === 0 ? (
           <div className="flex justify-center items-center h-40">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="ml-4 text-muted-foreground">Cargando tu información...</p>
