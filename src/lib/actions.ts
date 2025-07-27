@@ -7,7 +7,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
 import { db, storage } from "./firebase";
-import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc, increment } from "firebase/firestore";
+import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc, increment, orderBy, limit } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { startOfDay, differenceInDays } from 'date-fns';
 
@@ -240,8 +240,8 @@ export async function getCreditsByProvider() {
     const creditsPromises = querySnapshot.docs.map(async (docSnapshot) => {
         const creditData: any = { id: docSnapshot.id, ...docSnapshot.data() };
         
-        creditData.formattedDate = creditData.fecha instanceof Timestamp ? creditData.fecha.toDate().toISOString() : creditData.fecha;
-        
+        creditData.formattedDate = creditData.fecha instanceof Timestamp ? creditData.fecha.toDate().toLocaleString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date(creditData.fecha).toLocaleString('es-CO');
+
         creditData.fecha = creditData.fecha instanceof Timestamp ? creditData.fecha.toDate().toISOString() : creditData.fecha;
         creditData.updatedAt = creditData.updatedAt instanceof Timestamp ? creditData.updatedAt.toDate().toISOString() : creditData.updatedAt;
         creditData.createdAt = creditData.createdAt instanceof Timestamp ? creditData.createdAt.toDate().toISOString() : creditData.createdAt;
@@ -366,6 +366,65 @@ export async function getCreditsByCobrador() {
 
     return credits;
 }
+
+
+export async function getCreditsByCliente() {
+    const clienteIdCookie = cookies().get('loggedInUser');
+    if (!clienteIdCookie) return null;
+
+    const clienteDocRef = doc(db, "users", clienteIdCookie.value);
+    const clienteSnap = await getDoc(clienteDocRef);
+    if (!clienteSnap.exists() || clienteSnap.data().role !== 'cliente') {
+        return null;
+    }
+    const clienteData = clienteSnap.data();
+
+    const creditsRef = collection(db, "credits");
+    const q = query(
+        creditsRef, 
+        where("clienteId", "==", clienteData.idNumber),
+        orderBy("fecha", "desc"),
+        limit(1)
+    );
+
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+        return null;
+    }
+
+    const creditDoc = querySnapshot.docs[0];
+    const creditData = creditDoc.data();
+
+    const paymentsRef = collection(db, "payments");
+    const paymentsQuery = query(paymentsRef, where("creditId", "==", creditDoc.id));
+    const paymentsSnapshot = await getDocs(paymentsQuery);
+    const payments = paymentsSnapshot.docs.map(p => p.data());
+        
+    const paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
+    const paidInstallments = payments.filter(p => p.type === 'cuota').length;
+    
+    const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
+    const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
+    const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
+
+    return {
+        id: creditDoc.id,
+        valor: creditData.valor,
+        commission: creditData.commission,
+        cuotas: creditData.cuotas,
+        paidInstallments,
+        paymentDates: (creditData.paymentDates || []).map((d: any) => d instanceof Timestamp ? d.toDate().toISOString() : d).sort((a: string, b: string) => new Date(a).getTime() - new Date(b).getTime()),
+        totalLoanAmount,
+        installmentAmount: totalLoanAmount / creditData.cuotas,
+        remainingBalance,
+        paidAmount,
+        estado: creditData.estado,
+    };
+}
+
 
 // --- Data Mutation Actions ---
 
