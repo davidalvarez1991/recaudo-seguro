@@ -442,10 +442,10 @@ export async function getCreditsByCliente() {
     });
     
     const allCredits = await Promise.all(creditsPromises);
-    // Sort credits by most recent first
+    // Sort credits by most recent first, using the credit ID which is a timestamp
     const sortedCredits = allCredits.sort((a,b) => {
-        const dateA = a.id ? new Date(a.id).getTime() : 0;
-        const dateB = b.id ? new Date(b.id).getTime() : 0;
+        const dateA = new Date(a.id).getTime();
+        const dateB = new Date(b.id).getTime();
         return dateB - dateA;
     });
 
@@ -502,14 +502,15 @@ export async function getPaymentsByCreditId(creditId: string) {
     if (!creditId) return [];
     
     const paymentsRef = collection(db, "payments");
-    const q = query(paymentsRef, where("creditId", "==", creditId), orderBy("date", "asc"));
+    // Remove orderBy to avoid needing a composite index
+    const q = query(paymentsRef, where("creditId", "==", creditId));
     const querySnapshot = await getDocs(q);
     
     if (querySnapshot.empty) {
         return [];
     }
     
-    return querySnapshot.docs.map(doc => {
+    const payments = querySnapshot.docs.map(doc => {
         const data = doc.data();
         return {
             id: doc.id,
@@ -518,6 +519,9 @@ export async function getPaymentsByCreditId(creditId: string) {
             type: data.type,
         };
     });
+
+    // Sort the results in application code
+    return payments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
 
@@ -991,5 +995,7 @@ export async function registerMissedPayment(creditId: string) {
     return { error: "No se pudo registrar el día de mora." };
   }
 }
+
+    
 
     
