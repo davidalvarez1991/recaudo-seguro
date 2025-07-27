@@ -11,6 +11,8 @@ import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writ
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { startOfDay, differenceInDays } from 'date-fns';
 
+const ADMIN_ID = "admin_0703091991";
+
 // --- Utility Functions ---
 const findUserByIdNumber = async (idNumber: string) => {
     const usersRef = collection(db, "users");
@@ -45,7 +47,7 @@ export async function login(values: z.infer<typeof LoginSchema>) {
     
     // Check for a hardcoded admin user first
     if (idNumber === "0703091991" && password === "19913030") {
-         cookies().set('loggedInUser', 'admin_0703091991', { httpOnly: true, path: '/' });
+         cookies().set('loggedInUser', ADMIN_ID, { httpOnly: true, path: '/' });
          cookies().set('userRole', 'admin', { httpOnly: true, path: '/' });
          return { successUrl: `/dashboard/admin` };
     }
@@ -119,7 +121,7 @@ export async function logout() {
 
 export async function getUserRole(userId: string) {
     // Special case for hardcoded admin
-    if (userId === 'admin_0703091991') {
+    if (userId === ADMIN_ID) {
         return 'admin';
     }
     const cookieRole = cookies().get('userRole')?.value;
@@ -135,9 +137,9 @@ export async function getUserRole(userId: string) {
 
 export async function getUserData(userId: string) {
     // Special case for hardcoded admin
-    if (userId === 'admin_0703091991') {
+    if (userId === ADMIN_ID) {
         return {
-            id: 'admin_0703091991',
+            id: ADMIN_ID,
             name: 'Administrador',
             role: 'admin'
         };
@@ -209,26 +211,36 @@ const calculateLateFee = (credit: any) => {
 };
 
 export async function getCreditsByProvider() {
-    const providerIdCookie = cookies().get('loggedInUser');
-    if (!providerIdCookie) return [];
+    const userIdCookie = cookies().get('loggedInUser');
+    if (!userIdCookie) return [];
+    const userId = userIdCookie.value;
+
+    const userRole = await getUserRole(userId);
     
-    const providerDocRef = doc(db, "users", providerIdCookie.value);
-    const providerSnap = await getDoc(providerDocRef);
-    if (!providerSnap.exists() || providerSnap.data().role !== 'proveedor') {
+    let creditsQuery;
+    const creditsRef = collection(db, "credits");
+    
+    if (userRole === 'admin') {
+        // Admin sees all credits except their own (if any)
+        creditsQuery = query(creditsRef, where("cobradorId", "!=", "0703091991"));
+    } else if (userRole === 'proveedor') {
+        // Provider sees only their credits
+        creditsQuery = query(creditsRef, where("providerId", "==", userId));
+    } else {
+        // No other role should be calling this
         return [];
     }
-    const providerSettings = providerSnap.data();
+
+    const querySnapshot = await getDocs(creditsQuery);
     
-    const creditsRef = collection(db, "credits");
-    const q = query(creditsRef, where("providerId", "==", providerIdCookie.value));
-    const querySnapshot = await getDocs(q);
-    
+    // Fetch all providers in one go to minimize reads
+    const providersSnapshot = await getDocs(query(collection(db, "users"), where("role", "==", "proveedor")));
+    const providersMap = new Map(providersSnapshot.docs.map(doc => [doc.id, doc.data()]));
+
     const creditsPromises = querySnapshot.docs.map(async (docSnapshot) => {
         const creditData: any = { id: docSnapshot.id, ...docSnapshot.data() };
         
-        if (creditData.fecha instanceof Timestamp) {
-            creditData.formattedDate = creditData.fecha.toDate().toISOString(); // Keep original fecha for UI
-        }
+        creditData.formattedDate = creditData.fecha instanceof Timestamp ? creditData.fecha.toDate().toISOString() : creditData.fecha;
         
         creditData.fecha = creditData.fecha instanceof Timestamp ? creditData.fecha.toDate().toISOString() : creditData.fecha;
         creditData.updatedAt = creditData.updatedAt instanceof Timestamp ? creditData.updatedAt.toDate().toISOString() : creditData.updatedAt;
@@ -254,14 +266,15 @@ export async function getCreditsByProvider() {
         const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
         const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
         const paidInstallments = payments.filter(p => p.type === 'cuota').length;
+        
+        // Use the fetched provider data
+        const providerSettings = providersMap.get(creditData.providerId) || {};
 
-        // Calculate late fee
         const lateFee = calculateLateFee({
             ...creditData,
             lateInterestRate: providerSettings.isLateInterestActive ? (providerSettings.lateInterestRate || 0) : 0,
         });
 
-        // Get end date
         let endDate: string | undefined = undefined;
         if (creditData.paymentDates && creditData.paymentDates.length > 0) {
             const sortedDates = [...creditData.paymentDates].sort((a,b) => new Date(a).getTime() - new Date(b).getTime());

@@ -59,7 +59,6 @@ export default function RegistrosPage() {
     try {
       const allActivityRecords: any[] = await getCreditsByProvider();
       const formattedRecords = allActivityRecords
-        .filter(credito => credito.cobradorId !== ADMIN_ID)
         .map((credito) => ({
           ...credito,
           formattedDate: new Date(credito.fecha).toLocaleString('es-CO', {
