@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, MoreHorizontal, Trash2, Download, Eye, Pencil, RefreshCcw, Loader2 } from "lucide-react";
+import { ArrowLeft, ClipboardList, MoreHorizontal, Trash2, Download, Eye, Pencil, RefreshCcw, Loader2, Search } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getCreditsByProvider, deleteClientAndCredits } from "@/lib/actions";
@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Separator } from "@/components/ui/separator";
 import { EditClientForm } from "@/components/forms/edit-client-form";
+import { Input } from "@/components/ui/input";
 
 type Registro = {
   id: string;
@@ -49,6 +50,7 @@ export default function RegistrosPage() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
   const router = useRouter();
 
@@ -60,7 +62,7 @@ export default function RegistrosPage() {
         .filter(credito => credito.cobradorId !== ADMIN_ID)
         .map((credito) => ({
           ...credito,
-          formattedDate: new Date(credito.fecha).toLocaleDateString('es-CO', {
+          formattedDate: new Date(credito.fecha).toLocaleString('es-CO', {
             year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
           }),
         }))
@@ -136,6 +138,11 @@ export default function RegistrosPage() {
       return `$${value.toLocaleString('es-CO')}`;
   }
 
+  const filteredRegistros = registros.filter(registro =>
+    (registro.clienteName?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (registro.clienteId?.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
 
   return (
     <>
@@ -161,11 +168,21 @@ export default function RegistrosPage() {
                 </Button>
               </div>
           </div>
+            <div className="mt-4 relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                type="search"
+                placeholder="Buscar por nombre o cédula de cliente..."
+                className="w-full pl-8 sm:w-[300px]"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                />
+            </div>
         </CardHeader>
         <CardContent className="pt-6">
           {loading ? (
              <p>Cargando registros...</p>
-          ) : registros.length > 0 ? (
+          ) : filteredRegistros.length > 0 ? (
             <Table>
                 <TableHeader>
                   <TableRow>
@@ -178,7 +195,7 @@ export default function RegistrosPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {registros.map((registro) => (
+                  {filteredRegistros.map((registro) => (
                     <TableRow key={registro.id} onClick={() => handleViewDetails(registro)} className="cursor-pointer">
                       <TableCell>{registro.formattedDate}</TableCell>
                       <TableCell>
@@ -236,8 +253,8 @@ export default function RegistrosPage() {
           ) : (
               <div className="text-center text-muted-foreground py-8">
                   <ClipboardList className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                  <h3 className="text-lg font-semibold">No hay actividad registrada</h3>
-                  <p className="text-sm">Cuando un cobrador cree un crédito, aparecerá aquí.</p>
+                  <h3 className="text-lg font-semibold">{searchTerm ? 'No se encontraron registros' : 'No hay actividad registrada'}</h3>
+                  <p className="text-sm">{searchTerm ? 'Intenta con otro nombre o cédula.' : 'Cuando un cobrador cree un crédito, aparecerá aquí.'}</p>
               </div>
           )}
         </CardContent>
