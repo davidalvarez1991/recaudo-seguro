@@ -486,7 +486,10 @@ export async function getHistoricalCreditsByCliente() {
             id: creditDoc.id,
             fecha: creditData.fecha instanceof Timestamp ? creditData.fecha.toDate().toISOString() : creditData.fecha,
             valor: creditData.valor,
+            commission: creditData.commission,
+            cuotas: creditData.cuotas,
             estado: creditData.estado,
+            providerId: creditData.providerId,
             providerName,
         };
     });

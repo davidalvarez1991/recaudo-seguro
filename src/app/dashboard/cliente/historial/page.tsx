@@ -4,20 +4,32 @@
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getHistoricalCreditsByCliente } from "@/lib/actions";
-import { Loader2, History, ArrowLeft, ClipboardList } from "lucide-react";
+import { getHistoricalCreditsByCliente, getUserData } from "@/lib/actions";
+import { Loader2, History, ArrowLeft, ClipboardList, Download } from "lucide-react";
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import { useToast } from "@/hooks/use-toast";
+
+declare module 'jspdf' {
+    interface jsPDF {
+        autoTable: (options: any) => jsPDF;
+    }
+}
 
 type HistoricalCredit = {
   id: string;
   fecha: string;
   valor: number;
+  cuotas: number;
   estado: string;
+  providerId: string;
   providerName: string;
+  commission: number;
 };
 
 const formatCurrency = (value: number) => {
@@ -28,6 +40,7 @@ const formatCurrency = (value: number) => {
 export default function HistorialClientePage() {
   const [credits, setCredits] = useState<HistoricalCredit[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -44,6 +57,68 @@ export default function HistorialClientePage() {
     fetchHistory();
   }, []);
 
+  const handleDownloadPDF = async (credit: HistoricalCredit) => {
+    try {
+        const doc = new jsPDF();
+
+        const providerData = await getUserData(credit.providerId);
+        const providerName = providerData?.companyName || credit.providerName || 'N/A';
+        const providerId = providerData?.idNumber || 'N/A';
+        
+        // Header
+        doc.setFontSize(22);
+        doc.setTextColor(41, 98, 255);
+        doc.text("Paz y Salvo de Crédito", 105, 20, { align: 'center' });
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+        doc.text(`ID del Crédito: ${credit.id}`, 105, 27, { align: 'center' });
+
+        // Watermark
+        doc.setFontSize(72);
+        doc.setTextColor(200);
+        doc.text("PAGADO", 105, 160, { angle: 45, align: 'center' });
+        
+        // Body
+        doc.setFontSize(12);
+        doc.setTextColor(0);
+        doc.autoTable({
+            startY: 40,
+            head: [['Concepto', 'Detalle']],
+            body: [
+                ['Empresa Prestadora', providerName],
+                ['NIT/C.C. Empresa', providerId],
+                ['Fecha de Liquidación', format(new Date(), "d 'de' MMMM, yyyy", { locale: es })],
+                ['Fecha de Inicio Crédito', format(new Date(credit.fecha), "d 'de' MMMM, yyyy", { locale: es })],
+                ['Valor Solicitado', formatCurrency(credit.valor)],
+                ['Comisión', formatCurrency(credit.commission)],
+                ['Total Pagado', formatCurrency(credit.valor + credit.commission)],
+                ['Número de Cuotas', credit.cuotas.toString()],
+            ],
+            theme: 'striped',
+            headStyles: { fillColor: [41, 98, 255] },
+            styles: { fontSize: 11 },
+        });
+
+        doc.setFontSize(10);
+        doc.text("Este documento certifica que el crédito referenciado ha sido cancelado en su totalidad.", 14, (doc as any).lastAutoTable.finalY + 20);
+        doc.text("Generado por Recaudo Seguro.", 14, (doc as any).lastAutoTable.finalY + 25);
+
+        doc.save(`Paz_y_Salvo_${credit.id}.pdf`);
+        toast({
+            title: "Descarga Iniciada",
+            description: "El paz y salvo se ha generado correctamente."
+        });
+
+    } catch (e) {
+        console.error("Error generating PDF", e);
+        toast({
+            title: "Error",
+            description: "No se pudo generar el documento PDF.",
+            variant: "destructive"
+        });
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -54,7 +129,7 @@ export default function HistorialClientePage() {
                     Historial de Créditos
                 </CardTitle>
                 <CardDescription>
-                    Aquí puedes ver todos tus créditos anteriores.
+                    Aquí puedes ver todos tus créditos anteriores y descargar comprobantes.
                 </CardDescription>
             </div>
             <Button asChild variant="outline" className="w-full sm:w-auto">
@@ -79,6 +154,7 @@ export default function HistorialClientePage() {
                 <TableHead>Proveedor</TableHead>
                 <TableHead>Valor Solicitado</TableHead>
                 <TableHead>Estado Final</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -89,6 +165,14 @@ export default function HistorialClientePage() {
                   <TableCell>{formatCurrency(credit.valor)}</TableCell>
                   <TableCell>
                     <Badge variant={credit.estado === 'Pagado' ? 'secondary' : 'outline'}>{credit.estado}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {credit.estado === 'Pagado' && (
+                        <Button variant="outline" size="sm" onClick={() => handleDownloadPDF(credit)}>
+                            <Download className="mr-2 h-4 w-4"/>
+                            Paz y Salvo
+                        </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
