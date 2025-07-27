@@ -4,13 +4,15 @@
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { getCreditsByCliente } from "@/lib/actions";
-import { Loader2, CheckCircle2, Circle, Wallet, HandCoins, FileText } from "lucide-react";
+import { Loader2, CheckCircle2, Circle, Wallet, HandCoins, FileText, User, Fingerprint } from "lucide-react";
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
 
 type CreditData = {
   id: string;
+  clienteName?: string;
+  clienteId?: string;
   valor: number;
   commission: number;
   cuotas: number;
@@ -57,8 +59,14 @@ export default function ClienteDashboard() {
       <CardHeader>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="space-y-1">
-            <CardTitle className="text-3xl">Tu Estado de Cuenta</CardTitle>
-            <CardDescription>Consulta el estado actual de tu crédito.</CardDescription>
+            <CardTitle className="text-3xl flex items-center gap-2">
+                <User className="h-8 w-8 text-primary" />
+                {credit ? credit.clienteName : 'Tu Estado de Cuenta'}
+            </CardTitle>
+            <CardDescription className="flex items-center gap-2 pl-1">
+                <Fingerprint className="h-4 w-4 text-muted-foreground" />
+                {credit ? `CC: ${credit.clienteId}` : 'Consulta el estado actual de tu crédito.'}
+            </CardDescription>
           </div>
         </div>
       </CardHeader>

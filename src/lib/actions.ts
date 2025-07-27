@@ -420,6 +420,8 @@ export async function getCreditsByCliente() {
 
     return {
         id: creditDoc.id,
+        clienteName: clienteData.name,
+        clienteId: clienteData.idNumber,
         valor: creditData.valor,
         commission: creditData.commission,
         cuotas: creditData.cuotas,
