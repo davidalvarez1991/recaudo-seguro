@@ -76,17 +76,6 @@ export default async function ProveedorDashboard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-8">
-        <div>
-            <h3 className="text-lg font-medium">Resumen del Día</h3>
-            <p className="text-sm text-muted-foreground">
-                Visualiza el total recaudado hoy por tus cobradores en tiempo real.
-            </p>
-        </div>
-
-        <DailySummary summary={dailySummaryData.summary} total={dailySummaryData.totalCollected} />
-
-        <Separator />
-        
         <div className="space-y-6">
           <div>
             <h3 className="text-lg font-medium">Gestión de Cobradores ({cobradoresCount}/30)</h3>
@@ -102,6 +91,18 @@ export default async function ProveedorDashboard() {
             </Button>
           </div>
         </div>
+
+        <Separator />
+
+        <div>
+            <h3 className="text-lg font-medium">Resumen del Día</h3>
+            <p className="text-sm text-muted-foreground">
+                Visualiza el total recaudado hoy por tus cobradores en tiempo real.
+            </p>
+        </div>
+
+        <DailySummary summary={dailySummaryData.summary} total={dailySummaryData.totalCollected} />
+        
       </CardContent>
     </Card>
   );
