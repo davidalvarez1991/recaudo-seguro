@@ -9,7 +9,7 @@ import bcrypt from 'bcryptjs';
 import { db, storage } from "./firebase";
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc, increment, orderBy, limit } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { startOfDay, differenceInDays, endOfDay } from 'date-fns';
+import { startOfDay, differenceInDays, endOfDay, isWithinInterval } from 'date-fns';
 
 const ADMIN_ID = "admin_0703091991";
 
@@ -565,16 +565,11 @@ export async function getDailyCollectionSummary() {
 
     const todayStart = startOfDay(new Date());
     const todayEnd = endOfDay(new Date());
-    
+
     const paymentsRef = collection(db, "payments");
-    const paymentsQuery = query(
-        paymentsRef,
-        where("providerId", "==", providerId),
-        where("date", ">=", Timestamp.fromDate(todayStart)),
-        where("date", "<=", Timestamp.fromDate(todayEnd))
-    );
-    
+    const paymentsQuery = query(paymentsRef, where("providerId", "==", providerId));
     const paymentsSnapshot = await getDocs(paymentsQuery);
+
     if (paymentsSnapshot.empty) {
         return { summary: [], totalCollected: 0 };
     }
@@ -587,11 +582,15 @@ export async function getDailyCollectionSummary() {
 
     paymentsSnapshot.forEach(doc => {
         const payment = doc.data();
-        const amount = payment.amount || 0;
-        const cobradorId = payment.cobradorId;
+        const paymentDate = payment.date.toDate();
         
-        summaryMap.set(cobradorId, (summaryMap.get(cobradorId) || 0) + amount);
-        totalCollected += amount;
+        if (isWithinInterval(paymentDate, { start: todayStart, end: todayEnd })) {
+            const amount = payment.amount || 0;
+            const cobradorId = payment.cobradorId;
+            
+            summaryMap.set(cobradorId, (summaryMap.get(cobradorId) || 0) + amount);
+            totalCollected += amount;
+        }
     });
     
     const summary = Array.from(summaryMap.entries()).map(([cobradorId, collectedAmount]) => ({
