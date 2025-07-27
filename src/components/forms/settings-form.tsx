@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { getUserData, saveProviderSettings } from "@/lib/actions";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage } from "@/lib/firebase";
 
 type SettingsFormProps = {
   providerId: string;
@@ -41,26 +43,41 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
   }, [providerId]);
 
 
-  const handleLogoChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleLogoChange = async (event: ChangeEvent<HTMLInputElement>) => {
     if (!providerId) return;
     const file = event.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadstart = () => setIsUploading(true);
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        setLogo(result);
-        localStorage.setItem(`company-logo_${providerId}`, result);
+      setIsUploading(true);
+      const storagePath = `proveedores/${providerId}/logo/${file.name}`;
+      const storageRef = ref(storage, storagePath);
+
+      try {
+        await uploadBytes(storageRef, file);
+        const downloadURL = await getDownloadURL(storageRef);
+        
+        await saveProviderSettings(providerId, { companyLogoUrl: downloadURL });
+
+        setLogo(downloadURL);
+        localStorage.setItem(`company-logo_${providerId}`, downloadURL);
         window.dispatchEvent(new CustomEvent('logo-updated'));
-        setIsUploading(false);
+        
         toast({
           title: "Logo Actualizado",
           description: "El logo de tu empresa ha sido actualizado.",
           variant: "default",
           className: "bg-accent text-accent-foreground border-accent",
         });
-      };
-      reader.readAsDataURL(file);
+
+      } catch (error) {
+        console.error("Error uploading logo:", error);
+        toast({
+          title: "Error de carga",
+          description: "No se pudo subir el nuevo logo.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 

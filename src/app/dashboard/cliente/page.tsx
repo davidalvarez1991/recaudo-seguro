@@ -9,12 +9,14 @@ import { Loader2, CheckCircle2, Circle, Wallet, HandCoins, FileText, User, Finge
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 type CreditData = {
   id: string;
   clienteName?: string;
   clienteId?: string;
   providerName?: string;
+  providerLogoUrl?: string;
   valor: number;
   commission: number;
   cuotas: number;
@@ -61,6 +63,11 @@ export default function ClienteDashboard() {
 
     fetchCreditData();
   }, []);
+  
+  const getAvatarFallback = (name?: string) => {
+    if (!name) return 'P';
+    return name.substring(0, 2).toUpperCase();
+  }
 
   return (
     <Card>
@@ -94,10 +101,13 @@ export default function ClienteDashboard() {
               {credits.map((credit) => (
                 <TabsTrigger key={credit.id} value={credit.id} className="flex flex-col h-auto items-start p-2 text-left">
                   <div className="flex items-center gap-2">
-                     <Building className="h-4 w-4 text-muted-foreground"/>
+                     <Avatar className="h-6 w-6">
+                        <AvatarImage src={credit.providerLogoUrl} alt={credit.providerName} />
+                        <AvatarFallback>{getAvatarFallback(credit.providerName)}</AvatarFallback>
+                     </Avatar>
                      <span className="font-semibold">{credit.providerName || 'Proveedor Desconocido'}</span>
                   </div>
-                  <span className="text-xs text-muted-foreground">{formatCurrency(credit.totalLoanAmount)}</span>
+                  <span className="text-xs text-muted-foreground ml-8">{formatCurrency(credit.totalLoanAmount)}</span>
                 </TabsTrigger>
               ))}
             </TabsList>

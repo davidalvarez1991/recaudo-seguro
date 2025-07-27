@@ -398,10 +398,13 @@ export async function getCreditsByCliente() {
 
         // Fetch provider data for each credit
         let providerName = "Proveedor Desconocido";
+        let providerLogoUrl = null;
         if (creditData.providerId) {
             const providerDoc = await getDoc(doc(db, "users", creditData.providerId));
             if (providerDoc.exists()) {
-                providerName = providerDoc.data().companyName || providerDoc.data().name || providerName;
+                const providerData = providerDoc.data();
+                providerName = providerData.companyName || providerData.name || providerName;
+                providerLogoUrl = providerData.companyLogoUrl || null;
             }
         }
 
@@ -424,6 +427,7 @@ export async function getCreditsByCliente() {
             clienteName: clienteData.name,
             clienteId: clienteData.idNumber,
             providerName: providerName,
+            providerLogoUrl: providerLogoUrl,
             valor: creditData.valor,
             commission: creditData.commission,
             cuotas: creditData.cuotas,
@@ -869,7 +873,7 @@ export async function registerPayment(creditId: string, amount: number, type: "c
 }
 
 
-export async function saveProviderSettings(providerId: string, settings: { commissionPercentage?: number, lateInterestRate?: number, isLateInterestActive?: boolean }) {
+export async function saveProviderSettings(providerId: string, settings: { commissionPercentage?: number, lateInterestRate?: number, isLateInterestActive?: boolean, companyLogoUrl?: string }) {
   if (!providerId) return { error: "ID de proveedor no válido." };
   
   const providerRef = doc(db, "users", providerId);
@@ -887,6 +891,9 @@ export async function saveProviderSettings(providerId: string, settings: { commi
   }
    if (settings.isLateInterestActive !== undefined) {
     updateData.isLateInterestActive = settings.isLateInterestActive;
+  }
+   if (settings.companyLogoUrl !== undefined) {
+    updateData.companyLogoUrl = settings.companyLogoUrl;
   }
   updateData.updatedAt = Timestamp.now();
 
