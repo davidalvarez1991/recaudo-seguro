@@ -7,7 +7,7 @@ import {
   SidebarMenuButton,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Home, Settings, ClipboardList, Users, HandCoins, LayoutDashboard, Download } from "lucide-react";
+import { Home, Settings, ClipboardList, Users, HandCoins, LayoutDashboard, Download, History } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -154,7 +154,20 @@ export function SidebarContentMain({ role }: SidebarContentMainProps) {
           >
             <Link href={`/dashboard/cliente`}>
               <LayoutDashboard />
-              <span>Panel de Cliente</span>
+              <span>Mis Créditos</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+        <SidebarMenuItem>
+           <SidebarMenuButton
+            asChild
+            isActive={isActive(`/dashboard/cliente/historial`)}
+            tooltip="Historial de Créditos"
+            onClick={handleLinkClick}
+          >
+            <Link href={`/dashboard/cliente/historial`}>
+              <History />
+              <span>Historial</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>

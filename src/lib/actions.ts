@@ -386,7 +386,7 @@ export async function getCreditsByCliente() {
     const clienteData = clienteSnap.data();
 
     const creditsRef = collection(db, "credits");
-    const q = query(creditsRef, where("clienteId", "==", clienteData.idNumber), where("estado", "in", ["Activo", "Pagado"]));
+    const q = query(creditsRef, where("clienteId", "==", clienteData.idNumber), where("estado", "==", "Activo"));
     const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) {
@@ -443,9 +443,57 @@ export async function getCreditsByCliente() {
     
     const allCredits = await Promise.all(creditsPromises);
     // Sort credits by most recent first
-    return allCredits.sort((a,b) => new Date(b.id).getTime() - new Date(a.id).getTime());
+    const sortedCredits = allCredits.sort((a,b) => {
+        const dateA = a.id ? new Date(a.id).getTime() : 0;
+        const dateB = b.id ? new Date(b.id).getTime() : 0;
+        return dateB - dateA;
+    });
+
+    return sortedCredits;
 }
 
+export async function getHistoricalCreditsByCliente() {
+    const clienteIdCookie = cookies().get('loggedInUser');
+    if (!clienteIdCookie) return [];
+
+    const clienteDocRef = doc(db, "users", clienteIdCookie.value);
+    const clienteSnap = await getDoc(clienteDocRef);
+    if (!clienteSnap.exists() || clienteSnap.data().role !== 'cliente') {
+        return [];
+    }
+    const clienteData = clienteSnap.data();
+
+    const creditsRef = collection(db, "credits");
+    const q = query(creditsRef, where("clienteId", "==", clienteData.idNumber), where("estado", "in", ["Pagado", "Renovado"]));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+        return [];
+    }
+    
+    const creditsPromises = querySnapshot.docs.map(async (creditDoc) => {
+        const creditData = creditDoc.data();
+
+        let providerName = "Proveedor Desconocido";
+        if (creditData.providerId) {
+            const providerDoc = await getDoc(doc(db, "users", creditData.providerId));
+            if (providerDoc.exists()) {
+                providerName = providerDoc.data().companyName || "Proveedor";
+            }
+        }
+        
+        return {
+            id: creditDoc.id,
+            fecha: creditData.fecha instanceof Timestamp ? creditData.fecha.toDate().toISOString() : creditData.fecha,
+            valor: creditData.valor,
+            estado: creditData.estado,
+            providerName,
+        };
+    });
+
+    const allCredits = await Promise.all(creditsPromises);
+    return allCredits.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+}
 
 
 // --- Data Mutation Actions ---
