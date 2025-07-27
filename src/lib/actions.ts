@@ -672,11 +672,16 @@ export async function uploadSingleDocument(formData: FormData) {
         const creditData = creditSnap.data();
         
         const providerId = creditData.providerId;
-        if (!providerId) {
-             return { error: "El crédito no tiene un proveedor asociado." };
+        const cobradorId = creditData.cobradorId;
+        const clienteId = creditData.clienteId;
+
+        if (!providerId || !cobradorId || !clienteId) {
+             return { error: "Información de asociación incompleta en el crédito." };
         }
 
-        const storageRef = ref(storage, `clientes/${providerId}/${creditData.clienteId}/${Date.now()}_${document.name}`);
+        const storagePath = `proveedores/${providerId}/cobradores/${cobradorId}/clientes/${clienteId}/${Date.now()}_${document.name}`;
+        const storageRef = ref(storage, storagePath);
+        
         const buffer = await document.arrayBuffer();
         await uploadBytes(storageRef, buffer);
         const url = await getDownloadURL(storageRef);
