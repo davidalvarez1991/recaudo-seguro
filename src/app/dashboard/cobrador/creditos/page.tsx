@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
@@ -268,7 +267,7 @@ export default function CreditosPage() {
 
       {/* Payment Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Registrar Pago</DialogTitle>
             <DialogDescription>
@@ -283,7 +282,7 @@ export default function CreditosPage() {
                            <CalendarDays className="h-5 w-5 text-muted-foreground" />
                            <h4 className="font-medium text-sm">Calendario de Pagos</h4>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-sm pl-2 max-h-24 overflow-y-auto">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 text-sm pl-2 max-h-24 overflow-y-auto">
                             {selectedCredit.paymentDates
                                 .sort((a,b) => new Date(a).getTime() - new Date(b).getTime())
                                 .map((dateStr, index) => {
@@ -364,7 +363,7 @@ export default function CreditosPage() {
                 </Button>
                 <Button onClick={handleRegisterPayment} disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <HandCoins className="mr-2 h-4 w-4" />}
-                  {isSubmitting ? 'Registrando...' : `Registrar Pago (${formatCurrency(getPaymentAmount())})`}
+                  {isSubmitting ? 'Registrando...' : `Registrar Pago (${formatCurrency(getPaymentAmount())}`}
                 </Button>
                  <Button onClick={handleRenewClick} variant="secondary" className="bg-amber-400 hover:bg-amber-500 text-amber-900" disabled={isSubmitting || !canRenewCredit(selectedCredit)}>
                     <Star className="mr-2 h-4 w-4" />
@@ -407,3 +406,6 @@ export default function CreditosPage() {
 
 
 
+
+
+    
