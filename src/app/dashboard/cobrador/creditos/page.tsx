@@ -89,21 +89,14 @@ export default function CreditosPage() {
   }, [fetchCredits]);
 
   const handleRowClick = (credito: Credito) => {
-    if (credito.estado === 'Renovado') {
-        toast({ title: "Crédito Renovado", description: "Este crédito ya ha sido renovado y reemplazado por uno nuevo." });
+    if (credito.estado === 'Renovado' || credito.estado === 'Pagado') {
+        toast({ title: `Crédito ${credito.estado}`, description: "Este crédito ya no está activo y no se pueden registrar pagos." });
         return;
     }
     
     setSelectedCredit(credito);
-    const totalLoanAmount = credito.valor + credito.commission;
-    const canRenew = credito.paidAmount >= totalLoanAmount / 2;
-
-    if (credito.estado === 'Pagado' || canRenew) {
-        setIsRenewModalOpen(true);
-    } else {
-        setPaymentType("cuota");
-        setIsModalOpen(true);
-    }
+    setPaymentType("cuota");
+    setIsModalOpen(true);
   };
   
   const handleRegisterPayment = async () => {
@@ -183,6 +176,7 @@ export default function CreditosPage() {
   
   const canRenewCredit = (credit: Credito | null) => {
     if (!credit) return false;
+    if (credit.estado !== 'Activo') return false;
     const totalLoanAmount = credit.valor + credit.commission;
     return credit.paidAmount >= totalLoanAmount / 2;
   }
@@ -236,7 +230,7 @@ export default function CreditosPage() {
                   </TableHeader>
                   <TableBody>
                     {creditos.map((credito) => (
-                      <TableRow key={credito.id} onClick={() => handleRowClick(credito)} className={`cursor-pointer ${credito.estado === 'Renovado' ? 'opacity-50 hover:bg-transparent' : ''}`}>
+                      <TableRow key={credito.id} onClick={() => handleRowClick(credito)} className={`cursor-pointer ${credito.estado !== 'Activo' ? 'opacity-50 hover:bg-transparent' : ''}`}>
                         <TableCell>{credito.formattedDate}</TableCell>
                         <TableCell>
                           <div className="font-medium">{credito.clienteName || 'Nombre no disponible'}</div>
