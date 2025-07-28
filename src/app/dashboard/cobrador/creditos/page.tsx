@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw, XCircle, CalendarDays, CheckCircle2, Circle } from "lucide-react";
+import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw, XCircle, CalendarDays, CheckCircle2, Circle, Star } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getCreditsByCobrador, registerPayment, registerMissedPayment } from "@/lib/actions";
@@ -96,11 +96,13 @@ export default function CreditosPage() {
     }
     
     setSelectedCredit(credito);
+    const totalLoanAmount = credito.valor + credito.commission;
+    const canRenew = credito.paidAmount >= totalLoanAmount / 2;
 
-    if (credito.estado === 'Pagado') {
+    if (credito.estado === 'Pagado' || canRenew) {
         setIsRenewModalOpen(true);
     } else {
-        setPaymentType("cuota"); // Reset to default when opening
+        setPaymentType("cuota");
         setIsModalOpen(true);
     }
   };
@@ -179,6 +181,17 @@ export default function CreditosPage() {
         default: return 0;
     }
   }
+  
+  const canRenewCredit = (credit: Credito | null) => {
+    if (!credit) return false;
+    const totalLoanAmount = credit.valor + credit.commission;
+    return credit.paidAmount >= totalLoanAmount / 2;
+  }
+
+  const handleRenewClick = () => {
+    setIsModalOpen(false);
+    setIsRenewModalOpen(true);
+  };
 
   const hasInterestOption = (selectedCredit?.lateInterestRate ?? 0) > 0;
   
@@ -338,9 +351,9 @@ export default function CreditosPage() {
                 </RadioGroup>
             </div>
           )}
-          <DialogFooter className="sm:justify-between gap-2">
+          <DialogFooter className="flex-col sm:flex-row sm:justify-between gap-2">
              <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancelar</Button>
-            <div className="flex gap-2">
+            <div className="flex flex-col-reverse sm:flex-row gap-2">
                 <Button
                     variant="destructive"
                     onClick={handleMissedPayment}
@@ -353,6 +366,10 @@ export default function CreditosPage() {
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <HandCoins className="mr-2 h-4 w-4" />}
                   {isSubmitting ? 'Registrando...' : `Registrar Pago (${formatCurrency(getPaymentAmount())})`}
                 </Button>
+                 <Button onClick={handleRenewClick} variant="secondary" className="bg-amber-400 hover:bg-amber-500 text-amber-900" disabled={isSubmitting || !canRenewCredit(selectedCredit)}>
+                    <Star className="mr-2 h-4 w-4" />
+                    Renovar Crédito
+                 </Button>
             </div>
           </DialogFooter>
         </DialogContent>
@@ -364,7 +381,7 @@ export default function CreditosPage() {
             <DialogHeader>
               <DialogTitle>Renovar Crédito</DialogTitle>
               <DialogDescription>
-                Crear un nuevo crédito para el cliente <span className="font-semibold">{selectedCredit?.clienteName}</span>.
+                Crear un nuevo crédito para el cliente <span className="font-semibold">{selectedCredit?.clienteName}</span>. El saldo pendiente del crédito actual, si existe, quedará registrado pero el crédito se marcará como 'Renovado'.
               </DialogDescription>
             </DialogHeader>
             {selectedCredit && (
@@ -386,6 +403,7 @@ export default function CreditosPage() {
     
 
     
+
 
 
 

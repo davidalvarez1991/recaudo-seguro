@@ -132,7 +132,6 @@ export function RenewCreditForm({ clienteId, oldCreditId, onFormSubmit }: RenewC
       setIsPending(true);
       const result = await savePaymentSchedule({
           creditId: newCreditId,
-          paymentFrequency: 'diario', // Default value, as it's not selected by user anymore
           paymentDates: validDates.map(d => d.toISOString())
       });
       
