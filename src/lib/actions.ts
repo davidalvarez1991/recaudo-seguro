@@ -881,8 +881,6 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
         cuotas: parseInt(installments, 10),
         fecha: Timestamp.now(),
         estado: 'Activo',
-        documentUrls: [],
-        references: null, // Reset references on renewal
         paymentScheduleSet: false, // Will need a schedule
         missedPaymentDays: 0,
     });
@@ -1056,16 +1054,15 @@ export async function getClientReputationData(clienteId: string) {
         }
 
         // 2. Fetch all credits for that client ID across all providers
-        const creditsRef = collection(db, "credits");
-        const q = query(creditsRef, where("clienteId", "==", clienteId));
-        const creditsSnapshot = await getDocs(q);
+        const allCreditsSnapshot = await getDocs(collection(db, "credits"));
+        const clientCreditsDocs = allCreditsSnapshot.docs.filter(doc => doc.data().clienteId === clienteId);
 
-        if (creditsSnapshot.empty) {
+        if (clientCreditsDocs.length === 0) {
              const analysis = await analyzeClientReputation({ clienteId, creditHistory: [] });
              return { analysis, clientName: client.name };
         }
 
-        const creditsPromises = creditsSnapshot.docs.map(async (creditDoc) => {
+        const creditsPromises = clientCreditsDocs.map(async (creditDoc) => {
             const creditData = creditDoc.data();
             const paymentsRef = collection(db, "payments");
             const paymentsQuery = query(paymentsRef, where("creditId", "==", creditDoc.id));
