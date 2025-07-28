@@ -297,16 +297,16 @@ export default function CreditosPage() {
                     {/* Pagar Cuota */}
                     <Label htmlFor="payment-cuota" className="flex items-start gap-4 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
                         <RadioGroupItem value="cuota" id="payment-cuota" className="mt-1" />
-                        <div className="w-full">
-                            <div className="flex justify-between items-center w-full">
+                        <div className="flex justify-between items-start w-full">
+                            <div>
                                 <p className="font-semibold">Pagar Cuota</p>
-                                <p className="font-bold text-lg">{formatCurrency(((selectedCredit.valor + selectedCredit.commission) / selectedCredit.cuotas) + selectedCredit.lateFee)}</p>
+                                <div className="text-xs text-muted-foreground flex flex-wrap gap-x-4">
+                                    <span>Capital: {formatCurrency(getInstallmentBreakdown().capital)}</span>
+                                    <span>Comisión: {formatCurrency(getInstallmentBreakdown().commission)}</span>
+                                    <span>Mora: {formatCurrency(selectedCredit.lateFee)}</span>
+                                </div>
                             </div>
-                            <div className="text-xs text-muted-foreground flex flex-wrap gap-x-4">
-                                <span>Capital: {formatCurrency(getInstallmentBreakdown().capital)}</span>
-                                <span>Comisión: {formatCurrency(getInstallmentBreakdown().commission)}</span>
-                                <span>Mora: {formatCurrency(selectedCredit.lateFee)}</span>
-                            </div>
+                            <p className="font-bold text-lg">{formatCurrency(((selectedCredit.valor + selectedCredit.commission) / selectedCredit.cuotas) + selectedCredit.lateFee)}</p>
                         </div>
                     </Label>
 
