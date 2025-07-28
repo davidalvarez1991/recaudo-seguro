@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -60,7 +60,7 @@ export default function CreditosPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  const fetchCredits = async () => {
+  const fetchCredits = useCallback(async () => {
     setLoading(true);
     try {
         const creditsData: Credito[] = await getCreditsByCobrador();
@@ -76,7 +76,7 @@ export default function CreditosPage() {
     } finally {
         setLoading(false);
     }
-  }
+  }, [toast]);
 
   useEffect(() => {
     fetchCredits();
@@ -87,7 +87,7 @@ export default function CreditosPage() {
       window.removeEventListener('creditos-updated', handleCreditsUpdate);
     }
 
-  }, []);
+  }, [fetchCredits]);
 
   const handleRowClick = (credito: Credito) => {
     if (credito.estado === 'Renovado') {
@@ -386,5 +386,6 @@ export default function CreditosPage() {
     
 
     
+
 
 
