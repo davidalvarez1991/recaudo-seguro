@@ -5,7 +5,7 @@ import { useState, useRef, ChangeEvent, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Upload, Save, Percent, Trash2, PlusCircle, DollarSign } from "lucide-react";
+import { Upload, Save, Percent, Trash2, PlusCircle, DollarSign, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -72,6 +72,10 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
     if (!providerId) return;
     const file = event.target.files?.[0];
     if (file) {
+      // Create a temporary URL for instant preview
+      const previewUrl = URL.createObjectURL(file);
+      setLogo(previewUrl); // Show preview immediately
+
       setIsUploading(true);
       const storagePath = `proveedores/${providerId}/logo/${file.name}`;
       const storageRef = ref(storage, storagePath);
@@ -82,6 +86,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
         
         await saveProviderSettings(providerId, { companyLogoUrl: downloadURL });
 
+        // Update with the final URL from storage
         setLogo(downloadURL);
         localStorage.setItem(`company-logo_${providerId}`, downloadURL);
         window.dispatchEvent(new CustomEvent('logo-updated'));
@@ -100,6 +105,9 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
           description: "No se pudo subir el nuevo logo.",
           variant: "destructive"
         });
+        // If upload fails, revoke the preview URL to avoid memory leaks
+        URL.revokeObjectURL(previewUrl);
+        // Optionally revert to the old logo if you have it stored
       } finally {
         setIsUploading(false);
       }
@@ -204,7 +212,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
                 disabled={isUploading || !providerId}
               />
             <Button onClick={handleUploadClick} disabled={isUploading || !providerId} className="w-full sm:w-auto">
-              <Upload className="mr-2 h-4 w-4" />
+              {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
               {isUploading ? "Cargando..." : "Subir Logo"}
             </Button>
             <p className="text-xs text-muted-foreground">
