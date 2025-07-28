@@ -790,6 +790,7 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     const { 
         idNumber, name, address, contactPhone, 
         creditAmount, installments, requiresGuarantor,
+        guarantorName, guarantorIdNumber, guarantorAddress, guarantorPhone,
         familyReferenceName, familyReferencePhone, familyReferenceAddress,
         personalReferenceName, personalReferencePhone, personalReferenceAddress
     } = validatedFields.data;
@@ -822,6 +823,12 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
         fecha: Timestamp.now(),
         estado: 'Activo',
         documentUrls: [],
+        guarantor: requiresGuarantor ? {
+            name: guarantorName,
+            idNumber: guarantorIdNumber,
+            address: guarantorAddress,
+            phone: guarantorPhone,
+        } : null,
         references: requiresGuarantor ? {
             familiar: {
                 name: familyReferenceName,

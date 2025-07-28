@@ -25,6 +25,13 @@ type Reference = {
     address: string;
 }
 
+type Guarantor = {
+    name: string;
+    idNumber: string;
+    address: string;
+    phone: string;
+}
+
 type Registro = {
   id: string;
   cobradorId: string;
@@ -37,6 +44,7 @@ type Registro = {
   fecha: string;
   formattedDate?: string;
   documentUrls?: string[];
+  guarantor?: Guarantor | null;
   references?: {
     familiar: Reference;
     personal: Reference;
@@ -317,6 +325,20 @@ export default function RegistrosPage() {
                                 <div className="text-lg font-bold text-red-900 dark:text-red-100">{formatCurrency(selectedRegistro.remainingBalance)}</div>
                             </div>
                         </div>
+
+                        {selectedRegistro.guarantor && (
+                           <>
+                                <Separator />
+                                <h4 className="font-semibold text-md">Información del Fiador</h4>
+                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1 text-sm pl-2">
+                                    <div><span className="font-semibold">Nombre:</span> {selectedRegistro.guarantor.name}</div>
+                                    <div><span className="font-semibold">Cédula:</span> {selectedRegistro.guarantor.idNumber}</div>
+                                    <div><span className="font-semibold">Teléfono:</span> {selectedRegistro.guarantor.phone}</div>
+                                    <div className="md:col-span-2"><span className="font-semibold">Dirección:</span> {selectedRegistro.guarantor.address}</div>
+                                </div>
+                            </>
+                        )}
+
 
                         {selectedRegistro.references && (
                             <>
