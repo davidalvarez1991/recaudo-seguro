@@ -195,31 +195,33 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
       <div className="space-y-6">
         <div className="space-y-1">
             <h3 className="text-lg font-medium">Logo de la Empresa</h3>
-            <p className="text-sm text-muted-foreground">Sube o actualiza el logo de tu empresa.</p>
+            <p className="text-sm text-muted-foreground">Sube o actualiza el logo que verán tus clientes y cobradores.</p>
         </div>
-        <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center">
-          <Avatar className="h-24 w-24 border">
-            <AvatarImage src={logo || "https://placehold.co/200x200.png"} data-ai-hint="company logo" alt="Logo de la empresa" />
-            <AvatarFallback>LOGO</AvatarFallback>
-          </Avatar>
-          <div className="flex flex-col gap-2 w-full sm:w-auto">
-             <Input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleLogoChange}
-                className="hidden"
-                accept="image/png, image/jpeg, image/gif"
-                disabled={isUploading || !providerId}
-              />
-            <Button onClick={handleUploadClick} disabled={isUploading || !providerId} className="w-full sm:w-auto">
-              {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-              {isUploading ? "Cargando..." : "Subir Logo"}
-            </Button>
-            <p className="text-xs text-muted-foreground">
-              PNG, JPG o GIF (Recomendado 200x200px).
-            </p>
-          </div>
-        </div>
+        <Card className="max-w-md">
+            <CardContent className="p-6 flex flex-col sm:flex-row items-center gap-6">
+                <Avatar className="h-24 w-24 border-2 border-primary/10 shadow-sm">
+                    <AvatarImage src={logo || "https://placehold.co/200x200.png"} data-ai-hint="company logo" alt="Logo de la empresa" />
+                    <AvatarFallback>LOGO</AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col gap-2 w-full text-center sm:text-left">
+                     <Input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleLogoChange}
+                        className="hidden"
+                        accept="image/png, image/jpeg, image/gif"
+                        disabled={isUploading || !providerId}
+                      />
+                    <Button onClick={handleUploadClick} disabled={isUploading || !providerId} className="w-full">
+                      {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                      {isUploading ? "Cargando..." : (logo ? "Cambiar Logo" : "Subir Logo")}
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      PNG, JPG o GIF (Recomendado 200x200px).
+                    </p>
+                </div>
+            </CardContent>
+        </Card>
       </div>
 
       <Separator />
