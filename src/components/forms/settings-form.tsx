@@ -72,31 +72,31 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
     if (!providerId) return;
     const file = event.target.files?.[0];
     if (file) {
-      // Create a temporary URL for instant preview
       const previewUrl = URL.createObjectURL(file);
-      setLogo(previewUrl); // Show preview immediately
+      setLogo(previewUrl);
 
       setIsUploading(true);
-      const storagePath = `proveedores/${providerId}/logo/${file.name}`;
-      const storageRef = ref(storage, storagePath);
-
       try {
+        const storagePath = `proveedores/${providerId}/logo/${file.name}`;
+        const storageRef = ref(storage, storagePath);
         await uploadBytes(storageRef, file);
         const downloadURL = await getDownloadURL(storageRef);
         
-        await saveProviderSettings(providerId, { companyLogoUrl: downloadURL });
+        const result = await saveProviderSettings(providerId, { companyLogoUrl: downloadURL });
 
-        // Update with the final URL from storage
-        setLogo(downloadURL);
-        localStorage.setItem(`company-logo_${providerId}`, downloadURL);
-        window.dispatchEvent(new CustomEvent('logo-updated'));
-        
-        toast({
-          title: "Logo Actualizado",
-          description: "El logo de tu empresa ha sido actualizado.",
-          variant: "default",
-          className: "bg-accent text-accent-foreground border-accent",
-        });
+        if (result.success) {
+            setLogo(downloadURL);
+            localStorage.setItem(`company-logo_${providerId}`, downloadURL);
+            window.dispatchEvent(new CustomEvent('logo-updated'));
+            toast({
+              title: "Logo Actualizado",
+              description: "El logo de tu empresa ha sido actualizado.",
+              variant: "default",
+              className: "bg-accent text-accent-foreground border-accent",
+            });
+        } else {
+             throw new Error(result.error || "Failed to save settings");
+        }
 
       } catch (error) {
         console.error("Error uploading logo:", error);
@@ -105,9 +105,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
           description: "No se pudo subir el nuevo logo.",
           variant: "destructive"
         });
-        // If upload fails, revoke the preview URL to avoid memory leaks
         URL.revokeObjectURL(previewUrl);
-        // Optionally revert to the old logo if you have it stored
       } finally {
         setIsUploading(false);
       }

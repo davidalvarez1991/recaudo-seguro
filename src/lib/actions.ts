@@ -1005,29 +1005,37 @@ export async function saveProviderSettings(providerId: string, settings: { commi
   if (!providerId) return { error: "ID de proveedor no válido." };
   
   const providerRef = doc(db, "users", providerId);
-  const providerSnap = await getDoc(providerRef);
-  if(!providerSnap.exists() || providerSnap.data().role !== 'proveedor') {
-    return { error: "Proveedor no encontrado o no autorizado." };
-  }
+  try {
+      const providerSnap = await getDoc(providerRef);
+      if(!providerSnap.exists() || providerSnap.data().role !== 'proveedor') {
+        return { error: "Proveedor no encontrado o no autorizado." };
+      }
 
-  const updateData: any = {};
-  if (settings.commissionTiers !== undefined) {
-    updateData.commissionTiers = settings.commissionTiers;
-  }
-  if (settings.lateInterestRate !== undefined) {
-    updateData.lateInterestRate = settings.lateInterestRate;
-  }
-   if (settings.isLateInterestActive !== undefined) {
-    updateData.isLateInterestActive = settings.isLateInterestActive;
-  }
-   if (settings.companyLogoUrl !== undefined) {
-    updateData.companyLogoUrl = settings.companyLogoUrl;
-  }
-  updateData.updatedAt = Timestamp.now();
+      const updateData: any = {};
+      if (settings.commissionTiers !== undefined) {
+        updateData.commissionTiers = settings.commissionTiers;
+      }
+      if (settings.lateInterestRate !== undefined) {
+        updateData.lateInterestRate = settings.lateInterestRate;
+      }
+      if (settings.isLateInterestActive !== undefined) {
+        updateData.isLateInterestActive = settings.isLateInterestActive;
+      }
+      if (settings.companyLogoUrl !== undefined) {
+        updateData.companyLogoUrl = settings.companyLogoUrl;
+      }
+      
+      if (Object.keys(updateData).length > 0) {
+        updateData.updatedAt = Timestamp.now();
+        await updateDoc(providerRef, updateData);
+      }
 
-  await updateDoc(providerRef, updateData);
+      return { success: true };
 
-  return { success: "Configuración guardada exitosamente." };
+  } catch (error) {
+      console.error("Error saving provider settings:", error);
+      return { error: "No se pudo guardar la configuración." };
+  }
 }
 
 export async function registerMissedPayment(creditId: string) {
