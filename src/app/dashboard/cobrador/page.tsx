@@ -5,6 +5,7 @@ import { CreditSimulator } from "@/components/dashboard/credit-simulator";
 import { getUserData } from "@/lib/actions";
 import { cookies } from "next/headers";
 import { Separator } from "@/components/ui/separator";
+import { ClientReputationSearch } from "@/components/dashboard/client-reputation-search";
 
 type CommissionTier = {
   minAmount: number;
@@ -56,41 +57,47 @@ export default async function CobradorDashboard() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="space-y-1">
-                <CardTitle className="text-3xl">Bienvenido, {userName}</CardTitle>
-                <CardDescription>Este es tu panel de gestión de clientes y créditos.</CardDescription>
+    <div className="space-y-8">
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="space-y-1">
+                  <CardTitle className="text-3xl">Bienvenido, {userName}</CardTitle>
+                  <CardDescription>Este es tu panel de gestión de clientes y créditos.</CardDescription>
+              </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-8">
+            <ClientReputationSearch />
+
+            <Separator />
+
+            <div>
+              <h3 className="text-lg font-medium">Gestión de Clientes</h3>
+              <p className="text-sm text-muted-foreground">
+                Desde aquí puedes registrar nuevos clientes y gestionar sus créditos.
+              </p>
             </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-8">
-        <div>
-          <h3 className="text-lg font-medium">Gestión de Clientes</h3>
-          <p className="text-sm text-muted-foreground">
-            Desde aquí puedes registrar nuevos clientes y gestionar sus créditos.
-          </p>
-        </div>
-        
-        <CobradorDashboardClient />
+            
+            <CobradorDashboardClient />
 
-        <Separator />
-        
-        <div>
-          <h3 className="text-lg font-medium">Simulador de Créditos</h3>
-           <p className="text-sm text-muted-foreground">
-            Calcula rápidamente el valor de las cuotas y el total a pagar para un nuevo crédito.
-          </p>
-        </div>
+            <Separator />
+            
+            <div>
+              <h3 className="text-lg font-medium">Simulador de Créditos</h3>
+              <p className="text-sm text-muted-foreground">
+                Calcula rápidamente el valor de las cuotas y el total a pagar para un nuevo crédito.
+              </p>
+            </div>
 
-        <CreditSimulator 
-            commissionTiers={commissionTiers} 
-            lateInterestRate={lateInterestRate}
-            isLateInterestActive={isLateInterestActive}
-        />
-        
-      </CardContent>
-    </Card>
+            <CreditSimulator 
+                commissionTiers={commissionTiers} 
+                lateInterestRate={lateInterestRate}
+                isLateInterestActive={isLateInterestActive}
+            />
+            
+        </CardContent>
+      </Card>
+    </div>
   );
 }

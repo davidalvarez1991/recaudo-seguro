@@ -9,6 +9,7 @@ import { CobradorRegistrationModal } from "@/components/proveedor/cobrador-regis
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cookies } from "next/headers";
 import { DailySummary } from "@/components/proveedor/daily-summary";
+import { ClientReputationSearch } from "@/components/dashboard/client-reputation-search";
 
 type UserData = {
     companyName?: string;
@@ -66,44 +67,51 @@ export default async function ProveedorDashboard() {
 
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="space-y-1">
-                <CardTitle className="text-3xl">{companyName}</CardTitle>
-                <CardDescription>Bienvenido a tu panel de gestión.</CardDescription>
+    <div className="space-y-8">
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="space-y-1">
+                  <CardTitle className="text-3xl">{companyName}</CardTitle>
+                  <CardDescription>Bienvenido a tu panel de gestión.</CardDescription>
+              </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-8">
+          
+          <ClientReputationSearch />
+
+          <Separator />
+          
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium">Gestión de Cobradores ({cobradoresCount}/30)</h3>
+              <p className="text-sm text-muted-foreground">Crea nuevas cuentas o visualiza tus cobradores existentes.</p>
             </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-8">
-        <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <CreateButton />
+              <Button asChild variant="outline" className="w-full sm:w-auto">
+                <Link href="/dashboard/proveedor/cobradores">
+                  <Eye className="mr-2 h-4 w-4" />
+                  Ver Cobradores
+                </Link>
+              </Button>
+            </div>
+          </div>
+
+          <Separator />
+
           <div>
-            <h3 className="text-lg font-medium">Gestión de Cobradores ({cobradoresCount}/30)</h3>
-            <p className="text-sm text-muted-foreground">Crea nuevas cuentas o visualiza tus cobradores existentes.</p>
+              <h3 className="text-lg font-medium">Resumen del Día</h3>
+              <p className="text-sm text-muted-foreground">
+                  Visualiza el total recaudado hoy por tus cobradores en tiempo real.
+              </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <CreateButton />
-            <Button asChild variant="outline" className="w-full sm:w-auto">
-              <Link href="/dashboard/proveedor/cobradores">
-                <Eye className="mr-2 h-4 w-4" />
-                Ver Cobradores
-              </Link>
-            </Button>
-          </div>
-        </div>
 
-        <Separator />
-
-        <div>
-            <h3 className="text-lg font-medium">Resumen del Día</h3>
-            <p className="text-sm text-muted-foreground">
-                Visualiza el total recaudado hoy por tus cobradores en tiempo real.
-            </p>
-        </div>
-
-        <DailySummary summary={dailySummaryData.summary} total={dailySummaryData.totalCollected} />
-        
-      </CardContent>
-    </Card>
+          <DailySummary summary={dailySummaryData.summary} total={dailySummaryData.totalCollected} />
+          
+        </CardContent>
+      </Card>
+    </div>
   );
 }

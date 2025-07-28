@@ -10,6 +10,7 @@ import { db, storage } from "./firebase";
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc, increment, orderBy, limit } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { startOfDay, differenceInDays, endOfDay, isWithinInterval } from 'date-fns';
+import { analyzeClientReputation, ClientReputationInput } from '@/ai/flows/analyze-client-reputation';
 
 const ADMIN_ID = "admin_0703091991";
 
@@ -1042,4 +1043,56 @@ export async function registerMissedPayment(creditId: string) {
     console.error("Error registering missed payment:", error);
     return { error: "No se pudo registrar el día de mora." };
   }
+}
+
+// --- AI Actions ---
+
+export async function getClientReputationData(clienteId: string) {
+    try {
+        // 1. Find the client by their ID number
+        const client = await findUserByIdNumber(clienteId);
+        if (!client || client.role !== 'cliente') {
+            return { error: "No se encontró un cliente con esa cédula." };
+        }
+
+        // 2. Fetch all credits for that client ID across all providers
+        const creditsRef = collection(db, "credits");
+        const q = query(creditsRef, where("clienteId", "==", clienteId));
+        const creditsSnapshot = await getDocs(q);
+
+        if (creditsSnapshot.empty) {
+             const analysis = await analyzeClientReputation({ clienteId, creditHistory: [] });
+             return { analysis, clientName: client.name };
+        }
+
+        const creditsPromises = creditsSnapshot.docs.map(async (creditDoc) => {
+            const creditData = creditDoc.data();
+            const paymentsRef = collection(db, "payments");
+            const paymentsQuery = query(paymentsRef, where("creditId", "==", creditDoc.id));
+            const paymentsSnapshot = await getDocs(paymentsQuery);
+            const paidInstallments = paymentsSnapshot.docs.filter(p => p.data().type === 'cuota').length;
+
+            return {
+                id: creditDoc.id,
+                valor: creditData.valor || 0,
+                estado: creditData.estado || 'Desconocido',
+                cuotas: creditData.cuotas || 0,
+                paidInstallments: paidInstallments,
+                missedPaymentDays: creditData.missedPaymentDays || 0,
+            };
+        });
+        
+        const creditHistory = await Promise.all(creditsPromises);
+
+        // 3. Call the Genkit flow with the prepared data
+        const analysis = await analyzeClientReputation({
+            clienteId: clienteId,
+            creditHistory: creditHistory,
+        });
+
+        return { analysis, clientName: client.name };
+    } catch (error) {
+        console.error("Error getting client reputation data:", error);
+        return { error: "Ocurrió un error al consultar la reputación del cliente." };
+    }
 }
