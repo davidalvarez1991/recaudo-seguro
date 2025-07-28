@@ -10,7 +10,7 @@ import { db, storage } from "./firebase";
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc, increment, orderBy, limit } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { startOfDay, differenceInDays, endOfDay, isWithinInterval } from 'date-fns';
-import { utcToZonedTime } from 'date-fns-tz';
+import { toZonedTime } from 'date-fns-tz';
 import { analyzeClientReputation, ClientReputationInput } from '@/ai/flows/analyze-client-reputation';
 
 const ADMIN_ID = "admin_0703091991";
@@ -565,7 +565,7 @@ export async function getDailyCollectionSummary() {
     const providerId = providerIdCookie.value;
 
     const timeZone = 'America/Bogota';
-    const nowInTimeZone = utcToZonedTime(new Date(), timeZone);
+    const nowInTimeZone = toZonedTime(new Date(), timeZone);
     const todayStart = startOfDay(nowInTimeZone);
     const todayEnd = endOfDay(nowInTimeZone);
 
@@ -589,7 +589,7 @@ export async function getDailyCollectionSummary() {
             return; // Skip record if date is missing
         }
         const paymentDateUTC = payment.date.toDate();
-        const paymentDateInTimeZone = utcToZonedTime(paymentDateUTC, timeZone);
+        const paymentDateInTimeZone = toZonedTime(paymentDateUTC, timeZone);
         
         if (isWithinInterval(paymentDateInTimeZone, { start: todayStart, end: todayEnd })) {
             const amount = payment.amount || 0;
