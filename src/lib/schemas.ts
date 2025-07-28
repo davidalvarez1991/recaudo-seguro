@@ -1,23 +1,6 @@
 
 import { z } from "zod";
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-const ALLOWED_FILE_TYPES = [
-    "image/jpeg", 
-    "image/png", 
-    "image/webp", 
-    "image/gif", 
-    "image/heic",
-    "image/heif",
-    "application/pdf", 
-    "video/mp4", 
-    "video/quicktime", // .mov
-    "video/x-msvideo", // .avi
-    "video/x-matroska", // .mkv
-    "video/webm",
-    "video/3gpp" // .3gp
-];
-
 export const LoginSchema = z.object({
   idNumber: z.string().min(1, {
     message: "El número de cédula es obligatorio.",
@@ -144,19 +127,6 @@ export const EditClientSchema = z.object({
   name: z.string().min(3, { message: "El nombre completo es obligatorio." }),
   address: z.string().min(5, { message: "La dirección es obligatoria." }),
   contactPhone: z.string().min(10, { message: "El teléfono debe tener 10 dígitos." }),
-});
-
-
-export const UploadSingleDocumentSchema = z.object({
-    creditId: z.string(),
-    document: z
-      .instanceof(File)
-      .refine((file) => file.size > 0, 'El archivo no puede estar vacío.')
-      .refine((file) => file.size <= MAX_FILE_SIZE, `El tamaño máximo por archivo es 50MB.`)
-      .refine(
-        (file) => ALLOWED_FILE_TYPES.includes(file.type),
-        "Tipo de archivo no permitido."
-      ),
 });
 
 export const SavePaymentScheduleSchema = z.object({

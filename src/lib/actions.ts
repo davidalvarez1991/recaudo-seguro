@@ -2,7 +2,7 @@
 "use server";
 
 import { z } from "zod";
-import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, UploadSingleDocumentSchema, SavePaymentScheduleSchema, RenewCreditSchema, EditClientSchema } from "./schemas";
+import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, SavePaymentScheduleSchema, RenewCreditSchema, EditClientSchema } from "./schemas";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
@@ -822,7 +822,6 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
         cuotas: parseInt(installments, 10),
         fecha: Timestamp.now(),
         estado: 'Activo',
-        documentUrls: [],
         guarantor: requiresGuarantor ? {
             name: guarantorName,
             idNumber: guarantorIdNumber,
@@ -918,54 +917,6 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
     } catch (error) {
         console.error("Error saving payment schedule:", error);
         return { error: "No se pudo guardar el calendario de pagos." };
-    }
-}
-
-export async function uploadSingleDocument(formData: FormData) {
-    try {
-        const rawData: {[k:string]: any} = Object.fromEntries(formData.entries());
-        const validatedFields = UploadSingleDocumentSchema.safeParse(rawData);
-        
-        if (!validatedFields.success) {
-            return { error: "Datos de subida inválidos." };
-        }
-        
-        const { creditId, document } = validatedFields.data;
-
-        const creditRef = doc(db, "credits", creditId);
-        const creditSnap = await getDoc(creditRef);
-        if (!creditSnap.exists()) {
-            return { error: "El crédito no fue encontrado." };
-        }
-        const creditData = creditSnap.data();
-        
-        const providerId = creditData.providerId;
-        const cobradorId = creditData.cobradorId;
-        const clienteId = creditData.clienteId;
-
-        if (!providerId || !cobradorId || !clienteId) {
-             return { error: "Información de asociación incompleta en el crédito." };
-        }
-
-        const storagePath = `proveedores/${providerId}/cobradores/${cobradorId}/clientes/${clienteId}/${Date.now()}_${document.name}`;
-        const storageRef = ref(storage, storagePath);
-        
-        const buffer = await document.arrayBuffer();
-        await uploadBytes(storageRef, buffer);
-        const url = await getDownloadURL(storageRef);
-
-        const documentUrls = creditData.documentUrls || [];
-        documentUrls.push(url);
-        await updateDoc(creditRef, { documentUrls });
-
-        return { success: true, url };
-
-    } catch (error: any) {
-        console.error("Upload error:", error);
-        if (error.code) { // Firebase storage errors have a code property
-            return { error: `Error de Firebase Storage: ${error.code}` };
-        }
-        return { error: "Error interno: no se pudo subir el archivo." };
     }
 }
 
