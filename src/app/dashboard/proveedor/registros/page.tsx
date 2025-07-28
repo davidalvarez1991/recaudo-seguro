@@ -19,6 +19,12 @@ import { Separator } from "@/components/ui/separator";
 import { EditClientForm } from "@/components/forms/edit-client-form";
 import { Input } from "@/components/ui/input";
 
+type Reference = {
+    name: string;
+    phone: string;
+    address: string;
+}
+
 type Registro = {
   id: string;
   cobradorId: string;
@@ -31,7 +37,10 @@ type Registro = {
   fecha: string;
   formattedDate?: string;
   documentUrls?: string[];
-  guarantor?: { name: string; phone: string; address: string } | null;
+  references?: {
+    familiar: Reference;
+    personal: Reference;
+  } | null;
   cuotas: number;
   clienteAddress?: string;
   clientePhone?: string;
@@ -309,14 +318,27 @@ export default function RegistrosPage() {
                             </div>
                         </div>
 
-                        {selectedRegistro.guarantor && (
+                        {selectedRegistro.references && (
                             <>
                                 <Separator />
-                                <h4 className="font-semibold text-md">Información del Fiador</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div><span className="font-semibold text-muted-foreground">Nombre:</span> {selectedRegistro.guarantor.name}</div>
-                                    <div><span className="font-semibold text-muted-foreground">Teléfono:</span> {selectedRegistro.guarantor.phone}</div>
-                                    <div className="md:col-span-2"><span className="font-semibold text-muted-foreground">Dirección:</span> {selectedRegistro.guarantor.address}</div>
+                                <h4 className="font-semibold text-md">Información de Referencias</h4>
+                                <div className="space-y-4">
+                                    <div>
+                                        <h5 className="font-medium text-sm text-muted-foreground">Referencia Familiar</h5>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1 text-sm pl-2">
+                                            <div><span className="font-semibold">Nombre:</span> {selectedRegistro.references.familiar.name}</div>
+                                            <div><span className="font-semibold">Teléfono:</span> {selectedRegistro.references.familiar.phone}</div>
+                                            <div className="md:col-span-2"><span className="font-semibold">Dirección:</span> {selectedRegistro.references.familiar.address}</div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h5 className="font-medium text-sm text-muted-foreground">Referencia Personal</h5>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1 text-sm pl-2">
+                                            <div><span className="font-semibold">Nombre:</span> {selectedRegistro.references.personal.name}</div>
+                                            <div><span className="font-semibold">Teléfono:</span> {selectedRegistro.references.personal.phone}</div>
+                                            <div className="md:col-span-2"><span className="font-semibold">Dirección:</span> {selectedRegistro.references.personal.address}</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </>
                         )}

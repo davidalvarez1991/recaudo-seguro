@@ -787,7 +787,12 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
         return { error: firstError };
     }
     
-    const { idNumber, name, address, contactPhone, guarantorName, guarantorPhone, guarantorAddress, creditAmount, installments, requiresGuarantor } = validatedFields.data;
+    const { 
+        idNumber, name, address, contactPhone, 
+        creditAmount, installments, requiresGuarantor,
+        familyReferenceName, familyReferencePhone, familyReferenceAddress,
+        personalReferenceName, personalReferencePhone, personalReferenceAddress
+    } = validatedFields.data;
     
     let existingClient = await findUserByIdNumber(idNumber);
     if (!existingClient) {
@@ -817,10 +822,17 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
         fecha: Timestamp.now(),
         estado: 'Activo',
         documentUrls: [],
-        guarantor: requiresGuarantor ? {
-            name: guarantorName,
-            phone: guarantorPhone,
-            address: guarantorAddress
+        references: requiresGuarantor ? {
+            familiar: {
+                name: familyReferenceName,
+                phone: familyReferencePhone,
+                address: familyReferenceAddress
+            },
+            personal: {
+                name: personalReferenceName,
+                phone: personalReferencePhone,
+                address: personalReferenceAddress
+            }
         } : null,
         missedPaymentDays: 0,
     });
@@ -863,7 +875,7 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
         fecha: Timestamp.now(),
         estado: 'Activo',
         documentUrls: [],
-        guarantor: null, // Assuming renewal doesn't require guarantor re-entry for simplicity
+        references: null, // Reset references on renewal
         paymentScheduleSet: false, // Will need a schedule
         missedPaymentDays: 0,
     });
@@ -1073,7 +1085,3 @@ export async function registerMissedPayment(creditId: string) {
     return { error: "No se pudo registrar el día de mora." };
   }
 }
-
-    
-
-    
