@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw, XCircle, CalendarDays, CheckCircle2, Circle, Star } from "lucide-react";
+import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw, XCircle, CalendarDays, CheckCircle2, Circle, Star, Search } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getCreditsByCobrador, registerPayment, registerMissedPayment } from "@/lib/actions";
@@ -19,6 +19,7 @@ import { format, isBefore, startOfToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 
 
 type Credito = {
@@ -57,6 +58,7 @@ export default function CreditosPage() {
   const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
 
   const fetchCredits = useCallback(async () => {
@@ -195,6 +197,11 @@ export default function CreditosPage() {
     return { capital: capitalPerInstallment, commission: commissionPerInstallment };
   }
 
+  const filteredCreditos = creditos.filter(credito =>
+    (credito.clienteName?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (credito.clienteId?.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
+
   return (
     <TooltipProvider>
       <Card>
@@ -213,11 +220,21 @@ export default function CreditosPage() {
                   </Link>
               </Button>
           </div>
+           <div className="mt-4 relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                type="search"
+                placeholder="Buscar por nombre o cédula de cliente..."
+                className="w-full pl-8 sm:w-[300px]"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                />
+            </div>
         </CardHeader>
         <CardContent className="pt-6">
           {loading ? (
              <p>Cargando créditos...</p>
-          ) : creditos.length > 0 ? (
+          ) : filteredCreditos.length > 0 ? (
               <Table>
                   <TableHeader>
                     <TableRow>
@@ -229,7 +246,7 @@ export default function CreditosPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {creditos.map((credito) => (
+                    {filteredCreditos.map((credito) => (
                       <TableRow key={credito.id} onClick={() => handleRowClick(credito)} className={`cursor-pointer ${credito.estado !== 'Activo' ? 'opacity-50 hover:bg-transparent' : ''}`}>
                         <TableCell>{credito.formattedDate}</TableCell>
                         <TableCell>
@@ -252,8 +269,8 @@ export default function CreditosPage() {
           ) : (
             <div className="text-center text-muted-foreground py-8">
                 <ClipboardList className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                <h3 className="text-lg font-semibold">No hay créditos registrados</h3>
-                <p className="text-sm">Cuando crees tu primer crédito, aparecerá aquí.</p>
+                <h3 className="text-lg font-semibold">{searchTerm ? 'No se encontraron clientes' : 'No hay créditos registrados'}</h3>
+                <p className="text-sm">{searchTerm ? 'Intenta con otro nombre o cédula.' : 'Cuando crees tu primer crédito, aparecerá aquí.'}</p>
             </div>
           )}
         </CardContent>
@@ -314,7 +331,9 @@ export default function CreditosPage() {
                     <Label htmlFor="payment-total" className="flex items-start gap-4 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
                         <RadioGroupItem value="total" id="payment-total" className="mt-1" />
                         <div className="flex justify-between items-center w-full">
-                            <p className="font-semibold">Pagar Valor Total</p>
+                            <div>
+                                <p className="font-semibold">Pagar Valor Total</p>
+                            </div>
                             <p className="font-bold text-lg">{formatCurrency(selectedCredit.totalDebt)}</p>
                         </div>
                     </Label>
@@ -323,13 +342,15 @@ export default function CreditosPage() {
                     <Label htmlFor="payment-interes" className={`flex items-start gap-4 rounded-md border p-4 transition-colors ${selectedCredit.lateFee > 0 ? 'cursor-pointer hover:bg-muted/50' : 'opacity-50 cursor-not-allowed'}`}>
                         <RadioGroupItem value="interes" id="payment-interes" disabled={selectedCredit.lateFee <= 0} className="mt-1" />
                         <div className="flex justify-between items-center w-full">
-                           <p className="font-semibold flex items-center gap-1">
-                                Abono a Intereses
-                                <Tooltip>
-                                    <TooltipTrigger asChild><Info className="w-4 h-4 text-muted-foreground" /></TooltipTrigger>
-                                    <TooltipContent><p>Este pago no reduce el capital de la deuda.</p></TooltipContent>
-                                </Tooltip>
-                            </p>
+                           <div>
+                                <p className="font-semibold flex items-center gap-1">
+                                    Abono a Intereses
+                                    <Tooltip>
+                                        <TooltipTrigger asChild><Info className="w-4 h-4 text-muted-foreground" /></TooltipTrigger>
+                                        <TooltipContent><p>Este pago no reduce el capital de la deuda.</p></TooltipContent>
+                                    </Tooltip>
+                                </p>
+                           </div>
                            <p className="font-bold text-lg">{formatCurrency(selectedCredit.lateFee)}</p>
                         </div>
                     </Label>
@@ -385,3 +406,5 @@ export default function CreditosPage() {
     </TooltipProvider>
   );
 }
+
+    
