@@ -349,7 +349,7 @@ export default function CreditosPage() {
                 </Button>
                 <Button onClick={handleRegisterPayment} disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <HandCoins className="mr-2 h-4 w-4" />}
-                  {isSubmitting ? 'Registrando...' : `Registrar Pago (${formatCurrency(getPaymentAmount())}`}
+                  {isSubmitting ? 'Registrando...' : formatCurrency(getPaymentAmount())}
                 </Button>
                  <Button onClick={handleRenewClick} variant="secondary" className="bg-amber-400 hover:bg-amber-500 text-amber-900" disabled={isSubmitting || !canRenewCredit(selectedCredit)}>
                     <Star className="mr-2 h-4 w-4" />
@@ -399,3 +399,4 @@ export default function CreditosPage() {
 
 
     
+
