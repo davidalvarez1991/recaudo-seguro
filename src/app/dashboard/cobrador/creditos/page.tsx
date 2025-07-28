@@ -295,36 +295,35 @@ export default function CreditosPage() {
                 )}
                 <RadioGroup value={paymentType} onValueChange={(value: any) => setPaymentType(value)} className="gap-4">
                     {/* Pagar Cuota */}
-                    <Label htmlFor="payment-cuota" className="flex items-center gap-4 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
-                        <RadioGroupItem value="cuota" id="payment-cuota" className="mt-0.5" />
+                    <Label htmlFor="payment-cuota" className="flex items-start gap-4 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                        <RadioGroupItem value="cuota" id="payment-cuota" className="mt-1" />
                         <div className="grid gap-1.5 w-full">
                             <div className="flex justify-between items-center w-full">
                                 <p className="font-semibold flex-1">Pagar Cuota</p>
                                 <p className="font-bold text-lg">{formatCurrency(((selectedCredit.valor + selectedCredit.commission) / selectedCredit.cuotas) + selectedCredit.lateFee)}</p>
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                                Incluye valor a capital ({formatCurrency(getInstallmentBreakdown().capital)}), comisión ({formatCurrency(getInstallmentBreakdown().commission)}) e intereses por mora ({formatCurrency(selectedCredit.lateFee)}).
-                            </p>
+                            <div className="text-xs text-muted-foreground grid grid-cols-3 gap-x-2">
+                                <span>Capital: {formatCurrency(getInstallmentBreakdown().capital)}</span>
+                                <span>Comisión: {formatCurrency(getInstallmentBreakdown().commission)}</span>
+                                <span>Mora: {formatCurrency(selectedCredit.lateFee)}</span>
+                            </div>
                         </div>
                     </Label>
 
                     {/* Pagar Total */}
-                    <Label htmlFor="payment-total" className="flex items-center gap-4 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
-                        <RadioGroupItem value="total" id="payment-total" className="mt-0.5" />
+                    <Label htmlFor="payment-total" className="flex items-start gap-4 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                        <RadioGroupItem value="total" id="payment-total" className="mt-1" />
                         <div className="grid gap-1.5 w-full">
                             <div className="flex justify-between items-center w-full">
                                 <p className="font-semibold flex-1">Pagar Valor Total</p>
                                  <p className="font-bold text-lg">{formatCurrency(selectedCredit.totalDebt)}</p>
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                                Liquida completamente el crédito. Incluye capital e intereses pendientes.
-                            </p>
                         </div>
                     </Label>
 
                      {/* Abono Interes */}
-                    <Label htmlFor="payment-interes" className={`flex items-center gap-4 rounded-md border p-4 transition-colors ${selectedCredit.lateFee > 0 ? 'cursor-pointer hover:bg-muted/50' : 'opacity-50 cursor-not-allowed'}`}>
-                        <RadioGroupItem value="interes" id="payment-interes" disabled={selectedCredit.lateFee <= 0} className="mt-0.5" />
+                    <Label htmlFor="payment-interes" className={`flex items-start gap-4 rounded-md border p-4 transition-colors ${selectedCredit.lateFee > 0 ? 'cursor-pointer hover:bg-muted/50' : 'opacity-50 cursor-not-allowed'}`}>
+                        <RadioGroupItem value="interes" id="payment-interes" disabled={selectedCredit.lateFee <= 0} className="mt-1" />
                         <div className="grid gap-1.5 w-full">
                            <div className="flex justify-between items-center w-full">
                                 <p className="font-semibold flex items-center gap-1 flex-1">
@@ -336,9 +335,6 @@ export default function CreditosPage() {
                                 </p>
                                <p className="font-bold text-lg">{formatCurrency(selectedCredit.lateFee)}</p>
                            </div>
-                           <p className="text-xs text-muted-foreground">
-                                Paga únicamente los intereses generados por mora.
-                           </p>
                         </div>
                     </Label>
                 </RadioGroup>
@@ -403,3 +399,4 @@ export default function CreditosPage() {
 
 
     
+
