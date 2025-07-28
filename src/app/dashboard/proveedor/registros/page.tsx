@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ClipboardList, MoreHorizontal, Trash2, Download, Eye, Pencil, RefreshCcw, Loader2, Search } from "lucide-react";
@@ -57,7 +57,7 @@ type Registro = {
   remainingBalance: number;
 };
 
-const ADMIN_ID = "0703091991";
+const ITEMS_PER_PAGE = 10;
 
 export default function RegistrosPage() {
   const [registros, setRegistros] = useState<Registro[]>([]);
@@ -68,6 +68,7 @@ export default function RegistrosPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -98,6 +99,11 @@ export default function RegistrosPage() {
   useEffect(() => {
     fetchRecords();
   }, []);
+  
+  // Reset page to 1 when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   const handleViewDetails = (registro: Registro) => {
     setSelectedRegistro(registro);
@@ -158,7 +164,12 @@ export default function RegistrosPage() {
     (registro.clienteName?.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (registro.clienteId?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
-
+  
+  const totalPages = Math.ceil(filteredRegistros.length / ITEMS_PER_PAGE);
+  const paginatedRegistros = filteredRegistros.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   return (
     <>
@@ -198,7 +209,7 @@ export default function RegistrosPage() {
         <CardContent className="pt-6">
           {loading ? (
              <p>Cargando registros...</p>
-          ) : filteredRegistros.length > 0 ? (
+          ) : paginatedRegistros.length > 0 ? (
             <Table>
                 <TableHeader>
                   <TableRow>
@@ -211,7 +222,7 @@ export default function RegistrosPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredRegistros.map((registro) => (
+                  {paginatedRegistros.map((registro) => (
                     <TableRow key={registro.id} onClick={() => handleViewDetails(registro)} className="cursor-pointer">
                       <TableCell>{registro.formattedDate}</TableCell>
                       <TableCell>
@@ -274,6 +285,29 @@ export default function RegistrosPage() {
               </div>
           )}
         </CardContent>
+         {totalPages > 1 && (
+            <CardFooter>
+                <div className="flex items-center justify-between w-full">
+                    <Button 
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1 || loading}
+                        variant="outline"
+                    >
+                        Anterior
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                        Página {currentPage} de {totalPages}
+                    </span>
+                    <Button 
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages || loading}
+                        variant="outline"
+                    >
+                        Siguiente
+                    </Button>
+                </div>
+            </CardFooter>
+        )}
       </Card>
       
       <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
