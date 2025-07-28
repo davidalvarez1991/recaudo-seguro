@@ -45,6 +45,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   const [step, setStep] = useState(1);
   const [isPending, setIsPending] = useState(false);
   const [requiresGuarantor, setRequiresGuarantor] = useState(false);
+  const [requiresReferences, setRequiresReferences] = useState(false);
   const [filesToUpload, setFilesToUpload] = useState<FileWithStatus[]>([]);
   const [createdCreditId, setCreatedCreditId] = useState<string | null>(null);
   
@@ -75,9 +76,11 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       creditAmount: "",
       installments: "",
       requiresGuarantor: false,
+      requiresReferences: false,
     },
     context: {
         requiresGuarantor: false,
+        requiresReferences: false,
     }
   });
 
@@ -88,6 +91,13 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       form.setValue('guarantorIdNumber', '');
       form.setValue('guarantorAddress', '');
       form.setValue('guarantorPhone', '');
+    }
+    form.trigger(['guarantorName', 'guarantorIdNumber', 'guarantorAddress', 'guarantorPhone']);
+  }, [requiresGuarantor, form]);
+  
+  useEffect(() => {
+    form.setValue('requiresReferences', requiresReferences);
+    if (!requiresReferences) {
       form.setValue('familyReferenceName', '');
       form.setValue('familyReferencePhone', '');
       form.setValue('familyReferenceAddress', '');
@@ -95,8 +105,8 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       form.setValue('personalReferencePhone', '');
       form.setValue('personalReferenceAddress', '');
     }
-    form.trigger(['guarantorName', 'guarantorIdNumber', 'guarantorAddress', 'guarantorPhone', 'familyReferenceName', 'familyReferencePhone', 'familyReferenceAddress', 'personalReferenceName', 'personalReferencePhone', 'personalReferenceAddress']);
-  }, [requiresGuarantor, form]);
+    form.trigger(['familyReferenceName', 'familyReferencePhone', 'familyReferenceAddress', 'personalReferenceName', 'personalReferencePhone', 'personalReferenceAddress']);
+  }, [requiresReferences, form]);
   
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
@@ -348,13 +358,14 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     )}
                   />
                   <Separator className="my-6" />
+                  
                   <Controller
                       control={form.control}
                       name="requiresGuarantor"
                       render={({ field }) => (
                           <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
                               <div className="space-y-0.5">
-                                  <FormLabel>¿Requiere Fiador y Referencias?</FormLabel>
+                                  <FormLabel>¿Requiere Fiador?</FormLabel>
                               </div>
                               <FormControl>
                                   <Switch
@@ -370,62 +381,86 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                       )}
                   />
                   {requiresGuarantor && (
+                      <div className="space-y-4 p-4 border rounded-lg">
+                        <h4 className="font-semibold text-md">Información del Fiador</h4>
+                         <FormField
+                            control={form.control}
+                            name="guarantorName"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Nombre Completo del Fiador</FormLabel>
+                                <FormControl>
+                                    <Input {...field} value={field.value || ''} placeholder="Nombre del fiador" disabled={isPending} />
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name="guarantorIdNumber"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Cédula del Fiador</FormLabel>
+                                <FormControl>
+                                    <Input {...field} value={field.value || ''} placeholder="Cédula del fiador" disabled={isPending} />
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={form.control}
+                            name="guarantorAddress"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Dirección del Fiador</FormLabel>
+                                <FormControl>
+                                    <Input {...field} value={field.value || ''} placeholder="Dirección del fiador" disabled={isPending} />
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name="guarantorPhone"
+                            render={({ field }) => (
+                                <FormItem>
+                                <FormLabel>Teléfono del Fiador</FormLabel>
+                                <FormControl>
+                                    <Input {...field} value={field.value || ''} type="tel" placeholder="Teléfono del fiador" disabled={isPending} />
+                                </FormControl>
+                                <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                      </div>
+                  )}
+
+                  <Controller
+                      control={form.control}
+                      name="requiresReferences"
+                      render={({ field }) => (
+                          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                              <div className="space-y-0.5">
+                                  <FormLabel>¿Requiere Referencias?</FormLabel>
+                              </div>
+                              <FormControl>
+                                  <Switch
+                                      checked={field.value}
+                                      onCheckedChange={(checked) => {
+                                          field.onChange(checked);
+                                          setRequiresReferences(checked);
+                                      }}
+                                      disabled={isPending}
+                                  />
+                              </FormControl>
+                          </FormItem>
+                      )}
+                  />
+                  {requiresReferences && (
                       <div className="space-y-6 pt-2">
-                          <div className="space-y-4 p-4 border rounded-lg">
-                            <h4 className="font-semibold text-md">Información del Fiador</h4>
-                             <FormField
-                                control={form.control}
-                                name="guarantorName"
-                                render={({ field }) => (
-                                    <FormItem>
-                                    <FormLabel>Nombre Completo del Fiador</FormLabel>
-                                    <FormControl>
-                                        <Input {...field} value={field.value || ''} placeholder="Nombre del fiador" disabled={isPending} />
-                                    </FormControl>
-                                    <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                             <FormField
-                                control={form.control}
-                                name="guarantorIdNumber"
-                                render={({ field }) => (
-                                    <FormItem>
-                                    <FormLabel>Cédula del Fiador</FormLabel>
-                                    <FormControl>
-                                        <Input {...field} value={field.value || ''} placeholder="Cédula del fiador" disabled={isPending} />
-                                    </FormControl>
-                                    <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="guarantorAddress"
-                                render={({ field }) => (
-                                    <FormItem>
-                                    <FormLabel>Dirección del Fiador</FormLabel>
-                                    <FormControl>
-                                        <Input {...field} value={field.value || ''} placeholder="Dirección del fiador" disabled={isPending} />
-                                    </FormControl>
-                                    <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                             <FormField
-                                control={form.control}
-                                name="guarantorPhone"
-                                render={({ field }) => (
-                                    <FormItem>
-                                    <FormLabel>Teléfono del Fiador</FormLabel>
-                                    <FormControl>
-                                        <Input {...field} value={field.value || ''} type="tel" placeholder="Teléfono del fiador" disabled={isPending} />
-                                    </FormControl>
-                                    <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                          </div>
                           <div className="space-y-4 p-4 border rounded-lg">
                             <h4 className="font-semibold text-md">Referencia Familiar</h4>
                             <FormField
@@ -513,6 +548,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                           </div>
                       </div>
                   )}
+
                   <Separator className="my-6" />
                   <FormField
                     control={form.control}

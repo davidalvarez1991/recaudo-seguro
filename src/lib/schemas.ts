@@ -68,7 +68,9 @@ export const ClientCreditSchema = z.object({
   name: z.string().min(3, "El nombre completo es obligatorio."),
   address: z.string().min(5, "La dirección es obligatoria."),
   contactPhone: z.string().min(10, "El teléfono debe tener 10 dígitos."),
+  
   requiresGuarantor: z.boolean().default(false),
+  requiresReferences: z.boolean().default(false),
   
   // Guarantor fields
   guarantorName: z.string().optional(),
@@ -88,7 +90,6 @@ export const ClientCreditSchema = z.object({
   installments: z.string().min(1, "El número de cuotas es obligatorio."),
 }).superRefine((data, ctx) => {
     if (data.requiresGuarantor) {
-        // Guarantor validation
         if (!data.guarantorName || data.guarantorName.length < 3) {
             ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El nombre del fiador es obligatorio.", path: ['guarantorName']});
         }
@@ -101,7 +102,8 @@ export const ClientCreditSchema = z.object({
         if (!data.guarantorPhone || data.guarantorPhone.length < 10) {
             ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El teléfono del fiador debe tener 10 dígitos.", path: ['guarantorPhone']});
         }
-        // Family Reference validation
+    }
+    if (data.requiresReferences) {
         if (!data.familyReferenceName || data.familyReferenceName.length < 3) {
             ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El nombre de la referencia familiar es obligatorio.", path: ['familyReferenceName']});
         }
@@ -111,7 +113,6 @@ export const ClientCreditSchema = z.object({
         if (!data.familyReferenceAddress || data.familyReferenceAddress.length < 5) {
             ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La dirección de la referencia familiar es obligatoria.", path: ['familyReferenceAddress']});
         }
-        // Personal Reference validation
         if (!data.personalReferenceName || data.personalReferenceName.length < 3) {
             ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El nombre de la referencia personal es obligatorio.", path: ['personalReferenceName']});
         }

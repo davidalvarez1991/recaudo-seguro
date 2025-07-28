@@ -789,7 +789,7 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     
     const { 
         idNumber, name, address, contactPhone, 
-        creditAmount, installments, requiresGuarantor,
+        creditAmount, installments, requiresGuarantor, requiresReferences,
         guarantorName, guarantorIdNumber, guarantorAddress, guarantorPhone,
         familyReferenceName, familyReferencePhone, familyReferenceAddress,
         personalReferenceName, personalReferencePhone, personalReferenceAddress
@@ -829,7 +829,7 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
             address: guarantorAddress,
             phone: guarantorPhone,
         } : null,
-        references: requiresGuarantor ? {
+        references: requiresReferences ? {
             familiar: {
                 name: familyReferenceName,
                 phone: familyReferencePhone,
