@@ -298,7 +298,7 @@ export default function CreditosPage() {
                     <Label htmlFor="payment-cuota" className="flex items-start gap-4 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
                         <RadioGroupItem value="cuota" id="payment-cuota" className="mt-1" />
                         <div className="flex justify-between items-start w-full">
-                            <div>
+                           <div>
                                 <p className="font-semibold">Pagar Cuota</p>
                                 <div className="text-xs text-muted-foreground flex flex-wrap gap-x-4">
                                     <span>Capital: {formatCurrency(getInstallmentBreakdown().capital)}</span>
@@ -366,13 +366,14 @@ export default function CreditosPage() {
             <DialogHeader>
               <DialogTitle>Renovar Crédito</DialogTitle>
               <DialogDescription>
-                Crear un nuevo crédito para el cliente <span className="font-semibold">{selectedCredit?.clienteName}</span>. El saldo pendiente del crédito actual, si existe, quedará registrado pero el crédito se marcará como 'Renovado'.
+                Crear un nuevo crédito para el cliente <span className="font-semibold">{selectedCredit?.clienteName}</span>. El saldo pendiente del crédito actual se refinanciará en el nuevo préstamo.
               </DialogDescription>
             </DialogHeader>
             {selectedCredit && (
               <RenewCreditForm
                 clienteId={selectedCredit.clienteId}
                 oldCreditId={selectedCredit.id}
+                remainingBalance={selectedCredit.remainingBalance}
                 onFormSubmit={() => {
                   setIsRenewModalOpen(false);
                   fetchCredits();
@@ -384,19 +385,3 @@ export default function CreditosPage() {
     </TooltipProvider>
   );
 }
-
-    
-
-    
-
-
-
-
-
-
-    
-
-
-
-    
-

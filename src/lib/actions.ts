@@ -870,27 +870,44 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
     if (!providerSnap.exists()) return { error: "Proveedor no encontrado."};
     const provider = providerSnap.data();
 
-    const { clienteId, oldCreditId, creditAmount, installments } = values;
+    const { clienteId, oldCreditId, additionalAmount, installments } = values;
 
-    const valor = parseFloat(creditAmount.replace(/\./g, '').replace(',', '.'));
-    const commission = calculateCommission(valor, provider.commissionTiers);
+    // Recalculate remaining balance on the server for security
+    const oldCreditRef = doc(db, "credits", oldCreditId);
+    const oldCreditSnap = await getDoc(oldCreditRef);
+    if (!oldCreditSnap.exists()) {
+        return { error: "El crédito anterior no fue encontrado." };
+    }
+    const oldCreditData = oldCreditSnap.data();
+    const paymentsRef = collection(db, "payments");
+    const paymentsQuery = query(paymentsRef, where("creditId", "==", oldCreditId));
+    const paymentsSnapshot = await getDocs(paymentsQuery);
+    const capitalAndCommissionPayments = paymentsSnapshot.docs.map(p => p.data()).filter(p => p.type === 'cuota' || p.type === 'total');
+    const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
+    const totalOldLoanAmount = (oldCreditData.valor || 0) + (oldCreditData.commission || 0);
+    const remainingBalance = totalOldLoanAmount - paidCapitalAndCommission;
+
+    const additionalValue = parseFloat(additionalAmount.replace(/\./g, '').replace(',', '.'));
+    const newTotalValue = additionalValue + remainingBalance;
+
+    const commission = calculateCommission(newTotalValue, provider.commissionTiers);
 
     // 1. Create the new credit
     const newCreditRef = await addDoc(collection(db, "credits"), {
         clienteId,
         cobradorId: cobrador.idNumber,
         providerId,
-        valor,
+        valor: newTotalValue,
         commission,
         cuotas: parseInt(installments, 10),
         fecha: Timestamp.now(),
         estado: 'Activo',
-        paymentScheduleSet: false, // Will need a schedule
+        paymentScheduleSet: false,
         missedPaymentDays: 0,
+        renewedFrom: oldCreditId, // Link to the old credit
     });
 
     // 2. Mark the old credit as 'Renovado'
-    const oldCreditRef = doc(db, "credits", oldCreditId);
     await updateDoc(oldCreditRef, {
         estado: 'Renovado',
         updatedAt: Timestamp.now(),

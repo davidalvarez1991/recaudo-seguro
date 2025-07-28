@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, DollarSign, Save, CalendarIcon, RefreshCw, CheckCircle2 } from "lucide-react";
+import { Loader2, DollarSign, Save, CalendarIcon, RefreshCw, CheckCircle2, BadgeInfo } from "lucide-react";
 import { RenewCreditSchema } from "@/lib/schemas";
 import { renewCredit, savePaymentSchedule } from "@/lib/actions";
 import { useRouter } from "next/navigation";
@@ -21,10 +21,16 @@ import { es } from 'date-fns/locale';
 type RenewCreditFormProps = {
   clienteId: string;
   oldCreditId: string;
+  remainingBalance: number;
   onFormSubmit: () => void;
 };
 
-export function RenewCreditForm({ clienteId, oldCreditId, onFormSubmit }: RenewCreditFormProps) {
+const formatCurrency = (value: number) => {
+    if (isNaN(value)) return "$0";
+    return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+};
+
+export function RenewCreditForm({ clienteId, oldCreditId, remainingBalance, onFormSubmit }: RenewCreditFormProps) {
   const [step, setStep] = useState(1);
   const [isPending, setIsPending] = useState(false);
   const [newCreditId, setNewCreditId] = useState<string | null>(null);
@@ -39,7 +45,7 @@ export function RenewCreditForm({ clienteId, oldCreditId, onFormSubmit }: RenewC
     defaultValues: {
       clienteId,
       oldCreditId,
-      creditAmount: "",
+      additionalAmount: "",
       installments: "",
     },
   });
@@ -47,16 +53,16 @@ export function RenewCreditForm({ clienteId, oldCreditId, onFormSubmit }: RenewC
   const handleCurrencyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (!value) {
-      form.setValue('creditAmount', "");
+      form.setValue('additionalAmount', "");
       return;
     }
     const numberValue = parseInt(value.replace(/\D/g, ""), 10);
     if (isNaN(numberValue)) {
-      form.setValue('creditAmount', "");
+      form.setValue('additionalAmount', "");
       return;
     }
     const formattedValue = new Intl.NumberFormat('es-CO').format(numberValue);
-    form.setValue('creditAmount', formattedValue);
+    form.setValue('additionalAmount', formattedValue);
   };
   
   const handleNextStep = async () => {
@@ -157,12 +163,20 @@ export function RenewCreditForm({ clienteId, oldCreditId, onFormSubmit }: RenewC
     if (step === 1) {
       return (
         <>
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-center space-y-1 mb-4">
+              <div className="text-sm font-medium text-blue-700 dark:text-blue-300 flex items-center justify-center gap-1.5">
+                  <BadgeInfo className="h-4 w-4"/> Saldo Anterior a Refinanciar
+              </div>
+              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 tracking-tight">
+                  {formatCurrency(remainingBalance)}
+              </div>
+          </div>
           <FormField
               control={form.control}
-              name="creditAmount"
+              name="additionalAmount"
               render={({ field }) => (
               <FormItem>
-                  <FormLabel>Nuevo Valor del Crédito</FormLabel>
+                  <FormLabel>Valor Adicional a Entregar</FormLabel>
                   <div className="relative">
                       <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <FormControl>
