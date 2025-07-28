@@ -297,12 +297,12 @@ export default function CreditosPage() {
                     {/* Pagar Cuota */}
                     <Label htmlFor="payment-cuota" className="flex items-start gap-4 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
                         <RadioGroupItem value="cuota" id="payment-cuota" className="mt-1" />
-                        <div className="grid gap-1.5 w-full">
+                        <div className="w-full">
                             <div className="flex justify-between items-center w-full">
-                                <p className="font-semibold flex-1">Pagar Cuota</p>
+                                <p className="font-semibold">Pagar Cuota</p>
                                 <p className="font-bold text-lg">{formatCurrency(((selectedCredit.valor + selectedCredit.commission) / selectedCredit.cuotas) + selectedCredit.lateFee)}</p>
                             </div>
-                            <div className="text-xs text-muted-foreground grid grid-cols-3 gap-x-2">
+                            <div className="text-xs text-muted-foreground flex flex-wrap gap-x-4">
                                 <span>Capital: {formatCurrency(getInstallmentBreakdown().capital)}</span>
                                 <span>Comisión: {formatCurrency(getInstallmentBreakdown().commission)}</span>
                                 <span>Mora: {formatCurrency(selectedCredit.lateFee)}</span>
@@ -313,28 +313,24 @@ export default function CreditosPage() {
                     {/* Pagar Total */}
                     <Label htmlFor="payment-total" className="flex items-start gap-4 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
                         <RadioGroupItem value="total" id="payment-total" className="mt-1" />
-                        <div className="grid gap-1.5 w-full">
-                            <div className="flex justify-between items-center w-full">
-                                <p className="font-semibold flex-1">Pagar Valor Total</p>
-                                 <p className="font-bold text-lg">{formatCurrency(selectedCredit.totalDebt)}</p>
-                            </div>
+                        <div className="flex justify-between items-center w-full">
+                            <p className="font-semibold">Pagar Valor Total</p>
+                            <p className="font-bold text-lg">{formatCurrency(selectedCredit.totalDebt)}</p>
                         </div>
                     </Label>
 
                      {/* Abono Interes */}
                     <Label htmlFor="payment-interes" className={`flex items-start gap-4 rounded-md border p-4 transition-colors ${selectedCredit.lateFee > 0 ? 'cursor-pointer hover:bg-muted/50' : 'opacity-50 cursor-not-allowed'}`}>
                         <RadioGroupItem value="interes" id="payment-interes" disabled={selectedCredit.lateFee <= 0} className="mt-1" />
-                        <div className="grid gap-1.5 w-full">
-                           <div className="flex justify-between items-center w-full">
-                                <p className="font-semibold flex items-center gap-1 flex-1">
-                                    Abono a Intereses
-                                    <Tooltip>
-                                        <TooltipTrigger asChild><Info className="w-4 h-4 text-muted-foreground" /></TooltipTrigger>
-                                        <TooltipContent><p>Este pago no reduce el capital de la deuda.</p></TooltipContent>
-                                    </Tooltip>
-                                </p>
-                               <p className="font-bold text-lg">{formatCurrency(selectedCredit.lateFee)}</p>
-                           </div>
+                        <div className="flex justify-between items-center w-full">
+                           <p className="font-semibold flex items-center gap-1">
+                                Abono a Intereses
+                                <Tooltip>
+                                    <TooltipTrigger asChild><Info className="w-4 h-4 text-muted-foreground" /></TooltipTrigger>
+                                    <TooltipContent><p>Este pago no reduce el capital de la deuda.</p></TooltipContent>
+                                </Tooltip>
+                            </p>
+                           <p className="font-bold text-lg">{formatCurrency(selectedCredit.lateFee)}</p>
                         </div>
                     </Label>
                 </RadioGroup>
@@ -400,3 +396,6 @@ export default function CreditosPage() {
 
     
 
+
+
+    
