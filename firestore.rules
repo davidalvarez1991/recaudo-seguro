@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Users can be created (registration) and read (login, data fetching),
+    // but not updated or deleted directly from the client.
+    match /users/{userId} {
+      allow read, create: if true;
+      allow update, delete: if false;
+    }
+
+    // Credits can be read and written by server-side logic.
+    // The security is handled in the actions.ts file.
+    match /credits/{creditId} {
+      allow read, write: if true;
+    }
+
+    // Payments can be read and written by server-side logic.
+    match /payments/{paymentId} {
+      allow read, write: if true;
+    }
+  }
+}
