@@ -239,15 +239,23 @@ const calculateLateFee = (credit: any) => {
 
 // Helper function to get full details for a credit
 const getFullCreditDetails = async (creditData: any, providersMap: Map<string, any>) => {
-    creditData.paymentDates = (creditData.paymentDates || []).map((d: any) => 
+    
+    const serializableCreditData = { ...creditData };
+    for (const key in serializableCreditData) {
+        if (serializableCreditData[key] instanceof Timestamp) {
+            serializableCreditData[key] = serializableCreditData[key].toDate().toISOString();
+        }
+    }
+    
+    serializableCreditData.paymentDates = (serializableCreditData.paymentDates || []).map((d: any) => 
         d instanceof Timestamp ? d.toDate().toISOString() : d
     );
 
-    const cobradorData = await findUserByIdNumber(creditData.cobradorId as string);
-    const clienteData = await findUserByIdNumber(creditData.clienteId as string);
+    const cobradorData = await findUserByIdNumber(serializableCreditData.cobradorId as string);
+    const clienteData = await findUserByIdNumber(serializableCreditData.clienteId as string);
     
     const paymentsRef = collection(db, "payments");
-    const paymentsQuery = query(paymentsRef, where("creditId", "==", creditData.id));
+    const paymentsQuery = query(paymentsRef, where("creditId", "==", serializableCreditData.id));
     const paymentsSnapshot = await getDocs(paymentsQuery);
     const payments = paymentsSnapshot.docs.map(p => p.data());
     
@@ -257,19 +265,19 @@ const getFullCreditDetails = async (creditData: any, providersMap: Map<string, a
     const paidAmount = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
     const agreementAmount = agreementPayments.reduce((sum, p) => sum + p.amount, 0);
 
-    const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
+    const totalLoanAmount = (serializableCreditData.valor || 0) + (serializableCreditData.commission || 0);
     const remainingBalance = totalLoanAmount - paidAmount;
     const paidInstallments = payments.filter(p => p.type === 'cuota').length;
     
-    const providerSettings = providersMap.get(creditData.providerId) || {};
+    const providerSettings = providersMap.get(serializableCreditData.providerId) || {};
     const lateFee = calculateLateFee({
-        ...creditData,
+        ...serializableCreditData,
         lateInterestRate: providerSettings.isLateInterestActive ? (providerSettings.lateInterestRate || 0) : 0,
     });
     
     let endDate: string | undefined = undefined;
-    if (creditData.paymentDates && creditData.paymentDates.length > 0) {
-        const sortedDates = [...creditData.paymentDates].sort((a:string,b:string) => new Date(a).getTime() - new Date(b).getTime());
+    if (serializableCreditData.paymentDates && serializableCreditData.paymentDates.length > 0) {
+        const sortedDates = [...serializableCreditData.paymentDates].sort((a:string,b:string) => new Date(a).getTime() - new Date(b).getTime());
         endDate = sortedDates[sortedDates.length - 1];
     }
 
@@ -286,7 +294,7 @@ const getFullCreditDetails = async (creditData: any, providersMap: Map<string, a
     }, 0);
 
     return {
-        ...creditData,
+        ...serializableCreditData,
         cobradorName: cobradorData?.name || 'No disponible',
         clienteName: clienteData?.name || 'No disponible',
         clienteAddress: clienteData?.address || 'No disponible',
@@ -382,7 +390,7 @@ export async function getProviderActivityLog() {
 
     const enrichedLog = (await Promise.all(enrichedLogPromises)).filter(Boolean);
 
-    return enrichedLog;
+    return enrichedLog as any[];
 }
 
 
@@ -527,8 +535,6 @@ export async function getCreditsByCliente() {
     const sortedCredits = allCredits.sort((a,b) => {
         // This assumes credit IDs are sortable timestamps, which might not be the case.
         // A better approach is to sort by creation date if available.
-        const dateA = new Date(a.id).getTime(); // Risky if ID is not a date
-        const dateB = new Date(b.id).getTime(); // Risky
         // Let's rely on Firestore's default ordering for now or add an explicit `createdAt` field.
         // For now, no client-side sort to avoid issues.
         return allCredits;
