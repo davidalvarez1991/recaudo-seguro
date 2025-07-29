@@ -237,114 +237,152 @@ const calculateLateFee = (credit: any) => {
     return lateFee;
 };
 
-export async function getCreditsByProvider() {
+// Helper function to get full details for a credit
+const getFullCreditDetails = async (creditData: any, providersMap: Map<string, any>) => {
+    creditData.paymentDates = (creditData.paymentDates || []).map((d: any) => 
+        d instanceof Timestamp ? d.toDate().toISOString() : d
+    );
+
+    const cobradorData = await findUserByIdNumber(creditData.cobradorId as string);
+    const clienteData = await findUserByIdNumber(creditData.clienteId as string);
+    
+    const paymentsRef = collection(db, "payments");
+    const paymentsQuery = query(paymentsRef, where("creditId", "==", creditData.id));
+    const paymentsSnapshot = await getDocs(paymentsQuery);
+    const payments = paymentsSnapshot.docs.map(p => p.data());
+    
+    const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
+    const agreementPayments = payments.filter(p => p.type === 'acuerdo');
+
+    const paidAmount = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
+    const agreementAmount = agreementPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
+    const remainingBalance = totalLoanAmount - paidAmount;
+    const paidInstallments = payments.filter(p => p.type === 'cuota').length;
+    
+    const providerSettings = providersMap.get(creditData.providerId) || {};
+    const lateFee = calculateLateFee({
+        ...creditData,
+        lateInterestRate: providerSettings.isLateInterestActive ? (providerSettings.lateInterestRate || 0) : 0,
+    });
+    
+    let endDate: string | undefined = undefined;
+    if (creditData.paymentDates && creditData.paymentDates.length > 0) {
+        const sortedDates = [...creditData.paymentDates].sort((a:string,b:string) => new Date(a).getTime() - new Date(b).getTime());
+        endDate = sortedDates[sortedDates.length - 1];
+    }
+
+    const timeZone = 'America/Bogota';
+    const todayStart = startOfDay(toZonedTime(new Date(), timeZone));
+    const todayEnd = endOfDay(toZonedTime(new Date(), timeZone));
+    const dailyCollectedAmount = payments.reduce((sum, p) => {
+        const paymentDateUTC = p.date.toDate();
+        const paymentDateInTimeZone = toZonedTime(paymentDateUTC, timeZone);
+        if (isWithinInterval(paymentDateInTimeZone, { start: todayStart, end: todayEnd })) {
+            return sum + p.amount;
+        }
+        return sum;
+    }, 0);
+
+    return {
+        ...creditData,
+        cobradorName: cobradorData?.name || 'No disponible',
+        clienteName: clienteData?.name || 'No disponible',
+        clienteAddress: clienteData?.address || 'No disponible',
+        clientePhone: clienteData?.contactPhone || 'No disponible',
+        paidInstallments,
+        paidAmount,
+        agreementAmount,
+        remainingBalance,
+        lateFee,
+        endDate,
+        dailyCollectedAmount,
+    };
+};
+
+
+export async function getProviderActivityLog() {
     const userIdCookie = cookies().get('loggedInUser');
     if (!userIdCookie) return [];
     const userId = userIdCookie.value;
 
     const userRole = await getUserRole(userId);
-    
-    let creditsQuery;
+    if (userRole !== 'proveedor') return [];
+
+    let activityLog: any[] = [];
+
+    // 1. Fetch all credits for the provider
     const creditsRef = collection(db, "credits");
+    const creditsQuery = query(creditsRef, where("providerId", "==", userId));
+    const creditsSnapshot = await getDocs(creditsQuery);
     
-    if (userRole === 'admin') {
-        // Admin sees all credits
-        creditsQuery = query(creditsRef);
-    } else if (userRole === 'proveedor') {
-        // Provider sees only their credits
-        creditsQuery = query(creditsRef, where("providerId", "==", userId));
-    } else {
-        // No other role should be calling this
-        return [];
+    // Create a map of credits for easy lookup
+    const creditsMap = new Map(creditsSnapshot.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() }]));
+
+    for (const credit of creditsMap.values()) {
+        const date = credit.fecha instanceof Timestamp ? credit.fecha.toDate() : new Date(credit.fecha);
+        activityLog.push({
+            id: credit.id,
+            type: 'credit',
+            date: date.toISOString(),
+            formattedDate: date.toLocaleString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+            amount: credit.valor,
+            creditId: credit.id,
+            clienteId: credit.clienteId,
+            creditState: credit.estado,
+        });
     }
 
-    const querySnapshot = await getDocs(creditsQuery);
-    
+    // 2. Fetch all payments for the provider
+    const paymentsRef = collection(db, "payments");
+    const paymentsQuery = query(paymentsRef, where("providerId", "==", userId));
+    const paymentsSnapshot = await getDocs(paymentsQuery);
+
+    for (const doc of paymentsSnapshot.docs) {
+        const payment = doc.data();
+        const credit = creditsMap.get(payment.creditId);
+        if (!credit) continue;
+
+        const date = payment.date instanceof Timestamp ? payment.date.toDate() : new Date(payment.date);
+        activityLog.push({
+            id: doc.id,
+            type: 'payment',
+            date: date.toISOString(),
+            formattedDate: date.toLocaleString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+            amount: payment.amount,
+            creditId: payment.creditId,
+            clienteId: credit.clienteId,
+            paymentType: payment.type,
+            creditState: credit.estado,
+        });
+    }
+
+    // 3. Sort by date descending
+    activityLog.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // 4. Enrich with details
     // Fetch all providers in one go to minimize reads
     const providersSnapshot = await getDocs(query(collection(db, "users"), where("role", "==", "proveedor")));
     const providersMap = new Map(providersSnapshot.docs.map(doc => [doc.id, doc.data()]));
-    
-    const timeZone = 'America/Bogota';
-    const todayStart = startOfDay(toZonedTime(new Date(), timeZone));
-    const todayEnd = endOfDay(toZonedTime(new Date(), timeZone));
 
-    const creditsPromises = querySnapshot.docs.map(async (docSnapshot) => {
-        const creditData: any = { id: docSnapshot.id, ...docSnapshot.data() };
-        
-        // Use a new field for formatted date and keep original for sorting
-        creditData.formattedDate = creditData.fecha instanceof Timestamp ? creditData.fecha.toDate().toLocaleString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date(creditData.fecha).toLocaleString('es-CO');
-        
-        // Ensure original date field is a serializable ISO string for filtering
-        creditData.fecha = creditData.fecha instanceof Timestamp ? creditData.fecha.toDate().toISOString() : creditData.fecha;
-        creditData.updatedAt = creditData.updatedAt instanceof Timestamp ? creditData.updatedAt.toDate().toISOString() : creditData.updatedAt;
-        creditData.createdAt = creditData.createdAt instanceof Timestamp ? creditData.createdAt.toDate().toISOString() : creditData.createdAt;
+    const enrichedLogPromises = activityLog.map(async (entry) => {
+        const creditData = creditsMap.get(entry.creditId);
+        if (!creditData) return null; // Should not happen
 
-        creditData.paymentDates = (creditData.paymentDates || []).map((d: any) => 
-            d instanceof Timestamp ? d.toDate().toISOString() : d
-        );
-
-        const cobradorData = await findUserByIdNumber(creditData.cobradorId as string);
-        const clienteData = await findUserByIdNumber(creditData.clienteId as string);
-        
-        const paymentsRef = collection(db, "payments");
-        const paymentsQuery = query(paymentsRef, where("creditId", "==", creditData.id));
-        const paymentsSnapshot = await getDocs(paymentsQuery);
-        const payments = paymentsSnapshot.docs.map(p => p.data());
-        
-        const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
-        const agreementPayments = payments.filter(p => p.type === 'acuerdo');
-
-        const paidAmount = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
-        const agreementAmount = agreementPayments.reduce((sum, p) => sum + p.amount, 0);
-
-        const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
-        const remainingBalance = totalLoanAmount - paidAmount;
-        const paidInstallments = payments.filter(p => p.type === 'cuota').length;
-        
-        const providerSettings = providersMap.get(creditData.providerId) || {};
-
-        const lateFee = calculateLateFee({
-            ...creditData,
-            lateInterestRate: providerSettings.isLateInterestActive ? (providerSettings.lateInterestRate || 0) : 0,
-        });
-        
-        let endDate: string | undefined = undefined;
-        if (creditData.paymentDates && creditData.paymentDates.length > 0) {
-            const sortedDates = [...creditData.paymentDates].sort((a:string,b:string) => new Date(a).getTime() - new Date(b).getTime());
-            endDate = sortedDates[sortedDates.length - 1];
-        }
-
-        const dailyCollectedAmount = payments.reduce((sum, p) => {
-            const paymentDateUTC = p.date.toDate();
-            const paymentDateInTimeZone = toZonedTime(paymentDateUTC, timeZone);
-            if (isWithinInterval(paymentDateInTimeZone, { start: todayStart, end: todayEnd })) {
-                return sum + p.amount;
-            }
-            return sum;
-        }, 0);
+        const cliente = await findUserByIdNumber(entry.clienteId);
+        const fullCreditDetails = await getFullCreditDetails({ ...creditData }, providersMap);
 
         return {
-            ...creditData,
-            cobradorName: cobradorData?.name || 'No disponible',
-            clienteName: clienteData?.name || 'No disponible',
-            clienteAddress: clienteData?.address || 'No disponible',
-            clientePhone: clienteData?.contactPhone || 'No disponible',
-            paidInstallments,
-            paidAmount,
-            agreementAmount,
-            remainingBalance,
-            lateFee,
-            endDate,
-            dailyCollectedAmount,
+            ...entry,
+            clienteName: cliente?.name || 'No disponible',
+            fullCreditDetails,
         };
     });
-    
-    // Filter out admin's "own" records if any exist.
-    const allCredits = await Promise.all(creditsPromises);
-    if (userRole === 'admin') {
-      return allCredits.filter(c => c.cobradorId !== ADMIN_ID);
-    }
-    return allCredits;
+
+    const enrichedLog = (await Promise.all(enrichedLogPromises)).filter(Boolean);
+
+    return enrichedLog;
 }
 
 
