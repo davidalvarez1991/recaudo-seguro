@@ -12,8 +12,9 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { getUserData, saveProviderSettings } from "@/lib/actions";
 import { storage } from "@/lib/firebase";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 
 
 type CommissionTier = {
@@ -39,6 +40,7 @@ const formatCurrencyForInput = (value: number | string): string => {
 export function SettingsForm({ providerId }: SettingsFormProps) {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [commissionTiers, setCommissionTiers] = useState<CommissionTier[]>([]);
@@ -80,31 +82,48 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
     if (!providerId) return;
     const file = event.target.files?.[0];
     if (file) {
-      const originalLogoUrl = logoUrl;
-      const previewUrl = URL.createObjectURL(file);
-      setIsUploading(true);
-      setLogoUrl(previewUrl);
+        const originalLogoUrl = logoUrl;
+        const previewUrl = URL.createObjectURL(file);
+        setIsUploading(true);
+        setUploadProgress(0);
+        setLogoUrl(previewUrl);
 
-      try {
-        const storagePath = `proveedores/${providerId}/logo/${file.name}`;
-        const storageRef = ref(storage, storagePath);
-        await uploadBytes(storageRef, file);
-        const downloadURL = await getDownloadURL(storageRef);
-        
-        await saveProviderSettings(providerId, { companyLogoUrl: downloadURL });
-        setLogoUrl(downloadURL);
-        localStorage.setItem(`company-logo_${providerId}`, downloadURL);
-        window.dispatchEvent(new CustomEvent('logo-updated'));
-        toast({ title: "Logo Actualizado", description: "El nuevo logo se ha guardado correctamente.", className: "bg-accent text-accent-foreground border-accent" });
+        try {
+            const storagePath = `proveedores/${providerId}/logo/${Date.now()}_${file.name}`;
+            const storageRef = ref(storage, storagePath);
+            const uploadTask = uploadBytesResumable(storageRef, file);
 
-      } catch (error) {
-        console.error("Error uploading logo:", error);
-        setLogoUrl(originalLogoUrl);
-        toast({ title: "Error de carga", description: "No se pudo subir el nuevo logo.", variant: "destructive" });
-      } finally {
-        setIsUploading(false);
-        URL.revokeObjectURL(previewUrl);
-      }
+            uploadTask.on('state_changed', 
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    setUploadProgress(progress);
+                }, 
+                (error) => {
+                    console.error("Error uploading logo:", error);
+                    setLogoUrl(originalLogoUrl);
+                    toast({ title: "Error de carga", description: `No se pudo subir el nuevo logo: ${error.message}`, variant: "destructive" });
+                    setIsUploading(false);
+                }, 
+                async () => {
+                    const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                    await saveProviderSettings(providerId, { companyLogoUrl: downloadURL });
+                    
+                    setLogoUrl(downloadURL);
+                    localStorage.setItem(`company-logo_${providerId}`, downloadURL);
+                    window.dispatchEvent(new CustomEvent('logo-updated'));
+                    
+                    toast({ title: "Logo Actualizado", description: "El nuevo logo se ha guardado correctamente.", className: "bg-accent text-accent-foreground border-accent" });
+                    setIsUploading(false);
+                    URL.revokeObjectURL(previewUrl);
+                }
+            );
+
+        } catch (error) {
+            console.error("Error setting up upload:", error);
+            setLogoUrl(originalLogoUrl);
+            toast({ title: "Error de Configuración", description: "No se pudo iniciar la subida del logo.", variant: "destructive" });
+            setIsUploading(false);
+        }
     }
   };
 
@@ -214,8 +233,11 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
                       />
                     <Button onClick={handleUploadClick} disabled={isUploading || !providerId} className="w-full">
                       {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                      {isUploading ? "Cargando..." : (logoUrl ? "Cambiar Logo" : "Subir Logo")}
+                      {isUploading ? `Cargando... ${Math.round(uploadProgress)}%` : (logoUrl ? "Cambiar Logo" : "Subir Logo")}
                     </Button>
+                    {isUploading && (
+                       <Progress value={uploadProgress} className="w-full h-2" />
+                    )}
                     <p className="text-xs text-muted-foreground">
                       PNG, JPG o GIF (Recomendado 200x200px).
                     </p>
