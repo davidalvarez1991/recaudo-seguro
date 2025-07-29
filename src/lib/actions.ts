@@ -288,14 +288,14 @@ export async function getCreditsByProvider() {
         const paymentsSnapshot = await getDocs(paymentsQuery);
         const payments = paymentsSnapshot.docs.map(p => p.data());
         
-        const paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
-        
-        // Payments that reduce capital and commission
         const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
-        const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
+        const agreementPayments = payments.filter(p => p.type === 'acuerdo');
+
+        const paidAmount = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
+        const agreementAmount = agreementPayments.reduce((sum, p) => sum + p.amount, 0);
 
         const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
-        const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
+        const remainingBalance = totalLoanAmount - paidAmount;
         const paidInstallments = payments.filter(p => p.type === 'cuota').length;
         
         const providerSettings = providersMap.get(creditData.providerId) || {};
@@ -319,6 +319,7 @@ export async function getCreditsByProvider() {
             clientePhone: clienteData?.contactPhone || 'No disponible',
             paidInstallments,
             paidAmount,
+            agreementAmount,
             remainingBalance,
             lateFee,
             endDate,
@@ -375,14 +376,12 @@ export async function getCreditsByCobrador() {
         const paymentsSnapshot = await getDocs(paymentsQuery);
         const payments = paymentsSnapshot.docs.map(p => p.data());
         
-        const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-        
         // Payments that reduce capital and commission
         const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
         const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
 
         serializableData.paidInstallments = payments.filter(p => p.type === 'cuota').length;
-        serializableData.paidAmount = totalPaid;
+        serializableData.paidAmount = paidCapitalAndCommission;
         
         const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
         const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
@@ -442,15 +441,14 @@ export async function getCreditsByCliente() {
         const paymentsSnapshot = await getDocs(paymentsQuery);
         const payments = paymentsSnapshot.docs.map(p => p.data());
             
-        const paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
         const paidInstallments = payments.filter(p => p.type === 'cuota').length;
         
         // Payments that reduce capital and commission
         const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
-        const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
+        const paidAmount = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
 
         const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
-        const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
+        const remainingBalance = totalLoanAmount - paidAmount;
 
         return {
             id: creditDoc.id,
@@ -1070,8 +1068,7 @@ export async function registerPaymentAgreement(creditId: string, amount: number)
         updatedAt: Timestamp.now(),
     });
 
-    // Log the agreement as a payment for historical purposes
-    // This payment does NOT affect the principal balance
+    // Log the agreement as a payment
     await addDoc(collection(db, "payments"), {
         creditId,
         amount,

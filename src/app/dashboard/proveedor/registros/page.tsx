@@ -54,6 +54,7 @@ type Registro = {
   clientePhone?: string;
   paidInstallments: number;
   paidAmount: number;
+  agreementAmount: number;
   remainingBalance: number;
 };
 
@@ -351,13 +352,19 @@ export default function RegistrosPage() {
                                 <div className="text-lg font-bold">{selectedRegistro.paidInstallments} / {selectedRegistro.cuotas}</div>
                             </div>
                             <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-md">
-                                <div className="text-sm text-green-800 dark:text-green-200">Total Pagado</div>
+                                <div className="text-sm text-green-800 dark:text-green-200">Total Pagado (Cuotas)</div>
                                 <div className="text-lg font-bold text-green-900 dark:text-green-100">{formatCurrency(selectedRegistro.paidAmount)}</div>
                             </div>
                              <div className="p-3 bg-red-100 dark:bg-red-900/50 rounded-md">
                                 <div className="text-sm text-red-800 dark:text-red-200">Saldo Pendiente</div>
                                 <div className="text-lg font-bold text-red-900 dark:text-red-100">{formatCurrency(selectedRegistro.remainingBalance)}</div>
                             </div>
+                            {selectedRegistro.agreementAmount > 0 && (
+                                <div className="p-3 bg-blue-100 dark:bg-blue-900/50 rounded-md md:col-span-2">
+                                    <div className="text-sm text-blue-800 dark:text-blue-200">Total Acuerdos</div>
+                                    <div className="text-lg font-bold text-blue-900 dark:text-blue-100">{formatCurrency(selectedRegistro.agreementAmount)}</div>
+                                </div>
+                            )}
                         </div>
 
                         {selectedRegistro.guarantor && (
@@ -444,7 +451,7 @@ export default function RegistrosPage() {
             <DialogDescription>
               Actualiza la información del cliente. Los cambios se reflejarán en todos sus registros.
             </DialogDescription>
-          </DialogHeader>
+          </Header>
           {selectedRegistro && (
             <EditClientForm
               cliente={{
