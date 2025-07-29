@@ -956,7 +956,7 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
     }
 }
 
-export async function registerPayment(creditId: string, amount: number, type: "cuota" | "total") {
+export async function registerPayment(creditId: string, amount: number, type: "cuota" | "total" | "comision") {
     const cobradorIdCookie = cookies().get('loggedInUser');
     if (!cobradorIdCookie) return { error: "Acceso no autorizado." };
 
@@ -984,51 +984,48 @@ export async function registerPayment(creditId: string, amount: number, type: "c
         providerId: creditData.providerId,
     });
     
-    // Update credit status
-    const paymentsRef = collection(db, "payments");
-    const q = query(paymentsRef, where("creditId", "==", creditId));
-    const paymentsSnapshot = await getDocs(q);
-    const allPayments = paymentsSnapshot.docs.map(doc => doc.data());
-    
-    let isPaidOff = false;
-    if (type === 'total') {
-        isPaidOff = true;
-    } else if (type === 'cuota') {
-        // Only 'cuota' and 'total' payments reduce the capital balance
-        const capitalAndCommissionPayments = allPayments.filter(p => p.type === 'cuota' || p.type === 'total');
-        const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum,p) => sum + p.amount, 0);
+    // Update credit status if it's not a commission-only payment
+    if (type === 'cuota' || type === 'total') {
+        const paymentsRef = collection(db, "payments");
+        const q = query(paymentsRef, where("creditId", "==", creditId));
+        const paymentsSnapshot = await getDocs(q);
+        const allPayments = paymentsSnapshot.docs.map(doc => doc.data());
         
-        // Fetch the credit again to get the most up-to-date values
-        const freshCreditSnap = await getDoc(creditRef);
-        const freshCreditData = freshCreditSnap.data();
-        if (!freshCreditData) return { error: "Error al recargar el crédito." };
+        let isPaidOff = false;
+        if (type === 'total') {
+            isPaidOff = true;
+        } else { // type === 'cuota'
+            const capitalAndCommissionPayments = allPayments.filter(p => p.type === 'cuota' || p.type === 'total');
+            const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum,p) => sum + p.amount, 0);
+            
+            const freshCreditSnap = await getDoc(creditRef);
+            const freshCreditData = freshCreditSnap.data();
+            if (!freshCreditData) return { error: "Error al recargar el crédito." };
 
-        const totalLoanAmount = (freshCreditData.valor || 0) + (freshCreditData.commission || 0);
-        
-        const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
-        
-        const providerDocRef = doc(db, "users", freshCreditData.providerId);
-        const providerSnap = await getDoc(providerDocRef);
-        const providerSettings = providerSnap.exists() ? providerSnap.data() : {};
-        const lateInterestRate = providerSettings.isLateInterestActive ? (providerSettings.lateInterestRate || 0) : 0;
-        
-        const lateFee = calculateLateFee({
-            ...freshCreditData,
-            lateInterestRate,
-        });
+            const totalLoanAmount = (freshCreditData.valor || 0) + (freshCreditData.commission || 0);
+            const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
+            
+            const providerDocRef = doc(db, "users", freshCreditData.providerId);
+            const providerSnap = await getDoc(providerDocRef);
+            const providerSettings = providerSnap.exists() ? providerSnap.data() : {};
+            const lateInterestRate = providerSettings.isLateInterestActive ? (providerSettings.lateInterestRate || 0) : 0;
+            
+            const lateFee = calculateLateFee({ ...freshCreditData, lateInterestRate });
+            const totalDebt = remainingBalance + lateFee;
 
-        const totalDebt = remainingBalance + lateFee;
-
-        // Using a small threshold for floating point comparisons
-        if (totalDebt <= 1) {
-             isPaidOff = true;
+            if (totalDebt <= 1) { // Using a small threshold for floating point comparisons
+                 isPaidOff = true;
+            }
         }
-    }
 
-    if (isPaidOff) {
-        await updateDoc(creditRef, { estado: 'Pagado', updatedAt: Timestamp.now(), missedPaymentDays: 0 });
-    } else {
-         await updateDoc(creditRef, { updatedAt: Timestamp.now(), missedPaymentDays: 0 }); // Reset missed days if a quota payment is made
+        if (isPaidOff) {
+            await updateDoc(creditRef, { estado: 'Pagado', updatedAt: Timestamp.now(), missedPaymentDays: 0 });
+        } else {
+             await updateDoc(creditRef, { updatedAt: Timestamp.now(), missedPaymentDays: 0 }); // Reset missed days if a quota payment is made
+        }
+    } else { // type === 'comision'
+        // Just update the timestamp for commission payments, don't change state
+        await updateDoc(creditRef, { updatedAt: Timestamp.now() });
     }
 
     return { success: `Pago de ${amount.toLocaleString('es-CO')} registrado.` };
@@ -1083,14 +1080,16 @@ export async function registerPaymentAgreement(creditId: string, amount: number)
     });
 
     // Log the agreement as a payment
-    await addDoc(collection(db, "payments"), {
-        creditId,
-        amount,
-        type: "acuerdo",
-        date: Timestamp.now(),
-        cobradorId: cobradorData.idNumber,
-        providerId: creditData.providerId,
-    });
+    if (amount > 0) {
+      await addDoc(collection(db, "payments"), {
+          creditId,
+          amount,
+          type: "acuerdo",
+          date: Timestamp.now(),
+          cobradorId: cobradorData.idNumber,
+          providerId: creditData.providerId,
+      });
+    }
     
     return { success: "Acuerdo registrado. El calendario de pagos ha sido actualizado." };
 }

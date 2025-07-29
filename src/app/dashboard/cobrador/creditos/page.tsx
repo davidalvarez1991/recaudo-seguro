@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw, XCircle, CalendarDays, CheckCircle2, Circle, Star, Search, Handshake } from "lucide-react";
+import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw, XCircle, CalendarDays, CheckCircle2, Circle, Star, Search, Handshake, Percent } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getCreditsByCobrador, registerPayment, registerMissedPayment, registerPaymentAgreement } from "@/lib/actions";
@@ -45,7 +45,7 @@ type Credito = {
   missedPaymentDays: number;
 };
 
-type PaymentType = "cuota" | "total" | "acuerdo";
+type PaymentType = "cuota" | "total" | "acuerdo" | "comision";
 
 const formatCurrency = (value: number) => {
     if (isNaN(value)) return "$0";
@@ -131,6 +131,7 @@ export default function CreditosPage() {
     const installmentAmount = totalLoanAmount / selectedCredit.cuotas;
 
     let amountToPay = 0;
+    let type = paymentType;
     switch (paymentType) {
         case "cuota":
             amountToPay = installmentAmount + selectedCredit.lateFee;
@@ -138,9 +139,12 @@ export default function CreditosPage() {
         case "total":
             amountToPay = selectedCredit.totalDebt;
             break;
+        case "comision":
+            amountToPay = selectedCredit.commission;
+            break;
     }
 
-    const result = await registerPayment(selectedCredit.id, amountToPay, paymentType);
+    const result = await registerPayment(selectedCredit.id, amountToPay, type);
 
     if (result.success) {
         toast({
@@ -220,6 +224,7 @@ export default function CreditosPage() {
     switch (paymentType) {
         case "cuota": return installmentAmount + selectedCredit.lateFee;
         case "total": return selectedCredit.totalDebt;
+        case "comision": return selectedCredit.commission;
         default: return 0;
     }
   }
@@ -328,58 +333,75 @@ export default function CreditosPage() {
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Registrar Pago</DialogTitle>
+            <DialogTitle>Registrar Acción de Pago</DialogTitle>
             <DialogDescription>
-              Selecciona una opción y confirma la acción para el cliente <span className="font-semibold">{selectedCredit?.clienteName}</span>.
+              Selecciona una opción para el cliente <span className="font-semibold">{selectedCredit?.clienteName}</span>.
             </DialogDescription>
           </DialogHeader>
           {selectedCredit && (
             <div className="py-4 space-y-4">
-               {selectedCredit.paymentDates && selectedCredit.paymentDates.length > 0 && (
-                    <Accordion type="single" collapsible className="w-full">
-                        <AccordionItem value="item-1">
-                            <AccordionTrigger className="text-sm font-medium hover:no-underline">
-                                <div className="flex items-center gap-2">
-                                    <CalendarDays className="h-5 w-5 text-muted-foreground" />
-                                    <span>Calendario de Pagos</span>
-                                </div>
-                            </AccordionTrigger>
-                            <AccordionContent>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 text-sm pl-2 max-h-24 overflow-y-auto">
-                                    {selectedCredit.paymentDates
-                                        .sort((a,b) => new Date(a).getTime() - new Date(b).getTime())
-                                        .map((dateStr, index) => {
-                                        const isPaid = index < selectedCredit.paidInstallments;
-                                        const isNext = index === selectedCredit.paidInstallments;
-                                        return (
-                                        <div key={index} className={cn("flex items-center gap-2", { "text-muted-foreground": isPaid, "font-bold text-primary": isNext })}>
-                                            {isPaid ? <CheckCircle2 className="h-4 w-4 text-green-500"/> : <Circle className="h-4 w-4 text-muted-foreground/50"/>}
-                                            <span>{format(new Date(dateStr), "d 'de' MMMM", { locale: es })}</span>
-                                        </div>
-                                        );
-                                    })}
-                                </div>
-                            </AccordionContent>
-                        </AccordionItem>
-                    </Accordion>
-                )}
+               <Accordion type="single" collapsible className="w-full">
+                  <AccordionItem value="item-1">
+                      <AccordionTrigger className="text-sm font-medium hover:no-underline">
+                          <div className="flex items-center gap-2">
+                              <CalendarDays className="h-5 w-5 text-muted-foreground" />
+                              <span>Calendario de Pagos</span>
+                          </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                          {selectedCredit.paymentDates && selectedCredit.paymentDates.length > 0 ? (
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 text-sm pl-2 max-h-24 overflow-y-auto">
+                                  {selectedCredit.paymentDates
+                                      .sort((a,b) => new Date(a).getTime() - new Date(b).getTime())
+                                      .map((dateStr, index) => {
+                                      const isPaid = index < selectedCredit.paidInstallments;
+                                      const isNext = index === selectedCredit.paidInstallments;
+                                      return (
+                                      <div key={index} className={cn("flex items-center gap-2", { "text-muted-foreground": isPaid, "font-bold text-primary": isNext })}>
+                                          {isPaid ? <CheckCircle2 className="h-4 w-4 text-green-500"/> : <Circle className="h-4 w-4 text-muted-foreground/50"/>}
+                                          <span>{format(new Date(dateStr), "d 'de' MMM", { locale: es })}</span>
+                                      </div>
+                                      );
+                                  })}
+                              </div>
+                          ) : (
+                              <p className="text-sm text-muted-foreground text-center py-4">No hay un calendario de pagos definido.</p>
+                          )}
+                      </AccordionContent>
+                  </AccordionItem>
+              </Accordion>
 
                 <RadioGroup value={paymentType} onValueChange={(value: any) => setPaymentType(value)} className="gap-4 pt-4">
                     {/* Pagar Cuota */}
-                    <Label htmlFor="payment-cuota" className="flex flex-col gap-2 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                     <Label htmlFor="payment-cuota" className="flex flex-col gap-2 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                        <div className="flex items-start gap-4">
+                          <RadioGroupItem value="cuota" id="payment-cuota" className="mt-1 flex-shrink-0" />
+                          <div className="flex-1">
+                            <div className="flex justify-between items-start">
+                              <p className="font-semibold">Pagar Cuota</p>
+                              <p className="font-bold text-lg text-right pl-2">{formatCurrency(((selectedCredit.valor + selectedCredit.commission) / selectedCredit.cuotas) + selectedCredit.lateFee)}</p>
+                            </div>
+                            <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+                                <span>Capital: {formatCurrency(getInstallmentBreakdown().capital)}</span>
+                                <span>Comisión: {formatCurrency(getInstallmentBreakdown().commission)}</span>
+                                <span>Mora: {formatCurrency(selectedCredit.lateFee)}</span>
+                            </div>
+                          </div>
+                        </div>
+                    </Label>
+                    
+                    {/* Pago de Comisión */}
+                    <Label htmlFor="payment-comision" className="flex items-start gap-4 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
+                        <RadioGroupItem value="comision" id="payment-comision" className="mt-1 flex-shrink-0" />
                         <div className="flex justify-between items-start w-full">
-                           <div className="flex items-start gap-4">
-                               <RadioGroupItem value="cuota" id="payment-cuota" className="mt-1 flex-shrink-0" />
-                               <div>
-                                   <p className="font-semibold">Pagar Cuota</p>
-                                   <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
-                                       <span>Capital: {formatCurrency(getInstallmentBreakdown().capital)}</span>
-                                       <span>Comisión: {formatCurrency(getInstallmentBreakdown().commission)}</span>
-                                       <span>Mora: {formatCurrency(selectedCredit.lateFee)}</span>
-                                   </div>
-                               </div>
-                           </div>
-                           <p className="font-bold text-lg text-right pl-2">{formatCurrency(((selectedCredit.valor + selectedCredit.commission) / selectedCredit.cuotas) + selectedCredit.lateFee)}</p>
+                            <div>
+                                <p className="font-semibold flex items-center gap-1.5">
+                                  <Percent className="h-4 w-4" />
+                                  Pagar Comisión
+                                </p>
+                                <p className="text-xs text-muted-foreground">Cubre la ganancia del crédito.</p>
+                            </div>
+                            <p className="font-bold text-lg text-right pl-2">{formatCurrency(selectedCredit.commission)}</p>
                         </div>
                     </Label>
 
@@ -389,6 +411,7 @@ export default function CreditosPage() {
                         <div className="flex justify-between items-center w-full">
                             <div>
                                 <p className="font-semibold">Pagar Valor Total</p>
+                                <p className="text-xs text-muted-foreground">Liquidar la deuda completa.</p>
                             </div>
                             <p className="font-bold text-lg text-right pl-2">{formatCurrency(selectedCredit.totalDebt)}</p>
                         </div>
@@ -398,15 +421,17 @@ export default function CreditosPage() {
                     <Label htmlFor="payment-acuerdo" className={`flex flex-col gap-2 rounded-md border p-4 transition-colors cursor-pointer hover:bg-muted/50`}>
                         <div className="flex items-start gap-4 w-full">
                             <RadioGroupItem value="acuerdo" id="payment-acuerdo" className="mt-1 flex-shrink-0" />
-                            <div className="flex justify-between items-start w-full">
-                               <div>
-                                    <p className="font-semibold flex items-center gap-1">
-                                        <Handshake className="w-4 h-4 text-muted-foreground" />
-                                        Acuerdo de Cuota
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">Registra un pago parcial y reprograma la deuda.</p>
+                            <div className="flex-1">
+                               <div className="flex justify-between items-start">
+                                  <div>
+                                      <p className="font-semibold flex items-center gap-1">
+                                          <Handshake className="w-4 h-4 text-muted-foreground" />
+                                          Acuerdo de Pago
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">Abona un valor y reprograma la deuda.</p>
+                                  </div>
+                                  <p className="font-bold text-lg text-right pl-2">{agreementAmount ? formatCurrency(parseFloat(agreementAmount.replace(/\D/g, ''))) : '$0'}</p>
                                </div>
-                               <p className="font-bold text-lg text-right pl-2">{agreementAmount ? formatCurrency(parseFloat(agreementAmount.replace(/\D/g, ''))) : '$0'}</p>
                             </div>
                         </div>
                          {paymentType === 'acuerdo' && (
