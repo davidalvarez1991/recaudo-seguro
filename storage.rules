@@ -1,14 +1,14 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // Permite a los proveedores subir su logo. La ruta está protegida por la lógica de la app.
     match /proveedores/{providerId}/logo/{fileName} {
-      // Allow public write access only to the logo upload path.
-      // This is secure because the path is specific and the action is
-      // triggered from a protected part of the application.
-      allow write: if true;
-      
-      // Allow public read access so logos can be displayed anywhere.
-      allow read;
+      allow read, write: if true;
+    }
+
+    // Por defecto, deniega el acceso al resto de las rutas.
+    match /{allPaths=**} {
+      allow read, write: if false;
     }
   }
 }
