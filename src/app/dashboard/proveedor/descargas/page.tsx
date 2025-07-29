@@ -29,6 +29,8 @@ type Registro = {
   cuotas: number;
   lateFee: number;
   endDate?: string;
+  dailyCollectedAmount?: number;
+  agreementAmount?: number;
 };
 
 export default function DescargasPage() {
@@ -81,6 +83,8 @@ export default function DescargasPage() {
                 "Cuotas": r.cuotas,
                 "Valor Crédito": r.valor,
                 "Ganancia (Comisión)": r.commission,
+                "Recaudo del Día": r.dailyCollectedAmount || 0,
+                "Valor Acuerdos": r.agreementAmount || 0,
                 "Valor Mora": r.lateFee,
                 "Nombre Cobrador": r.cobradorName,
                 "Cédula Cobrador": r.cobradorId,

@@ -264,6 +264,10 @@ export async function getCreditsByProvider() {
     // Fetch all providers in one go to minimize reads
     const providersSnapshot = await getDocs(query(collection(db, "users"), where("role", "==", "proveedor")));
     const providersMap = new Map(providersSnapshot.docs.map(doc => [doc.id, doc.data()]));
+    
+    const timeZone = 'America/Bogota';
+    const todayStart = startOfDay(toZonedTime(new Date(), timeZone));
+    const todayEnd = endOfDay(toZonedTime(new Date(), timeZone));
 
     const creditsPromises = querySnapshot.docs.map(async (docSnapshot) => {
         const creditData: any = { id: docSnapshot.id, ...docSnapshot.data() };
@@ -311,6 +315,15 @@ export async function getCreditsByProvider() {
             endDate = sortedDates[sortedDates.length - 1];
         }
 
+        const dailyCollectedAmount = payments.reduce((sum, p) => {
+            const paymentDateUTC = p.date.toDate();
+            const paymentDateInTimeZone = toZonedTime(paymentDateUTC, timeZone);
+            if (isWithinInterval(paymentDateInTimeZone, { start: todayStart, end: todayEnd })) {
+                return sum + p.amount;
+            }
+            return sum;
+        }, 0);
+
         return {
             ...creditData,
             cobradorName: cobradorData?.name || 'No disponible',
@@ -323,6 +336,7 @@ export async function getCreditsByProvider() {
             remainingBalance,
             lateFee,
             endDate,
+            dailyCollectedAmount,
         };
     });
     
