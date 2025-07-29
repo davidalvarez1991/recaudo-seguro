@@ -37,43 +37,52 @@ const formatCurrencyForInput = (value: number | string): string => {
 };
 
 export function SettingsForm({ providerId }: SettingsFormProps) {
-  const [logo, setLogo] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [commissionTiers, setCommissionTiers] = useState<CommissionTier[]>([]);
   const [lateInterestRate, setLateInterestRate] = useState("2");
   const [isLateInterestActive, setIsLateInterestActive] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
   const { toast } = useToast();
 
   useEffect(() => {
     const fetchUserData = async () => {
-      if (providerId) {
+      if (!providerId) return;
+      setIsLoading(true);
+      try {
         const userData = await getUserData(providerId);
         if (userData) {
-          setLogo(userData.companyLogoUrl || null);
+          setLogoUrl(userData.companyLogoUrl || null);
           setLateInterestRate((userData.lateInterestRate || 2).toString());
           setIsLateInterestActive(userData.isLateInterestActive || false);
           
           if (userData.commissionTiers && userData.commissionTiers.length > 0) {
               setCommissionTiers(userData.commissionTiers);
           } else {
-              // Set a default tier if none exist
               setCommissionTiers([{ minAmount: 0, maxAmount: 50000000, percentage: userData.commissionPercentage || 20 }]);
           }
         }
+      } catch (error) {
+        toast({ title: "Error", description: "No se pudieron cargar los datos de configuración.", variant: "destructive" });
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchUserData();
-  }, [providerId]);
+  }, [providerId, toast]);
 
 
   const handleLogoChange = async (event: ChangeEvent<HTMLInputElement>) => {
     if (!providerId) return;
     const file = event.target.files?.[0];
     if (file) {
+      const originalLogoUrl = logoUrl;
       const previewUrl = URL.createObjectURL(file);
-      setLogo(previewUrl);
+      setLogoUrl(previewUrl); // Show preview immediately
 
       setIsUploading(true);
       try {
@@ -82,32 +91,22 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
         await uploadBytes(storageRef, file);
         const downloadURL = await getDownloadURL(storageRef);
         
-        const result = await saveProviderSettings(providerId, { companyLogoUrl: downloadURL });
-
-        if (result.success) {
-            setLogo(downloadURL);
-            localStorage.setItem(`company-logo_${providerId}`, downloadURL);
-            window.dispatchEvent(new CustomEvent('logo-updated'));
-            toast({
-              title: "Logo Actualizado",
-              description: "El logo de tu empresa ha sido actualizado.",
-              variant: "default",
-              className: "bg-accent text-accent-foreground border-accent",
-            });
-        } else {
-             throw new Error(result.error || "Failed to save settings");
-        }
+        await saveSettings({ companyLogoUrl: downloadURL }); // Save the new URL
+        setLogoUrl(downloadURL); // Set the final URL
+        localStorage.setItem(`company-logo_${providerId}`, downloadURL);
+        window.dispatchEvent(new CustomEvent('logo-updated'));
 
       } catch (error) {
         console.error("Error uploading logo:", error);
+        setLogoUrl(originalLogoUrl); // Revert to original logo on error
         toast({
           title: "Error de carga",
           description: "No se pudo subir el nuevo logo.",
           variant: "destructive"
         });
-        URL.revokeObjectURL(previewUrl);
       } finally {
         setIsUploading(false);
+        URL.revokeObjectURL(previewUrl);
       }
     }
   };
@@ -140,51 +139,64 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
         toast({ title: "Acción no permitida", description: "Debe haber al menos un tramo de comisión.", variant: "destructive" });
     }
   };
+  
+  const saveSettings = async (newSettings: Partial<{
+      companyLogoUrl: string;
+      commissionTiers: CommissionTier[];
+      lateInterestRate: number;
+      isLateInterestActive: boolean;
+    }>
+  ) => {
+    setIsSaving(true);
+    try {
+        const rate = parseFloat(lateInterestRate);
+        if (isNaN(rate)) {
+            toast({ title: "Error de validación", description: "La tasa de interés debe ser un número.", variant: "destructive" });
+            return;
+        }
 
-  const handleSaveCommissions = async () => {
-    // Basic validation
-    for (const tier of commissionTiers) {
-      if (tier.minAmount >= tier.maxAmount && tier.maxAmount !== 0) {
-        toast({ title: "Error de validación", description: `El monto mínimo (${formatCurrencyForInput(tier.minAmount)}) debe ser menor que el máximo (${formatCurrencyForInput(tier.maxAmount)}) en un tramo.`, variant: "destructive" });
-        return;
-      }
-      if (tier.percentage <= 0 || tier.percentage > 100) {
-        toast({ title: "Error de validación", description: `El porcentaje (${tier.percentage}%) debe estar entre 1 y 100.`, variant: "destructive" });
-        return;
-      }
-    }
+        for (const tier of commissionTiers) {
+            if (tier.minAmount >= tier.maxAmount && tier.maxAmount !== 0) {
+                toast({ title: "Error de validación", description: `En un tramo, el monto mínimo (${formatCurrencyForInput(tier.minAmount)}) debe ser menor que el máximo (${formatCurrencyForInput(tier.maxAmount)}).`, variant: "destructive" });
+                return;
+            }
+            if (tier.percentage <= 0 || tier.percentage > 100) {
+                toast({ title: "Error de validación", description: `El porcentaje (${tier.percentage}%) debe estar entre 1 y 100.`, variant: "destructive" });
+                return;
+            }
+        }
     
-    const result = await saveProviderSettings(providerId, { commissionTiers: commissionTiers });
-    if (result.success) {
-      toast({
-        title: "Comisiones Guardadas",
-        description: "La nueva estructura de comisiones ha sido guardada.",
-        variant: "default",
-        className: "bg-accent text-accent-foreground border-accent",
-      });
-    } else {
-       toast({ title: "Error", description: result.error, variant: "destructive" });
+        const settingsToSave = {
+            commissionTiers,
+            lateInterestRate: rate,
+            isLateInterestActive,
+            ...newSettings
+        };
+
+        const result = await saveProviderSettings(providerId, settingsToSave);
+        if (result.success) {
+          toast({
+            title: "Configuración Guardada",
+            description: "Tus ajustes se han guardado correctamente.",
+            variant: "default",
+            className: "bg-accent text-accent-foreground border-accent",
+          });
+        } else {
+           toast({ title: "Error", description: result.error, variant: "destructive" });
+        }
+    } finally {
+        setIsSaving(false);
     }
   };
 
-  const handleSaveLateInterest = async () => {
-     const rate = parseFloat(lateInterestRate);
-     if (isNaN(rate)) {
-        toast({ title: "Error", description: "La tasa de interés debe ser un número.", variant: "destructive" });
-        return;
-    }
-    const result = await saveProviderSettings(providerId, { lateInterestRate: rate, isLateInterestActive });
-     if (result.success) {
-      toast({
-        title: "Configuración de Mora Guardada",
-        description: `Interés por mora ${isLateInterestActive ? `activado al ${rate}%` : 'desactivado'}.`,
-        variant: "default",
-        className: "bg-accent text-accent-foreground border-accent",
-      });
-    } else {
-        toast({ title: "Error", description: result.error, variant: "destructive" });
-    }
-  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-48">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 pt-6">
@@ -198,7 +210,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
         <Card className="max-w-md">
             <CardContent className="p-6 flex flex-col sm:flex-row items-center gap-6">
                 <Avatar className="h-24 w-24 border-2 border-primary/10 shadow-sm">
-                    <AvatarImage src={logo || "https://placehold.co/200x200.png"} data-ai-hint="company logo" alt="Logo de la empresa" />
+                    <AvatarImage src={logoUrl || "https://placehold.co/200x200.png"} data-ai-hint="company logo" alt="Logo de la empresa" />
                     <AvatarFallback>LOGO</AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col gap-2 w-full text-center sm:text-left">
@@ -212,7 +224,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
                       />
                     <Button onClick={handleUploadClick} disabled={isUploading || !providerId} className="w-full">
                       {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                      {isUploading ? "Cargando..." : (logo ? "Cambiar Logo" : "Subir Logo")}
+                      {isUploading ? "Cargando..." : (logoUrl ? "Cambiar Logo" : "Subir Logo")}
                     </Button>
                     <p className="text-xs text-muted-foreground">
                       PNG, JPG o GIF (Recomendado 200x200px).
@@ -283,6 +295,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
                 size="icon"
                 onClick={() => removeCommissionTier(index)}
                 className="text-destructive hover:bg-destructive/10 absolute -top-3 -right-3 sm:relative sm:top-auto sm:right-auto"
+                disabled={commissionTiers.length <= 1}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -292,10 +305,6 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
             <Button onClick={addCommissionTier} variant="outline" className="w-full sm:w-auto" disabled={commissionTiers.length >= 4}>
               <PlusCircle className="mr-2 h-4 w-4" />
               Añadir Tramo
-            </Button>
-            <Button onClick={handleSaveCommissions} className="w-full sm:w-auto">
-                <Save className="mr-2 h-4 w-4" />
-                Guardar Comisiones
             </Button>
           </div>
         </CardContent>
@@ -337,12 +346,17 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
             <Percent className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           </div>
         </div>
-        
-        <Button onClick={handleSaveLateInterest} className="w-full sm:w-auto">
-          <Save className="mr-2 h-4 w-4" />
-          Guardar Configuración de Mora
+      </div>
+
+       <Separator />
+
+      <div className="flex justify-end">
+        <Button onClick={() => saveSettings({})} disabled={isSaving || isUploading}>
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            {isSaving ? 'Guardando...' : 'Guardar Toda la Configuración'}
         </Button>
       </div>
+
     </div>
   );
 }
