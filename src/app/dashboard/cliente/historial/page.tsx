@@ -66,32 +66,7 @@ export default function HistorialClientePage() {
 
         const providerData = await getUserData(credit.providerId);
         const providerName = providerData?.companyName || credit.providerName || 'N/A';
-        const providerLogoUrl = providerData?.companyLogoUrl;
         const paymentRecords = await getPaymentsByCreditId(credit.id);
-
-        // Add logo if available
-        if (providerLogoUrl) {
-             try {
-                // To avoid CORS issues, we need to fetch the image and convert it to a data URL
-                const response = await fetch(providerLogoUrl);
-                const blob = await response.blob();
-                const reader = new FileReader();
-                const dataUrl = await new Promise<string>((resolve) => {
-                    reader.onloadend = () => resolve(reader.result as string);
-                    reader.readAsDataURL(blob);
-                });
-                const img = new Image();
-                img.src = dataUrl;
-                await new Promise(resolve => img.onload = resolve);
-                const imgProps = doc.getImageProperties(img);
-                const aspectRatio = imgProps.width / imgProps.height;
-                const imgWidth = 25;
-                const imgHeight = imgWidth / aspectRatio;
-                doc.addImage(img, 'PNG', 14, 15, imgWidth, imgHeight);
-            } catch (imgError) {
-                console.error("Error loading provider logo for PDF:", imgError);
-            }
-        }
 
         // Header
         doc.setFontSize(22);

@@ -405,36 +405,7 @@ export default function RegistrosPage() {
                                 </div>
                             </>
                         )}
-                        
-                        <Separator />
-                        
-                        <div>
-                            <h4 className="font-semibold text-md mb-4">Documentos Adjuntos</h4>
-                            {(selectedRegistro.documentUrls && selectedRegistro.documentUrls.length > 0) ? (
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                    {selectedRegistro.documentUrls.map((url, index) => (
-                                        <div key={index} className="relative group border rounded-lg overflow-hidden">
-                                            {isMediaImage(url) ? (
-                                                <Image src={url} alt={`Documento ${index + 1}`} width={200} height={200} className="w-full h-32 object-cover" />
-                                            ) : isMediaVideo(url) ? (
-                                                <video src={url} controls className="w-full h-32 object-cover bg-black" />
-                                            ) : (
-                                                 <div className="w-full h-32 flex items-center justify-center bg-muted">
-                                                    <ClipboardList className="w-10 h-10 text-muted-foreground" />
-                                                 </div>
-                                            )}
-                                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <Button asChild variant="secondary" size="sm">
-                                                    <a href={url} target="_blank" rel="noopener noreferrer" download>
-                                                        <Download className="mr-2 h-4 w-4" /> Descargar
-                                                    </a>
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (<p className="text-sm text-muted-foreground">No hay documentos adjuntos.</p>)}
-                        </div>
+
                     </>
                 )}
             </div>
@@ -486,5 +457,3 @@ export default function RegistrosPage() {
     </>
   );
 }
-
-    

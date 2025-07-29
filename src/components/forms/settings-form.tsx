@@ -82,28 +82,25 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
     if (file) {
       const originalLogoUrl = logoUrl;
       const previewUrl = URL.createObjectURL(file);
-      setLogoUrl(previewUrl); // Show preview immediately
-
       setIsUploading(true);
+      setLogoUrl(previewUrl);
+
       try {
         const storagePath = `proveedores/${providerId}/logo/${file.name}`;
         const storageRef = ref(storage, storagePath);
         await uploadBytes(storageRef, file);
         const downloadURL = await getDownloadURL(storageRef);
         
-        await saveSettings({ companyLogoUrl: downloadURL }); // Save the new URL
-        setLogoUrl(downloadURL); // Set the final URL
+        await saveProviderSettings(providerId, { companyLogoUrl: downloadURL });
+        setLogoUrl(downloadURL);
         localStorage.setItem(`company-logo_${providerId}`, downloadURL);
         window.dispatchEvent(new CustomEvent('logo-updated'));
+        toast({ title: "Logo Actualizado", description: "El nuevo logo se ha guardado correctamente.", className: "bg-accent text-accent-foreground border-accent" });
 
       } catch (error) {
         console.error("Error uploading logo:", error);
-        setLogoUrl(originalLogoUrl); // Revert to original logo on error
-        toast({
-          title: "Error de carga",
-          description: "No se pudo subir el nuevo logo.",
-          variant: "destructive"
-        });
+        setLogoUrl(originalLogoUrl);
+        toast({ title: "Error de carga", description: "No se pudo subir el nuevo logo.", variant: "destructive" });
       } finally {
         setIsUploading(false);
         URL.revokeObjectURL(previewUrl);
@@ -140,13 +137,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
     }
   };
   
-  const saveSettings = async (newSettings: Partial<{
-      companyLogoUrl: string;
-      commissionTiers: CommissionTier[];
-      lateInterestRate: number;
-      isLateInterestActive: boolean;
-    }>
-  ) => {
+  const handleSaveAllSettings = async () => {
     setIsSaving(true);
     try {
         const rate = parseFloat(lateInterestRate);
@@ -170,7 +161,6 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
             commissionTiers,
             lateInterestRate: rate,
             isLateInterestActive,
-            ...newSettings
         };
 
         const result = await saveProviderSettings(providerId, settingsToSave);
@@ -351,7 +341,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
        <Separator />
 
       <div className="flex justify-end">
-        <Button onClick={() => saveSettings({})} disabled={isSaving || isUploading}>
+        <Button onClick={handleSaveAllSettings} disabled={isSaving || isUploading}>
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             {isSaving ? 'Guardando...' : 'Guardar Toda la Configuración'}
         </Button>
