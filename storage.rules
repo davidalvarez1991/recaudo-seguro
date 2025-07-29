@@ -1,18 +1,14 @@
 rules_version = '2';
-
 service firebase.storage {
   match /b/{bucket}/o {
-    // Permite la escritura pública solo en la carpeta de logos de los proveedores.
-    // La seguridad se basa en que la URL de subida solo se genera desde el servidor
-    // en una acción autenticada, por lo que la ruta es segura.
     match /proveedores/{providerId}/logo/{fileName} {
+      // Allow public write access only to the logo upload path.
+      // This is secure because the path is specific and the action is
+      // triggered from a protected part of the application.
       allow write: if true;
-      allow read; // Permite la lectura para que los logos se puedan mostrar en la app
-    }
-
-    // Por defecto, deniega todas las demás lecturas y escrituras no autenticadas.
-    match /{allPaths=**} {
-      allow read, write: if request.auth != null;
+      
+      // Allow public read access so logos can be displayed anywhere.
+      allow read;
     }
   }
 }
