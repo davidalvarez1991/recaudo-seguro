@@ -5,10 +5,10 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw, XCircle, CalendarDays, CheckCircle2, Circle, Star, Search } from "lucide-react";
+import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw, XCircle, CalendarDays, CheckCircle2, Circle, Star, Search, Handshake } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { getCreditsByCobrador, registerPayment, registerMissedPayment } from "@/lib/actions";
+import { getCreditsByCobrador, registerPayment, registerMissedPayment, registerPaymentAgreement } from "@/lib/actions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -43,7 +43,7 @@ type Credito = {
   missedPaymentDays: number;
 };
 
-type PaymentType = "cuota" | "total" | "interes";
+type PaymentType = "cuota" | "total" | "acuerdo";
 
 const formatCurrency = (value: number) => {
     if (isNaN(value)) return "$0";
@@ -101,8 +101,18 @@ export default function CreditosPage() {
     setIsModalOpen(true);
   };
   
-  const handleRegisterPayment = async () => {
+  const handleConfirmAction = async () => {
     if (!selectedCredit) return;
+
+    if (paymentType === 'acuerdo') {
+      await handlePaymentAgreement();
+    } else {
+      await handleRegisterPayment();
+    }
+  };
+
+  const handleRegisterPayment = async () => {
+    if (!selectedCredit || paymentType === 'acuerdo') return;
     
     setIsSubmitting(true);
     
@@ -116,9 +126,6 @@ export default function CreditosPage() {
             break;
         case "total":
             amountToPay = selectedCredit.totalDebt;
-            break;
-        case "interes":
-            amountToPay = selectedCredit.lateFee;
             break;
     }
 
@@ -141,6 +148,31 @@ export default function CreditosPage() {
     }
     setIsSubmitting(false);
   };
+  
+  const handlePaymentAgreement = async () => {
+    if (!selectedCredit) return;
+    setIsSubmitting(true);
+
+    const result = await registerPaymentAgreement(selectedCredit.id);
+
+    if (result.success) {
+        toast({
+            title: "Acuerdo Registrado",
+            description: result.success,
+            className: "bg-accent text-accent-foreground border-accent",
+        });
+        setIsModalOpen(false);
+        fetchCredits();
+    } else {
+        toast({
+            title: "Error en el Acuerdo",
+            description: result.error,
+            variant: "destructive",
+        });
+    }
+    setIsSubmitting(false);
+  };
+
 
   const handleMissedPayment = async () => {
     if (!selectedCredit) return;
@@ -171,7 +203,7 @@ export default function CreditosPage() {
     switch (paymentType) {
         case "cuota": return installmentAmount + selectedCredit.lateFee;
         case "total": return selectedCredit.totalDebt;
-        case "interes": return selectedCredit.lateFee;
+        case "acuerdo": return 0;
         default: return 0;
     }
   }
@@ -282,7 +314,7 @@ export default function CreditosPage() {
           <DialogHeader>
             <DialogTitle>Registrar Pago</DialogTitle>
             <DialogDescription>
-              Selecciona una opción y confirma el pago para el cliente <span className="font-semibold">{selectedCredit?.clienteName}</span>.
+              Selecciona una opción y confirma la acción para el cliente <span className="font-semibold">{selectedCredit?.clienteName}</span>.
             </DialogDescription>
           </DialogHeader>
           {selectedCredit && (
@@ -338,20 +370,18 @@ export default function CreditosPage() {
                         </div>
                     </Label>
 
-                     {/* Abono Interes */}
-                    <Label htmlFor="payment-interes" className={`flex items-start gap-4 rounded-md border p-4 transition-colors ${selectedCredit.lateFee > 0 ? 'cursor-pointer hover:bg-muted/50' : 'opacity-50 cursor-not-allowed'}`}>
-                        <RadioGroupItem value="interes" id="payment-interes" disabled={selectedCredit.lateFee <= 0} className="mt-1" />
+                     {/* Acuerdo de Cuota */}
+                    <Label htmlFor="payment-acuerdo" className={`flex items-start gap-4 rounded-md border p-4 transition-colors cursor-pointer hover:bg-muted/50`}>
+                        <RadioGroupItem value="acuerdo" id="payment-acuerdo" className="mt-1" />
                         <div className="flex justify-between items-center w-full">
                            <div>
                                 <p className="font-semibold flex items-center gap-1">
-                                    Abono a Intereses
-                                    <Tooltip>
-                                        <TooltipTrigger asChild><Info className="w-4 h-4 text-muted-foreground" /></TooltipTrigger>
-                                        <TooltipContent><p>Este pago no reduce el capital de la deuda.</p></TooltipContent>
-                                    </Tooltip>
+                                    <Handshake className="w-4 h-4 text-muted-foreground" />
+                                    Acuerdo de Cuota
                                 </p>
+                                <p className="text-xs text-muted-foreground">Reprograma la fecha de pago sin generar mora.</p>
                            </div>
-                           <p className="font-bold text-lg">{formatCurrency(selectedCredit.lateFee)}</p>
+                           <p className="font-bold text-lg">{formatCurrency(0)}</p>
                         </div>
                     </Label>
                 </RadioGroup>
@@ -368,9 +398,9 @@ export default function CreditosPage() {
                   <XCircle className="mr-2 h-4 w-4" />
                   Hoy no pagó
                 </Button>
-                <Button onClick={handleRegisterPayment} disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <HandCoins className="mr-2 h-4 w-4" />}
-                  {isSubmitting ? 'Registrando...' : formatCurrency(getPaymentAmount())}
+                <Button onClick={handleConfirmAction} disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (paymentType === 'acuerdo' ? <Handshake className="mr-2 h-4 w-4" /> : <HandCoins className="mr-2 h-4 w-4" />)}
+                  {isSubmitting ? 'Registrando...' : (paymentType === 'acuerdo' ? 'Confirmar Acuerdo' : formatCurrency(getPaymentAmount()))}
                 </Button>
                  <Button onClick={handleRenewClick} variant="secondary" className="bg-amber-400 hover:bg-amber-500 text-amber-900" disabled={isSubmitting || !canRenewCredit(selectedCredit)}>
                     <Star className="mr-2 h-4 w-4" />
@@ -406,5 +436,3 @@ export default function CreditosPage() {
     </TooltipProvider>
   );
 }
-
-    

@@ -9,7 +9,7 @@ import bcrypt from 'bcryptjs';
 import { db, storage } from "./firebase";
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc, increment, orderBy, limit } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { startOfDay, differenceInDays, endOfDay, isWithinInterval } from 'date-fns';
+import { startOfDay, differenceInDays, endOfDay, isWithinInterval, addDays } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { analyzeClientReputation, ClientReputationInput } from '@/ai/flows/analyze-client-reputation';
 
@@ -940,7 +940,7 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
     }
 }
 
-export async function registerPayment(creditId: string, amount: number, type: "cuota" | "total" | "interes") {
+export async function registerPayment(creditId: string, amount: number, type: "cuota" | "total" | "acuerdo") {
     const cobradorIdCookie = cookies().get('loggedInUser');
     if (!cobradorIdCookie) return { error: "Acceso no autorizado." };
 
@@ -977,7 +977,7 @@ export async function registerPayment(creditId: string, amount: number, type: "c
     let isPaidOff = false;
     if (type === 'total') {
         isPaidOff = true;
-    } else {
+    } else if (type === 'cuota') {
         const capitalAndCommissionPayments = allPayments.filter(p => p.type === 'cuota' || p.type === 'total');
         const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum,p) => sum + p.amount, 0);
         
@@ -1017,6 +1017,66 @@ export async function registerPayment(creditId: string, amount: number, type: "c
     return { success: `Pago de ${amount.toLocaleString('es-CO')} registrado.` };
 }
 
+export async function registerPaymentAgreement(creditId: string) {
+    const cobradorIdCookie = cookies().get('loggedInUser');
+    if (!cobradorIdCookie) return { error: "Acceso no autorizado." };
+
+    const cobradorDocRef = doc(db, "users", cobradorIdCookie.value);
+    const cobradorSnap = await getDoc(cobradorDocRef);
+    if (!cobradorSnap.exists() || cobradorSnap.data().role !== 'cobrador') {
+        return { error: "Acción no autorizada." };
+    }
+    const cobradorData = cobradorSnap.data();
+
+    const creditRef = doc(db, "credits", creditId);
+    const creditSnap = await getDoc(creditRef);
+    if (!creditSnap.exists()) return { error: "Crédito no encontrado." };
+    
+    const creditData = creditSnap.data();
+    if (!creditData.paymentDates || creditData.paymentDates.length < 2) {
+        return { error: "El calendario de pagos no es válido para reprogramar." };
+    }
+
+    // Infer payment frequency
+    const dates = creditData.paymentDates.map((ts: Timestamp) => ts.toDate()).sort((a: Date, b: Date) => a.getTime() - b.getTime());
+    const frequencyDays = differenceInDays(dates[1], dates[0]);
+
+    // Find the next upcoming payment date
+    const paymentsSnapshot = await getDocs(query(collection(db, "payments"), where("creditId", "==", creditId)));
+    const paidInstallments = paymentsSnapshot.docs.filter(p => p.data().type === 'cuota').length;
+    
+    if (paidInstallments >= dates.length) {
+        return { error: "El crédito ya ha sido pagado en su totalidad." };
+    }
+    
+    const remainingDates = dates.slice(paidInstallments);
+    const newPaymentDates = remainingDates.map(date => addDays(date, frequencyDays));
+
+    // Combine paid dates with new dates
+    const finalSchedule = [
+        ...dates.slice(0, paidInstallments),
+        ...newPaymentDates
+    ];
+
+    // Update the credit with the new schedule and reset missed days
+    await updateDoc(creditRef, {
+        paymentDates: finalSchedule.map(d => Timestamp.fromDate(d)),
+        missedPaymentDays: 0,
+        updatedAt: Timestamp.now(),
+    });
+
+    // Log the agreement as a $0 payment for historical purposes
+    await addDoc(collection(db, "payments"), {
+        creditId,
+        amount: 0,
+        type: "acuerdo",
+        date: Timestamp.now(),
+        cobradorId: cobradorData.idNumber,
+        providerId: creditData.providerId,
+    });
+    
+    return { success: "Acuerdo registrado. El calendario de pagos ha sido actualizado." };
+}
 
 export async function saveProviderSettings(providerId: string, settings: { commissionTiers?: CommissionTier[], lateInterestRate?: number, isLateInterestActive?: boolean, companyLogoUrl?: string }) {
   if (!providerId) return { error: "ID de proveedor no válido." };
