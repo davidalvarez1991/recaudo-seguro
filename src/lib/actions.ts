@@ -290,7 +290,7 @@ export async function getCreditsByProvider() {
         
         const paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
         
-        const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
+        const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total' || p.type === 'acuerdo');
         const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
 
         const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
@@ -377,7 +377,7 @@ export async function getCreditsByCobrador() {
         const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
         
         // Payments of type 'cuota' or 'total' reduce the principal debt (which includes commission). 'interes' does not.
-        const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
+        const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total' || p.type === 'acuerdo');
         const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
 
         serializableData.paidInstallments = payments.filter(p => p.type === 'cuota').length;
@@ -444,7 +444,7 @@ export async function getCreditsByCliente() {
         const paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
         const paidInstallments = payments.filter(p => p.type === 'cuota').length;
         
-        const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
+        const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total' || p.type === 'acuerdo');
         const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
 
         const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
@@ -940,7 +940,7 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
     }
 }
 
-export async function registerPayment(creditId: string, amount: number, type: "cuota" | "total" | "acuerdo") {
+export async function registerPayment(creditId: string, amount: number, type: "cuota" | "total") {
     const cobradorIdCookie = cookies().get('loggedInUser');
     if (!cobradorIdCookie) return { error: "Acceso no autorizado." };
 
@@ -1017,7 +1017,7 @@ export async function registerPayment(creditId: string, amount: number, type: "c
     return { success: `Pago de ${amount.toLocaleString('es-CO')} registrado.` };
 }
 
-export async function registerPaymentAgreement(creditId: string) {
+export async function registerPaymentAgreement(creditId: string, amount: number = 0) {
     const cobradorIdCookie = cookies().get('loggedInUser');
     if (!cobradorIdCookie) return { error: "Acceso no autorizado." };
 
@@ -1065,10 +1065,10 @@ export async function registerPaymentAgreement(creditId: string) {
         updatedAt: Timestamp.now(),
     });
 
-    // Log the agreement as a $0 payment for historical purposes
+    // Log the agreement as a payment for historical purposes
     await addDoc(collection(db, "payments"), {
         creditId,
-        amount: 0,
+        amount,
         type: "acuerdo",
         date: Timestamp.now(),
         cobradorId: cobradorData.idNumber,
@@ -1105,9 +1105,10 @@ export async function saveProviderSettings(providerId: string, settings: { commi
       if (Object.keys(updateData).length > 0) {
         updateData.updatedAt = Timestamp.now();
         await updateDoc(providerRef, updateData);
+        return { success: true };
       }
 
-      return { success: true };
+      return { success: true }; // No changes, but operation is successful.
 
   } catch (error) {
       console.error("Error saving provider settings:", error);

@@ -50,6 +50,13 @@ const formatCurrency = (value: number) => {
     return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 };
 
+const formatCurrencyForInput = (value: string): string => {
+    if (!value) return "";
+    const numberValue = parseInt(value.replace(/\D/g, ''), 10);
+    if (isNaN(numberValue)) return "";
+    return new Intl.NumberFormat('es-CO').format(numberValue);
+};
+
 export default function CreditosPage() {
   const [creditos, setCreditos] = useState<Credito[]>([]);
   const [selectedCredit, setSelectedCredit] = useState<Credito | null>(null);
@@ -59,6 +66,7 @@ export default function CreditosPage() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [agreementAmount, setAgreementAmount] = useState("");
   const { toast } = useToast();
 
   const fetchCredits = useCallback(async () => {
@@ -98,6 +106,7 @@ export default function CreditosPage() {
     
     setSelectedCredit(credito);
     setPaymentType("cuota");
+    setAgreementAmount("");
     setIsModalOpen(true);
   };
   
@@ -153,7 +162,8 @@ export default function CreditosPage() {
     if (!selectedCredit) return;
     setIsSubmitting(true);
 
-    const result = await registerPaymentAgreement(selectedCredit.id);
+    const amount = agreementAmount ? parseFloat(agreementAmount.replace(/\D/g, '')) : 0;
+    const result = await registerPaymentAgreement(selectedCredit.id, amount);
 
     if (result.success) {
         toast({
@@ -198,12 +208,16 @@ export default function CreditosPage() {
 
   const getPaymentAmount = () => {
     if (!selectedCredit) return 0;
+    
+    if (paymentType === 'acuerdo') {
+        return agreementAmount ? parseFloat(agreementAmount.replace(/\D/g, '')) : 0;
+    }
+
     const totalLoanAmount = selectedCredit.valor + selectedCredit.commission;
     const installmentAmount = totalLoanAmount / selectedCredit.cuotas;
     switch (paymentType) {
         case "cuota": return installmentAmount + selectedCredit.lateFee;
         case "total": return selectedCredit.totalDebt;
-        case "acuerdo": return 0;
         default: return 0;
     }
   }
@@ -344,18 +358,20 @@ export default function CreditosPage() {
                 )}
                 <RadioGroup value={paymentType} onValueChange={(value: any) => setPaymentType(value)} className="gap-4">
                     {/* Pagar Cuota */}
-                    <Label htmlFor="payment-cuota" className="flex items-start gap-4 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
-                        <RadioGroupItem value="cuota" id="payment-cuota" className="mt-1" />
+                    <Label htmlFor="payment-cuota" className="flex flex-col gap-2 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
                         <div className="flex justify-between items-start w-full">
-                           <div>
-                                <p className="font-semibold">Pagar Cuota</p>
-                                <div className="text-xs text-muted-foreground flex flex-wrap gap-x-4">
-                                    <span>Capital: {formatCurrency(getInstallmentBreakdown().capital)}</span>
-                                    <span>Comisión: {formatCurrency(getInstallmentBreakdown().commission)}</span>
-                                    <span>Mora: {formatCurrency(selectedCredit.lateFee)}</span>
-                                </div>
-                            </div>
-                            <p className="font-bold text-lg">{formatCurrency(((selectedCredit.valor + selectedCredit.commission) / selectedCredit.cuotas) + selectedCredit.lateFee)}</p>
+                           <div className="flex items-center gap-4">
+                               <RadioGroupItem value="cuota" id="payment-cuota" className="mt-1" />
+                               <div>
+                                   <p className="font-semibold">Pagar Cuota</p>
+                                   <div className="text-xs text-muted-foreground flex flex-wrap gap-x-4">
+                                       <span>Capital: {formatCurrency(getInstallmentBreakdown().capital)}</span>
+                                       <span>Comisión: {formatCurrency(getInstallmentBreakdown().commission)}</span>
+                                       <span>Mora: {formatCurrency(selectedCredit.lateFee)}</span>
+                                   </div>
+                               </div>
+                           </div>
+                           <p className="font-bold text-lg">{formatCurrency(((selectedCredit.valor + selectedCredit.commission) / selectedCredit.cuotas) + selectedCredit.lateFee)}</p>
                         </div>
                     </Label>
 
@@ -371,18 +387,29 @@ export default function CreditosPage() {
                     </Label>
 
                      {/* Acuerdo de Cuota */}
-                    <Label htmlFor="payment-acuerdo" className={`flex items-start gap-4 rounded-md border p-4 transition-colors cursor-pointer hover:bg-muted/50`}>
-                        <RadioGroupItem value="acuerdo" id="payment-acuerdo" className="mt-1" />
-                        <div className="flex justify-between items-center w-full">
-                           <div>
-                                <p className="font-semibold flex items-center gap-1">
-                                    <Handshake className="w-4 h-4 text-muted-foreground" />
-                                    Acuerdo de Cuota
-                                </p>
-                                <p className="text-xs text-muted-foreground">Reprograma la fecha de pago sin generar mora.</p>
-                           </div>
-                           <p className="font-bold text-lg">{formatCurrency(0)}</p>
+                    <Label htmlFor="payment-acuerdo" className={`flex flex-col gap-2 rounded-md border p-4 transition-colors cursor-pointer hover:bg-muted/50`}>
+                        <div className="flex items-start gap-4 w-full">
+                            <RadioGroupItem value="acuerdo" id="payment-acuerdo" className="mt-1" />
+                            <div className="flex justify-between items-center w-full">
+                               <div>
+                                    <p className="font-semibold flex items-center gap-1">
+                                        <Handshake className="w-4 h-4 text-muted-foreground" />
+                                        Acuerdo de Cuota
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">Registra un pago parcial y reprograma la deuda.</p>
+                               </div>
+                               <p className="font-bold text-lg">{agreementAmount ? formatCurrency(parseFloat(agreementAmount.replace(/\D/g, ''))) : '$0'}</p>
+                            </div>
                         </div>
+                         {paymentType === 'acuerdo' && (
+                             <div className="pl-8 pt-2">
+                                <Input 
+                                    placeholder="Digita el valor del acuerdo..."
+                                    value={agreementAmount}
+                                    onChange={(e) => setAgreementAmount(formatCurrencyForInput(e.target.value))}
+                                />
+                             </div>
+                         )}
                     </Label>
                 </RadioGroup>
             </div>
