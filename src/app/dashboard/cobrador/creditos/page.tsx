@@ -20,6 +20,7 @@ import { es } from 'date-fns/locale';
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
 type Credito = {
@@ -37,6 +38,7 @@ type Credito = {
   lateInterestRate?: number;
   paidInstallments: number;
   paidAmount: number;
+  agreementAmount: number;
   remainingBalance: number;
   lateFee: number;
   totalDebt: number;
@@ -334,63 +336,69 @@ export default function CreditosPage() {
           {selectedCredit && (
             <div className="py-4 space-y-4">
                {selectedCredit.paymentDates && selectedCredit.paymentDates.length > 0 && (
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                           <CalendarDays className="h-5 w-5 text-muted-foreground" />
-                           <h4 className="font-medium text-sm">Calendario de Pagos</h4>
-                        </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 text-sm pl-2 max-h-24 overflow-y-auto">
-                            {selectedCredit.paymentDates
-                                .sort((a,b) => new Date(a).getTime() - new Date(b).getTime())
-                                .map((dateStr, index) => {
-                                const isPaid = index < selectedCredit.paidInstallments;
-                                const isNext = index === selectedCredit.paidInstallments;
-                                return (
-                                <div key={index} className={cn("flex items-center gap-2", { "text-muted-foreground": isPaid, "font-bold text-primary": isNext })}>
-                                    {isPaid ? <CheckCircle2 className="h-4 w-4 text-green-500"/> : <Circle className="h-4 w-4 text-muted-foreground/50"/>}
-                                    <span>{format(new Date(dateStr), "d 'de' MMMM", { locale: es })}</span>
+                    <Accordion type="single" collapsible className="w-full">
+                        <AccordionItem value="item-1">
+                            <AccordionTrigger className="text-sm font-medium hover:no-underline">
+                                <div className="flex items-center gap-2">
+                                    <CalendarDays className="h-5 w-5 text-muted-foreground" />
+                                    <span>Calendario de Pagos</span>
                                 </div>
-                                );
-                            })}
-                        </div>
-                        <Separator className="mt-4" />
-                    </div>
+                            </AccordionTrigger>
+                            <AccordionContent>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 text-sm pl-2 max-h-24 overflow-y-auto">
+                                    {selectedCredit.paymentDates
+                                        .sort((a,b) => new Date(a).getTime() - new Date(b).getTime())
+                                        .map((dateStr, index) => {
+                                        const isPaid = index < selectedCredit.paidInstallments;
+                                        const isNext = index === selectedCredit.paidInstallments;
+                                        return (
+                                        <div key={index} className={cn("flex items-center gap-2", { "text-muted-foreground": isPaid, "font-bold text-primary": isNext })}>
+                                            {isPaid ? <CheckCircle2 className="h-4 w-4 text-green-500"/> : <Circle className="h-4 w-4 text-muted-foreground/50"/>}
+                                            <span>{format(new Date(dateStr), "d 'de' MMMM", { locale: es })}</span>
+                                        </div>
+                                        );
+                                    })}
+                                </div>
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
                 )}
-                <RadioGroup value={paymentType} onValueChange={(value: any) => setPaymentType(value)} className="gap-4">
+
+                <RadioGroup value={paymentType} onValueChange={(value: any) => setPaymentType(value)} className="gap-4 pt-4">
                     {/* Pagar Cuota */}
                     <Label htmlFor="payment-cuota" className="flex flex-col gap-2 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
                         <div className="flex justify-between items-start w-full">
-                           <div className="flex items-center gap-4">
-                               <RadioGroupItem value="cuota" id="payment-cuota" className="mt-1" />
+                           <div className="flex items-start gap-4">
+                               <RadioGroupItem value="cuota" id="payment-cuota" className="mt-1 flex-shrink-0" />
                                <div>
                                    <p className="font-semibold">Pagar Cuota</p>
-                                   <div className="text-xs text-muted-foreground flex flex-wrap gap-x-4">
+                                   <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
                                        <span>Capital: {formatCurrency(getInstallmentBreakdown().capital)}</span>
                                        <span>Comisión: {formatCurrency(getInstallmentBreakdown().commission)}</span>
                                        <span>Mora: {formatCurrency(selectedCredit.lateFee)}</span>
                                    </div>
                                </div>
                            </div>
-                           <p className="font-bold text-lg">{formatCurrency(((selectedCredit.valor + selectedCredit.commission) / selectedCredit.cuotas) + selectedCredit.lateFee)}</p>
+                           <p className="font-bold text-lg text-right pl-2">{formatCurrency(((selectedCredit.valor + selectedCredit.commission) / selectedCredit.cuotas) + selectedCredit.lateFee)}</p>
                         </div>
                     </Label>
 
                     {/* Pagar Total */}
                     <Label htmlFor="payment-total" className="flex items-start gap-4 rounded-md border p-4 hover:bg-muted/50 transition-colors cursor-pointer">
-                        <RadioGroupItem value="total" id="payment-total" className="mt-1" />
+                        <RadioGroupItem value="total" id="payment-total" className="mt-1 flex-shrink-0" />
                         <div className="flex justify-between items-center w-full">
                             <div>
                                 <p className="font-semibold">Pagar Valor Total</p>
                             </div>
-                            <p className="font-bold text-lg">{formatCurrency(selectedCredit.totalDebt)}</p>
+                            <p className="font-bold text-lg text-right pl-2">{formatCurrency(selectedCredit.totalDebt)}</p>
                         </div>
                     </Label>
 
                      {/* Acuerdo de Cuota */}
                     <Label htmlFor="payment-acuerdo" className={`flex flex-col gap-2 rounded-md border p-4 transition-colors cursor-pointer hover:bg-muted/50`}>
                         <div className="flex items-start gap-4 w-full">
-                            <RadioGroupItem value="acuerdo" id="payment-acuerdo" className="mt-1" />
-                            <div className="flex justify-between items-center w-full">
+                            <RadioGroupItem value="acuerdo" id="payment-acuerdo" className="mt-1 flex-shrink-0" />
+                            <div className="flex justify-between items-start w-full">
                                <div>
                                     <p className="font-semibold flex items-center gap-1">
                                         <Handshake className="w-4 h-4 text-muted-foreground" />
@@ -398,7 +406,7 @@ export default function CreditosPage() {
                                     </p>
                                     <p className="text-xs text-muted-foreground">Registra un pago parcial y reprograma la deuda.</p>
                                </div>
-                               <p className="font-bold text-lg">{agreementAmount ? formatCurrency(parseFloat(agreementAmount.replace(/\D/g, ''))) : '$0'}</p>
+                               <p className="font-bold text-lg text-right pl-2">{agreementAmount ? formatCurrency(parseFloat(agreementAmount.replace(/\D/g, ''))) : '$0'}</p>
                             </div>
                         </div>
                          {paymentType === 'acuerdo' && (
