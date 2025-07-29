@@ -290,7 +290,8 @@ export async function getCreditsByProvider() {
         
         const paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
         
-        const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total' || p.type === 'acuerdo');
+        // Payments that reduce capital and commission
+        const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
         const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
 
         const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
@@ -376,8 +377,8 @@ export async function getCreditsByCobrador() {
         
         const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
         
-        // Payments of type 'cuota' or 'total' reduce the principal debt (which includes commission). 'interes' does not.
-        const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total' || p.type === 'acuerdo');
+        // Payments that reduce capital and commission
+        const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
         const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
 
         serializableData.paidInstallments = payments.filter(p => p.type === 'cuota').length;
@@ -444,7 +445,8 @@ export async function getCreditsByCliente() {
         const paidAmount = payments.reduce((sum, p) => sum + p.amount, 0);
         const paidInstallments = payments.filter(p => p.type === 'cuota').length;
         
-        const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total' || p.type === 'acuerdo');
+        // Payments that reduce capital and commission
+        const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
         const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
 
         const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
@@ -882,6 +884,8 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
     const paymentsRef = collection(db, "payments");
     const paymentsQuery = query(paymentsRef, where("creditId", "==", oldCreditId));
     const paymentsSnapshot = await getDocs(paymentsQuery);
+    
+    // Only 'cuota' and 'total' payments reduce the capital balance
     const capitalAndCommissionPayments = paymentsSnapshot.docs.map(p => p.data()).filter(p => p.type === 'cuota' || p.type === 'total');
     const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
     const totalOldLoanAmount = (oldCreditData.valor || 0) + (oldCreditData.commission || 0);
@@ -978,6 +982,7 @@ export async function registerPayment(creditId: string, amount: number, type: "c
     if (type === 'total') {
         isPaidOff = true;
     } else if (type === 'cuota') {
+        // Only 'cuota' and 'total' payments reduce the capital balance
         const capitalAndCommissionPayments = allPayments.filter(p => p.type === 'cuota' || p.type === 'total');
         const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum,p) => sum + p.amount, 0);
         
@@ -1017,7 +1022,7 @@ export async function registerPayment(creditId: string, amount: number, type: "c
     return { success: `Pago de ${amount.toLocaleString('es-CO')} registrado.` };
 }
 
-export async function registerPaymentAgreement(creditId: string, amount: number = 0) {
+export async function registerPaymentAgreement(creditId: string, amount: number) {
     const cobradorIdCookie = cookies().get('loggedInUser');
     if (!cobradorIdCookie) return { error: "Acceso no autorizado." };
 
@@ -1066,6 +1071,7 @@ export async function registerPaymentAgreement(creditId: string, amount: number 
     });
 
     // Log the agreement as a payment for historical purposes
+    // This payment does NOT affect the principal balance
     await addDoc(collection(db, "payments"), {
         creditId,
         amount,
