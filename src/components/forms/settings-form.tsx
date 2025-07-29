@@ -34,14 +34,16 @@ const formatCurrencyForInput = (value: number | string): string => {
     return new Intl.NumberFormat('es-CO').format(numberValue);
 };
 
-const availableFonts = [
-    'Roboto',
-    'Lato',
-    'Montserrat',
-    'Oswald',
-    'Playfair Display',
-    'Merriweather'
-];
+const fontMap: { [key: string]: string } = {
+    'Roboto': 'Roboto:wght@400;700&display=swap',
+    'Lato': 'Lato:wght@400;700&display=swap',
+    'Montserrat': 'Montserrat:wght@400;700&display=swap',
+    'Oswald': 'Oswald:wght@400;700&display=swap',
+    'Playfair Display': 'Playfair+Display:wght@400;700&display=swap',
+    'Merriweather': 'Merriweather:wght@400;700&display=swap',
+};
+
+const availableFonts = Object.keys(fontMap);
 
 export function SettingsForm({ providerId }: SettingsFormProps) {
   const [fontFamily, setFontFamily] = useState('Roboto');
@@ -79,6 +81,20 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
     fetchUserData();
   }, [providerId, toast]);
   
+    useEffect(() => {
+        if (fontFamily && fontMap[fontFamily]) {
+            const linkId = `google-font-${fontFamily.replace(' ', '-')}`;
+            if (document.getElementById(linkId)) return;
+
+            const fontUrl = `https://fonts.googleapis.com/css2?family=${fontMap[fontFamily].replace(/ /g, '+')}`;
+            const link = document.createElement('link');
+            link.id = linkId;
+            link.rel = 'stylesheet';
+            link.href = fontUrl;
+            document.head.appendChild(link);
+        }
+    }, [fontFamily]);
+
   const handleCommissionTierChange = (index: number, field: keyof CommissionTier, value: string) => {
     const numericValue = parseInt(value.replace(/\D/g, ''), 10);
     
