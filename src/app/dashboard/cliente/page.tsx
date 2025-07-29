@@ -9,7 +9,7 @@ import { Loader2, CheckCircle2, Circle, Wallet, HandCoins, FileText, User, Finge
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import html2canvas from "html2canvas";
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +19,7 @@ type CreditData = {
   clienteName?: string;
   clienteId?: string;
   providerName?: string;
-  providerLogoUrl?: string;
+  providerFont?: string;
   valor: number;
   commission: number;
   cuotas: number;
@@ -159,10 +159,9 @@ export default function ClienteDashboard() {
                 <TabsTrigger key={credit.id} value={credit.id} className="flex flex-col h-auto items-start p-2 text-left">
                   <div className="flex items-center gap-2">
                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={credit.providerLogoUrl} alt={credit.providerName} crossOrigin="anonymous" />
                         <AvatarFallback>{getAvatarFallback(credit.providerName)}</AvatarFallback>
                      </Avatar>
-                     <span className="font-semibold">{credit.providerName || 'Proveedor Desconocido'}</span>
+                     <span className="font-semibold" style={{ fontFamily: credit.providerFont || 'inherit' }}>{credit.providerName || 'Proveedor Desconocido'}</span>
                   </div>
                   <span className="text-xs text-muted-foreground ml-8">{formatCurrency(credit.totalLoanAmount)}</span>
                 </TabsTrigger>

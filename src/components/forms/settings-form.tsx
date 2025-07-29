@@ -1,20 +1,17 @@
 
 "use client";
 
-import { useState, useRef, ChangeEvent, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Upload, Save, Percent, Trash2, PlusCircle, DollarSign, Loader2 } from "lucide-react";
+import { Save, Percent, Trash2, PlusCircle, DollarSign, Loader2, Type } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { getUserData, saveProviderSettings } from "@/lib/actions";
-import { storage } from "@/lib/firebase";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 type CommissionTier = {
@@ -37,12 +34,17 @@ const formatCurrencyForInput = (value: number | string): string => {
     return new Intl.NumberFormat('es-CO').format(numberValue);
 };
 
+const availableFonts = [
+    'Roboto',
+    'Lato',
+    'Montserrat',
+    'Oswald',
+    'Playfair Display',
+    'Merriweather'
+];
+
 export function SettingsForm({ providerId }: SettingsFormProps) {
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  
+  const [fontFamily, setFontFamily] = useState('Roboto');
   const [commissionTiers, setCommissionTiers] = useState<CommissionTier[]>([]);
   const [lateInterestRate, setLateInterestRate] = useState("2");
   const [isLateInterestActive, setIsLateInterestActive] = useState(false);
@@ -58,7 +60,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
       try {
         const userData = await getUserData(providerId);
         if (userData) {
-          setLogoUrl(userData.companyLogoUrl || null);
+          setFontFamily(userData.fontFamily || 'Roboto');
           setLateInterestRate((userData.lateInterestRate || 2).toString());
           setIsLateInterestActive(userData.isLateInterestActive || false);
           
@@ -76,61 +78,6 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
     };
     fetchUserData();
   }, [providerId, toast]);
-
-
-  const handleLogoChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    if (!providerId) return;
-    const file = event.target.files?.[0];
-    if (file) {
-        const originalLogoUrl = logoUrl;
-        const previewUrl = URL.createObjectURL(file);
-        setIsUploading(true);
-        setUploadProgress(0);
-        setLogoUrl(previewUrl);
-
-        try {
-            const storagePath = `proveedores/${providerId}/logo/${Date.now()}_${file.name}`;
-            const storageRef = ref(storage, storagePath);
-            const uploadTask = uploadBytesResumable(storageRef, file);
-
-            uploadTask.on('state_changed', 
-                (snapshot) => {
-                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                    setUploadProgress(progress);
-                }, 
-                (error) => {
-                    console.error("Error uploading logo:", error.code, error.message);
-                    setLogoUrl(originalLogoUrl);
-                    toast({ title: "Error de carga", description: `No se pudo subir el nuevo logo: ${error.code}`, variant: "destructive" });
-                    setIsUploading(false);
-                    setUploadProgress(0);
-                }, 
-                async () => {
-                    const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-                    await saveProviderSettings(providerId, { companyLogoUrl: downloadURL });
-                    
-                    setLogoUrl(downloadURL);
-                    localStorage.setItem(`company-logo_${providerId}`, downloadURL);
-                    window.dispatchEvent(new CustomEvent('logo-updated'));
-                    
-                    toast({ title: "Logo Actualizado", description: "El nuevo logo se ha guardado correctamente.", className: "bg-accent text-accent-foreground border-accent" });
-                    setIsUploading(false);
-                    URL.revokeObjectURL(previewUrl);
-                }
-            );
-
-        } catch (error: any) {
-            console.error("Error setting up upload:", error);
-            setLogoUrl(originalLogoUrl);
-            toast({ title: "Error de Configuración", description: `No se pudo iniciar la subida del logo: ${error.message}`, variant: "destructive" });
-            setIsUploading(false);
-        }
-    }
-  };
-
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
-  };
   
   const handleCommissionTierChange = (index: number, field: keyof CommissionTier, value: string) => {
     const numericValue = parseInt(value.replace(/\D/g, ''), 10);
@@ -178,6 +125,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
         }
     
         const settingsToSave = {
+            fontFamily,
             commissionTiers,
             lateInterestRate: rate,
             isLateInterestActive,
@@ -191,6 +139,8 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
             variant: "default",
             className: "bg-accent text-accent-foreground border-accent",
           });
+          // Force a reload to apply the new font everywhere
+          window.location.reload();
         } else {
            toast({ title: "Error", description: result.error, variant: "destructive" });
         }
@@ -211,36 +161,34 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
   return (
     <div className="space-y-8 pt-6">
 
-      {/* Logo Section */}
+      {/* Font/Branding Section */}
       <div className="space-y-6">
         <div className="space-y-1">
-            <h3 className="text-lg font-medium">Logo de la Empresa</h3>
-            <p className="text-sm text-muted-foreground">Sube o actualiza el logo que verán tus clientes y cobradores.</p>
+            <h3 className="text-lg font-medium">Identidad de Marca</h3>
+            <p className="text-sm text-muted-foreground">Elige una tipografía para representar tu marca.</p>
         </div>
         <Card className="max-w-md">
-            <CardContent className="p-6 flex flex-col sm:flex-row items-center gap-6">
-                <Avatar className="h-24 w-24 border-2 border-primary/10 shadow-sm">
-                    <AvatarImage src={logoUrl || "https://placehold.co/200x200.png"} data-ai-hint="company logo" alt="Logo de la empresa" />
-                    <AvatarFallback>LOGO</AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col gap-2 w-full text-center sm:text-left">
-                     <Input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleLogoChange}
-                        className="hidden"
-                        accept="image/png, image/jpeg, image/gif"
-                        disabled={isUploading || !providerId}
-                      />
-                    <Button onClick={handleUploadClick} disabled={isUploading || !providerId} className="w-full">
-                      {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                      {isUploading ? `Cargando... ${Math.round(uploadProgress)}%` : (logoUrl ? "Cambiar Logo" : "Subir Logo")}
-                    </Button>
-                    {isUploading && (
-                       <Progress value={uploadProgress} className="w-full h-2" />
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      PNG, JPG o GIF (Recomendado 200x200px).
+            <CardContent className="p-6 flex flex-col gap-4">
+                <Label htmlFor="font-family-select" className="flex items-center gap-2">
+                  <Type className="h-4 w-4" />
+                  Tipografía de la Marca
+                </Label>
+                <Select value={fontFamily} onValueChange={setFontFamily}>
+                    <SelectTrigger id="font-family-select">
+                        <SelectValue placeholder="Selecciona una fuente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {availableFonts.map(font => (
+                           <SelectItem key={font} value={font} style={{ fontFamily: font }}>
+                                {font}
+                           </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <div className="border rounded-md p-4 text-center">
+                    <p className="text-sm text-muted-foreground mb-2">Vista Previa:</p>
+                    <p className="text-3xl" style={{ fontFamily: fontFamily }}>
+                        Tu Marca Aquí
                     </p>
                 </div>
             </CardContent>
@@ -364,7 +312,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
        <Separator />
 
       <div className="flex justify-end">
-        <Button onClick={handleSaveAllSettings} disabled={isSaving || isUploading}>
+        <Button onClick={handleSaveAllSettings} disabled={isSaving}>
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             {isSaving ? 'Guardando...' : 'Guardar Toda la Configuración'}
         </Button>

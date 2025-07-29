@@ -20,47 +20,7 @@ import { useRouter } from "next/navigation";
 
 export function UserNav() {
   const [isPending, startTransition] = useTransition();
-  const [logo, setLogo] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
   const router = useRouter();
-
-  useEffect(() => {
-    const getCookie = (name: string): string | null => {
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
-      return null;
-    };
-    const currentUserId = getCookie('loggedInUser');
-    setUserId(currentUserId);
-
-    const updateLogo = () => {
-      if (currentUserId) {
-        const savedLogo = localStorage.getItem(`company-logo_${currentUserId}`);
-        setLogo(savedLogo);
-      } else {
-        setLogo(null);
-      }
-    };
-
-    updateLogo();
-
-    window.addEventListener('logo-updated', updateLogo);
-    
-    // Listen for storage changes in other tabs, which might indicate login/logout
-    const handleStorageChange = () => {
-        const updatedUserId = getCookie('loggedInUser');
-        if (updatedUserId !== userId) {
-            window.location.reload(); // Reload if user session changes
-        }
-    };
-    window.addEventListener('storage', handleStorageChange);
-
-    return () => {
-      window.removeEventListener('logo-updated', updateLogo);
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, [userId]);
 
   const handleLogout = () => {
     startTransition(async () => {
@@ -76,7 +36,7 @@ export function UserNav() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-9 w-9 rounded-full">
           <Avatar className="h-9 w-9">
-            <AvatarImage src={logo || "https://placehold.co/100x100.png"} data-ai-hint="user avatar" alt="@user" />
+            <AvatarImage src={"https://placehold.co/100x100.png"} data-ai-hint="user avatar" alt="@user" />
             <AvatarFallback>U</AvatarFallback>
           </Avatar>
         </Button>

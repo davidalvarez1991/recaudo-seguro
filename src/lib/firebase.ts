@@ -6,7 +6,7 @@ import { getStorage } from "firebase/storage";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyB-m11OcvdJzSXwA2sL3Oa1j5s_9s_8_g4",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: "recaudo-seguro.firebaseapp.com",
   projectId: "recaudo-seguro",
   storageBucket: "recaudo-seguro.appspot.com",
@@ -14,15 +14,13 @@ const firebaseConfig = {
   appId: "1:547595522209:web:57a4f2824bea39f53ba0e0"
 };
 
-// Initialize Firebase for SSR
-function getFirebaseApp(): FirebaseApp {
-  if (!getApps().length) {
-    return initializeApp(firebaseConfig);
-  }
-  return getApp();
+let app: FirebaseApp;
+if (!getApps().length) {
+    app = initializeApp(firebaseConfig);
+} else {
+    app = getApp();
 }
 
-const app = getFirebaseApp();
 const db = getFirestore(app);
 const storage = getStorage(app);
 

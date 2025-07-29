@@ -6,9 +6,8 @@ import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
-import { db, storage } from "./firebase";
+import { db } from "./firebase";
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc, increment, orderBy, limit } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { startOfDay, differenceInDays, endOfDay, isWithinInterval, addDays } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { analyzeClientReputation, ClientReputationInput } from '@/ai/flows/analyze-client-reputation';
@@ -442,13 +441,13 @@ export async function getCreditsByCliente() {
 
         // Fetch provider data for each credit
         let providerName = "Proveedor Desconocido";
-        let providerLogoUrl = null;
+        let providerFont = "Inter";
         if (creditData.providerId) {
             const providerDoc = await getDoc(doc(db, "users", creditData.providerId));
             if (providerDoc.exists()) {
                 const providerData = providerDoc.data();
                 providerName = providerData.companyName || providerData.name || providerName;
-                providerLogoUrl = providerData.companyLogoUrl || null;
+                providerFont = providerData.fontFamily || 'Inter';
             }
         }
 
@@ -471,7 +470,7 @@ export async function getCreditsByCliente() {
             clienteName: clienteData.name,
             clienteId: clienteData.idNumber,
             providerName: providerName,
-            providerLogoUrl: providerLogoUrl,
+            providerFont: providerFont,
             valor: creditData.valor,
             commission: creditData.commission,
             cuotas: creditData.cuotas,
@@ -1141,7 +1140,7 @@ export async function registerPaymentAgreement(creditId: string, amount: number)
     return { success: "Acuerdo registrado. El calendario de pagos ha sido actualizado." };
 }
 
-export async function saveProviderSettings(providerId: string, settings: { commissionTiers?: CommissionTier[], lateInterestRate?: number, isLateInterestActive?: boolean, companyLogoUrl?: string }) {
+export async function saveProviderSettings(providerId: string, settings: { commissionTiers?: CommissionTier[], lateInterestRate?: number, isLateInterestActive?: boolean, fontFamily?: string }) {
   if (!providerId) return { error: "ID de proveedor no válido." };
   
   const providerRef = doc(db, "users", providerId);
@@ -1161,8 +1160,8 @@ export async function saveProviderSettings(providerId: string, settings: { commi
       if (settings.isLateInterestActive !== undefined) {
         updateData.isLateInterestActive = settings.isLateInterestActive;
       }
-      if (settings.companyLogoUrl !== undefined) {
-        updateData.companyLogoUrl = settings.companyLogoUrl;
+       if (settings.fontFamily !== undefined) {
+        updateData.fontFamily = settings.fontFamily;
       }
       
       if (Object.keys(updateData).length > 0) {
