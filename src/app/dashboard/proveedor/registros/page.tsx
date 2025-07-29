@@ -451,7 +451,7 @@ export default function RegistrosPage() {
             <DialogDescription>
               Actualiza la información del cliente. Los cambios se reflejarán en todos sus registros.
             </DialogDescription>
-          </Header>
+          </DialogHeader>
           {selectedRegistro && (
             <EditClientForm
               cliente={{
@@ -486,3 +486,5 @@ export default function RegistrosPage() {
     </>
   );
 }
+
+    
