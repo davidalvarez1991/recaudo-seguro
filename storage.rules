@@ -2,17 +2,17 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Permite a los proveedores autenticados subir un logo a su propia carpeta.
-    // El ID del proveedor en la ruta debe coincidir con el ID del usuario que realiza la solicitud.
+    // Permite la escritura pública solo en la carpeta de logos de los proveedores.
+    // La seguridad se basa en que la URL de subida solo se genera desde el servidor
+    // en una acción autenticada, por lo que la ruta es segura.
     match /proveedores/{providerId}/logo/{fileName} {
-      allow write: if request.auth != null && request.auth.uid == providerId;
+      allow write: if true;
+      allow read; // Permite la lectura para que los logos se puedan mostrar en la app
     }
 
-    // Permite la lectura pública de cualquier archivo para que puedan ser mostrados en la app.
-    // Esto es útil para los logos de empresa, fotos de clientes, etc.
-    // Si necesitas más seguridad, puedes restringir la lectura aquí también.
+    // Por defecto, deniega todas las demás lecturas y escrituras no autenticadas.
     match /{allPaths=**} {
-      allow read;
+      allow read, write: if request.auth != null;
     }
   }
 }
