@@ -99,10 +99,11 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
                     setUploadProgress(progress);
                 }, 
                 (error) => {
-                    console.error("Error uploading logo:", error);
+                    console.error("Error uploading logo:", error.code, error.message);
                     setLogoUrl(originalLogoUrl);
-                    toast({ title: "Error de carga", description: `No se pudo subir el nuevo logo: ${error.message}`, variant: "destructive" });
+                    toast({ title: "Error de carga", description: `No se pudo subir el nuevo logo: ${error.code}`, variant: "destructive" });
                     setIsUploading(false);
+                    setUploadProgress(0);
                 }, 
                 async () => {
                     const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
@@ -118,10 +119,10 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
                 }
             );
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error setting up upload:", error);
             setLogoUrl(originalLogoUrl);
-            toast({ title: "Error de Configuración", description: "No se pudo iniciar la subida del logo.", variant: "destructive" });
+            toast({ title: "Error de Configuración", description: `No se pudo iniciar la subida del logo: ${error.message}`, variant: "destructive" });
             setIsUploading(false);
         }
     }

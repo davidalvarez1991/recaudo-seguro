@@ -15,13 +15,14 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase for SSR
-let app: FirebaseApp;
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApp();
+function getFirebaseApp(): FirebaseApp {
+  if (!getApps().length) {
+    return initializeApp(firebaseConfig);
+  }
+  return getApp();
 }
 
+const app = getFirebaseApp();
 const db = getFirestore(app);
 const storage = getStorage(app);
 
