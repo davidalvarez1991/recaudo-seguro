@@ -159,7 +159,7 @@ export default function ClienteDashboard() {
                 <TabsTrigger key={credit.id} value={credit.id} className="flex flex-col h-auto items-start p-2 text-left">
                   <div className="flex items-center gap-2">
                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={credit.providerLogoUrl} alt={credit.providerName} />
+                        <AvatarImage src={credit.providerLogoUrl} alt={credit.providerName} crossOrigin="anonymous" />
                         <AvatarFallback>{getAvatarFallback(credit.providerName)}</AvatarFallback>
                      </Avatar>
                      <span className="font-semibold">{credit.providerName || 'Proveedor Desconocido'}</span>
