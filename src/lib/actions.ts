@@ -2,7 +2,7 @@
 "use server";
 
 import { z } from "zod";
-import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, SavePaymentScheduleSchema, RenewCreditSchema, EditClientSchema } from "./schemas";
+import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, SavePaymentScheduleSchema, RenewCreditSchema, EditClientSchema, NewCreditSchema } from "./schemas";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
@@ -400,6 +400,8 @@ export async function getCreditsByCobrador() {
         const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
         const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
         serializableData.remainingBalance = remainingBalance;
+
+        serializableData.agreementAmount = payments.filter(p => p.type === 'acuerdo').reduce((sum, p) => sum + p.amount, 0);
         
         serializableData.lateInterestRate = providerSettings.isLateInterestActive ? (providerSettings.lateInterestRate || 0) : 0;
 
@@ -863,6 +865,51 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     });
 
     return { success: true, creditId: creditRef.id };
+}
+
+export async function createNewCreditForClient(values: z.infer<typeof NewCreditSchema>) {
+    const cobradorIdCookie = cookies().get('loggedInUser');
+    if (!cobradorIdCookie) return { error: "No se pudo identificar al cobrador." };
+
+    const cobradorDocRef = doc(db, "users", cobradorIdCookie.value);
+    const cobradorSnap = await getDoc(cobradorDocRef);
+    if (!cobradorSnap.exists() || cobradorSnap.data().role !== 'cobrador') {
+        return { error: "Acción no autorizada." };
+    }
+    const cobrador = cobradorSnap.data();
+
+    const providerId = cobrador.providerId;
+    if (!providerId) return { error: "El cobrador no tiene un proveedor asociado." };
+
+    const providerDocRef = doc(db, "users", providerId);
+    const providerSnap = await getDoc(providerDocRef);
+    if (!providerSnap.exists()) return { error: "Proveedor no encontrado." };
+    const provider = providerSnap.data();
+
+    const { clienteId, creditAmount, installments } = values;
+
+    const cliente = await findUserByIdNumber(clienteId);
+    if (!cliente) {
+        return { error: "Cliente no encontrado. No se puede crear el crédito." };
+    }
+
+    const valor = parseFloat(creditAmount.replace(/\./g, '').replace(',', '.'));
+    const commission = calculateCommission(valor, provider.commissionTiers);
+
+    const newCreditRef = await addDoc(collection(db, "credits"), {
+        clienteId,
+        cobradorId: cobrador.idNumber,
+        providerId,
+        valor,
+        commission,
+        cuotas: parseInt(installments, 10),
+        fecha: Timestamp.now(),
+        estado: 'Activo',
+        paymentScheduleSet: false,
+        missedPaymentDays: 0,
+    });
+
+    return { success: true, newCreditId: newCreditRef.id };
 }
 
 export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {

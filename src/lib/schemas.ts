@@ -140,3 +140,9 @@ export const RenewCreditSchema = z.object({
   additionalAmount: z.string().min(1, "El valor adicional es obligatorio."),
   installments: z.string().min(1, "El número de cuotas es obligatorio."),
 });
+
+export const NewCreditSchema = z.object({
+  clienteId: z.string().min(1, "La identificación del cliente es obligatoria."),
+  creditAmount: z.string().min(1, "El valor del crédito es obligatorio."),
+  installments: z.string().min(1, "El número de cuotas es obligatorio."),
+});

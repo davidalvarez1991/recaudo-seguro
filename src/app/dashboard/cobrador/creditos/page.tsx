@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw, XCircle, CalendarDays, CheckCircle2, Circle, Star, Search, Handshake, Percent } from "lucide-react";
+import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw, XCircle, CalendarDays, CheckCircle2, Circle, Star, Search, Handshake, Percent, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getCreditsByCobrador, registerPayment, registerMissedPayment, registerPaymentAgreement } from "@/lib/actions";
@@ -15,6 +15,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { RenewCreditForm } from "@/components/forms/renew-credit-form";
+import { NewCreditForm } from "@/components/forms/new-credit-form";
 import { format, isBefore, startOfToday } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Separator } from "@/components/ui/separator";
@@ -65,6 +66,7 @@ export default function CreditosPage() {
   const [paymentType, setPaymentType] = useState<PaymentType>("cuota");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
+  const [isNewCreditModalOpen, setIsNewCreditModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -101,8 +103,14 @@ export default function CreditosPage() {
   }, [fetchCredits]);
 
   const handleRowClick = (credito: Credito) => {
-    if (credito.estado === 'Renovado' || credito.estado === 'Pagado') {
-        toast({ title: `Crédito ${credito.estado}`, description: "Este crédito ya no está activo y no se pueden registrar pagos." });
+    if (credito.estado === 'Pagado') {
+        setSelectedCredit(credito);
+        setIsNewCreditModalOpen(true);
+        return;
+    }
+
+    if (credito.estado === 'Renovado') {
+        toast({ title: `Crédito ${credito.estado}`, description: "Este crédito ya fue renovado y no admite más acciones." });
         return;
     }
     
@@ -492,6 +500,30 @@ export default function CreditosPage() {
               />
             )}
           </DialogContent>
+        </Dialog>
+        
+        {/* New Credit for Paid Client Modal */}
+        <Dialog open={isNewCreditModalOpen} onOpenChange={setIsNewCreditModalOpen}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-amber-500"/>
+                        Habilitar Nuevo Crédito
+                    </DialogTitle>
+                    <DialogDescription>
+                        Crear un nuevo crédito para el cliente recurrente <span className="font-semibold">{selectedCredit?.clienteName}</span>.
+                    </DialogDescription>
+                </DialogHeader>
+                {selectedCredit && (
+                    <NewCreditForm
+                        clienteId={selectedCredit.clienteId}
+                        onFormSubmit={() => {
+                            setIsNewCreditModalOpen(false);
+                            fetchCredits();
+                        }}
+                    />
+                )}
+            </DialogContent>
         </Dialog>
     </TooltipProvider>
   );
