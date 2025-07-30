@@ -68,9 +68,11 @@ const formatCurrencyForInput = (value: string): string => {
 
 const formatDateGroup = (dateStr: string) => {    
     const date = parseISO(dateStr);
-    if (isToday(date)) return `Hoy, ${format(date, "d 'de' MMMM", { locale: es })}`;
-    if (isTomorrow(date)) return `Mañana, ${format(date, "d 'de' MMMM", { locale: es })}`;
-    return format(date, "EEEE, d 'de' MMMM", { locale: es });
+    const timeZone = 'America/Bogota';
+    const zonedDate = toZonedTime(date, timeZone);
+    if (isToday(zonedDate)) return `Hoy, ${format(zonedDate, "d 'de' MMMM", { locale: es })}`;
+    if (isTomorrow(zonedDate)) return `Mañana, ${format(zonedDate, "d 'de' MMMM", { locale: es })}`;
+    return format(zonedDate, "EEEE, d 'de' MMMM", { locale: es });
 };
 
 const generateWhatsAppLink = (phone: string, clientName: string) => {
@@ -116,7 +118,6 @@ export default function RutaDePagoPage() {
         const timeZone = 'America/Bogota';
 
         const filtered = allRoutes.filter(route => {
-            // Convert server date to Colombia timezone before comparison
             const routeDate = toZonedTime(parseISO(route.nextPaymentDate), timeZone);
             
             const dateMatch = filterDate ? isSameDay(routeDate, toZonedTime(filterDate, timeZone)) : true;
@@ -314,7 +315,7 @@ export default function RutaDePagoPage() {
                             <AccordionItem key={dateKey} value={`group-${dateKey}`} className="border rounded-lg bg-card">
                                 <AccordionTrigger className="px-4 py-3 hover:no-underline">
                                     <div className="flex items-center gap-4">
-                                        <Badge variant={isPast(parseISO(dateKey)) && !isToday(parseISO(dateKey)) ? "destructive" : "secondary"}>
+                                        <Badge variant={isPast(toZonedTime(parseISO(dateKey), 'America/Bogota')) && !isToday(toZonedTime(parseISO(dateKey), 'America/Bogota')) ? "destructive" : "secondary"}>
                                             {formatDateGroup(dateKey)}
                                         </Badge>
                                         <span className="text-muted-foreground text-sm">{groupedRoutes[dateKey].length} cliente(s)</span>
@@ -467,3 +468,5 @@ export default function RutaDePagoPage() {
         </Card>
     );
 }
+
+    
