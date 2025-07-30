@@ -1,11 +1,11 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, MoreHorizontal, Trash2, Eye, Pencil, RefreshCcw, Loader2, Search, HandCoins, FilePlus } from "lucide-react";
+import { ArrowLeft, ClipboardList, MoreHorizontal, Trash2, Eye, Pencil, RefreshCcw, Loader2, Search, HandCoins, FilePlus, Filter, X } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getProviderActivityLog, deleteClientAndCredits } from "@/lib/actions";
@@ -18,6 +18,12 @@ import { Separator } from "@/components/ui/separator";
 import { EditClientForm } from "@/components/forms/edit-client-form";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { DateRange } from "react-day-picker";
+import { format, isWithinInterval } from "date-fns";
+import { es } from "date-fns/locale";
+import { Label } from "@/components/ui/label";
 
 
 type ActivityLogEntry = {
@@ -49,6 +55,8 @@ export default function RegistrosPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [amountFilter, setAmountFilter] = useState("");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
   const router = useRouter();
@@ -73,10 +81,6 @@ export default function RegistrosPage() {
     fetchRecords();
   }, []);
   
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchTerm]);
-
   const handleViewDetails = (entry: ActivityLogEntry) => {
     setSelectedEntry(entry);
     setIsDetailsModalOpen(true);
@@ -144,17 +148,51 @@ export default function RegistrosPage() {
     }
     return null;
   }
-
-  const filteredLog = activityLog.filter(entry =>
-    (entry.clienteName?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (entry.clienteId?.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
   
+  const formatCurrencyForInput = (value: string): string => {
+    if (!value) return "";
+    const numberValue = parseInt(value.replace(/\D/g, ''), 10);
+    if (isNaN(numberValue)) return "";
+    return new Intl.NumberFormat('es-CO').format(numberValue);
+  };
+
+  const filteredLog = useMemo(() => {
+    const amount = amountFilter ? parseFloat(amountFilter.replace(/\D/g, '')) : NaN;
+
+    const filtered = activityLog.filter(entry => {
+      const nameMatch = searchTerm ? 
+        (entry.clienteName?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (entry.clienteId?.toLowerCase().includes(searchTerm.toLowerCase()))
+        : true;
+      
+      const amountMatch = !isNaN(amount) ? entry.amount === amount : true;
+      
+      const dateMatch = dateRange?.from ? isWithinInterval(new Date(entry.date), {
+          start: dateRange.from,
+          end: dateRange.to || dateRange.from,
+      }) : true;
+      
+      return nameMatch && amountMatch && dateMatch;
+    });
+
+    return filtered;
+  }, [activityLog, searchTerm, amountFilter, dateRange]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, amountFilter, dateRange]);
+
   const totalPages = Math.ceil(filteredLog.length / ITEMS_PER_PAGE);
   const paginatedLog = filteredLog.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
+  
+  const clearFilters = () => {
+    setSearchTerm("");
+    setAmountFilter("");
+    setDateRange(undefined);
+  };
 
   return (
     <>
@@ -180,15 +218,52 @@ export default function RegistrosPage() {
                 </Button>
               </div>
           </div>
-            <div className="mt-4 relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                type="search"
-                placeholder="Buscar por nombre o cédula de cliente..."
-                className="w-full pl-8 sm:w-[300px]"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                />
+            <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-grow">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                    type="search"
+                    placeholder="Buscar por nombre o cédula..."
+                    className="w-full pl-8"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+                 <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full sm:w-auto justify-start">
+                            <Filter className="mr-2 h-4 w-4" />
+                            <span>Filtros Avanzados</span>
+                            {(dateRange?.from || amountFilter) && <Badge variant="secondary" className="ml-2">Activo</Badge>}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 space-y-4">
+                        <div>
+                            <Label htmlFor="date-range">Rango de Fechas</Label>
+                             <Calendar
+                                id="date-range"
+                                mode="range"
+                                selected={dateRange}
+                                onSelect={setDateRange}
+                                locale={es}
+                                numberOfMonths={1}
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="amount-filter">Monto del Registro</Label>
+                            <Input
+                                id="amount-filter"
+                                placeholder="Ej: 68.000"
+                                value={amountFilter}
+                                onChange={(e) => setAmountFilter(formatCurrencyForInput(e.target.value))}
+                            />
+                        </div>
+                    </PopoverContent>
+                </Popover>
+                <Button variant="ghost" size="icon" onClick={clearFilters} className="w-full sm:w-auto">
+                    <X className="h-4 w-4" />
+                    <span className="sr-only">Limpiar filtros</span>
+                </Button>
             </div>
         </CardHeader>
         <CardContent className="pt-6">
@@ -249,8 +324,8 @@ export default function RegistrosPage() {
           ) : (
               <div className="text-center text-muted-foreground py-8">
                   <ClipboardList className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                  <h3 className="text-lg font-semibold">{searchTerm ? 'No se encontraron registros' : 'No hay actividad registrada'}</h3>
-                  <p className="text-sm">{searchTerm ? 'Intenta con otro nombre o cédula.' : 'Cuando un cobrador cree un crédito o registre un pago, aparecerá aquí.'}</p>
+                  <h3 className="text-lg font-semibold">{searchTerm || amountFilter || dateRange ? 'No se encontraron registros' : 'No hay actividad registrada'}</h3>
+                  <p className="text-sm">{searchTerm || amountFilter || dateRange ? 'Intenta con otros filtros.' : 'Cuando un cobrador cree un crédito o registre un pago, aparecerá aquí.'}</p>
               </div>
           )}
         </CardContent>

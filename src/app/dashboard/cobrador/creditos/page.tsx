@@ -1,11 +1,11 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw, XCircle, CalendarDays, CheckCircle2, Circle, Star, Search, Handshake, Percent, Sparkles } from "lucide-react";
+import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw, XCircle, CalendarDays, CheckCircle2, Circle, Star, Search, Handshake, Percent, Sparkles, Filter, X } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getCreditsByCobrador, registerPayment, registerMissedPayment, registerPaymentAgreement } from "@/lib/actions";
@@ -16,12 +16,15 @@ import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { RenewCreditForm } from "@/components/forms/renew-credit-form";
 import { NewCreditForm } from "@/components/forms/new-credit-form";
-import { format, isBefore, startOfToday } from 'date-fns';
+import { format, isBefore, startOfToday, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { DateRange } from "react-day-picker";
 
 
 type Credito = {
@@ -70,6 +73,8 @@ export default function CreditosPage() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [amountFilter, setAmountFilter] = useState("");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [agreementAmount, setAgreementAmount] = useState("");
   const { toast } = useToast();
 
@@ -258,10 +263,30 @@ export default function CreditosPage() {
     return { capital: capitalPerInstallment, commission: commissionPerInstallment };
   }
 
-  const filteredCreditos = creditos.filter(credito =>
-    (credito.clienteName?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (credito.clienteId?.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredCreditos = useMemo(() => {
+    const amount = amountFilter ? parseFloat(amountFilter.replace(/\D/g, '')) : NaN;
+    return creditos.filter(credito => {
+      const nameMatch = searchTerm ? 
+        (credito.clienteName?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (credito.clienteId?.toLowerCase().includes(searchTerm.toLowerCase()))
+        : true;
+
+      const amountMatch = !isNaN(amount) ? credito.valor === amount : true;
+      
+      const dateMatch = dateRange?.from ? isWithinInterval(new Date(credito.fecha), {
+          start: dateRange.from,
+          end: dateRange.to || dateRange.from,
+      }) : true;
+
+      return nameMatch && amountMatch && dateMatch;
+    });
+  }, [creditos, searchTerm, amountFilter, dateRange]);
+  
+  const clearFilters = () => {
+    setSearchTerm("");
+    setAmountFilter("");
+    setDateRange(undefined);
+  };
 
   return (
     <TooltipProvider>
@@ -281,15 +306,51 @@ export default function CreditosPage() {
                   </Link>
               </Button>
           </div>
-           <div className="mt-4 relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                type="search"
-                placeholder="Buscar por nombre o cédula de cliente..."
-                className="w-full pl-8 sm:w-[300px]"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                />
+           <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                <div className="relative flex-grow">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                    type="search"
+                    placeholder="Buscar por nombre o cédula..."
+                    className="w-full pl-8"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full sm:w-auto justify-start">
+                            <Filter className="mr-2 h-4 w-4" />
+                            <span>Filtros Avanzados</span>
+                            {(dateRange?.from || amountFilter) && <Badge variant="secondary" className="ml-2">Activo</Badge>}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 space-y-4">
+                        <div>
+                            <Label htmlFor="date-range">Rango de Fechas (Creación)</Label>
+                            <Calendar
+                                id="date-range"
+                                mode="range"
+                                selected={dateRange}
+                                onSelect={setDateRange}
+                                locale={es}
+                            />
+                        </div>
+                        <div>
+                            <Label htmlFor="amount-filter">Monto del Crédito</Label>
+                            <Input
+                                id="amount-filter"
+                                placeholder="Ej: 500.000"
+                                value={amountFilter}
+                                onChange={(e) => setAmountFilter(formatCurrencyForInput(e.target.value))}
+                            />
+                        </div>
+                    </PopoverContent>
+                </Popover>
+                 <Button variant="ghost" size="icon" onClick={clearFilters} className="w-full sm:w-auto">
+                    <X className="h-4 w-4" />
+                    <span className="sr-only">Limpiar filtros</span>
+                </Button>
             </div>
         </CardHeader>
         <CardContent className="pt-6">
@@ -330,8 +391,8 @@ export default function CreditosPage() {
           ) : (
             <div className="text-center text-muted-foreground py-8">
                 <ClipboardList className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                <h3 className="text-lg font-semibold">{searchTerm ? 'No se encontraron clientes' : 'No hay créditos registrados'}</h3>
-                <p className="text-sm">{searchTerm ? 'Intenta con otro nombre o cédula.' : 'Cuando crees tu primer crédito, aparecerá aquí.'}</p>
+                <h3 className="text-lg font-semibold">{searchTerm || amountFilter || dateRange ? 'No se encontraron créditos' : 'No hay créditos registrados'}</h3>
+                <p className="text-sm">{searchTerm || amountFilter || dateRange ? 'Intenta con otros filtros.' : 'Cuando crees tu primer crédito, aparecerá aquí.'}</p>
             </div>
           )}
         </CardContent>
