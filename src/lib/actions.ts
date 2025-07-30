@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
 import { db } from "./firebase";
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc, increment, orderBy, limit } from "firebase/firestore";
-import { startOfDay, differenceInDays, endOfDay, isWithinInterval, addDays, parseISO, isFuture, isToday } from 'date-fns';
+import { startOfDay, differenceInDays, endOfDay, isWithinInterval, addDays, parseISO, isFuture, isToday, isSameDay } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { analyzeClientReputation, ClientReputationInput } from '@/ai/flows/analyze-client-reputation';
 
@@ -362,7 +362,7 @@ export async function getProviderActivityLog() {
             formattedDate: date.toLocaleString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
             amount: payment.amount,
             creditId: payment.creditId,
-            clienteId: credit.clienteId,
+            clienteId: payment.clienteId,
             paymentType: payment.type,
             creditState: credit.estado,
         });
