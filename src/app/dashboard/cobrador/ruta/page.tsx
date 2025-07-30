@@ -1,9 +1,10 @@
+
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, HandCoins, Loader2, Map, Star, Handshake, Percent, XCircle } from "lucide-react";
+import { ArrowLeft, ClipboardList, HandCoins, Loader2, Map, Star, Handshake, Percent, XCircle, Calendar as CalendarIcon, X } from "lucide-react";
 import Link from "next/link";
 import { getPaymentRoute, registerPayment, registerMissedPayment, registerPaymentAgreement } from "@/lib/actions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -17,6 +18,9 @@ import { cn } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+
 
 type PaymentRouteEntry = {
   creditId: string;
@@ -67,7 +71,7 @@ const formatDateGroup = (dateStr: string) => {
 };
 
 export default function RutaDePagoPage() {
-    const [groupedRoutes, setGroupedRoutes] = useState<GroupedRoutes>({});
+    const [allRoutes, setAllRoutes] = useState<PaymentRouteEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedCredit, setSelectedCredit] = useState<PaymentRouteEntry | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -75,21 +79,14 @@ export default function RutaDePagoPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [paymentType, setPaymentType] = useState<PaymentType>("cuota");
     const [agreementAmount, setAgreementAmount] = useState("");
+    const [selectedDate, setSelectedDate] = useState<Date | undefined>();
     const { toast } = useToast();
 
     const fetchRoute = useCallback(async () => {
         setLoading(true);
         try {
             const routes = await getPaymentRoute();
-            const grouped: GroupedRoutes = routes.reduce((acc, route) => {
-                const dateKey = format(parseISO(route.nextPaymentDate), 'yyyy-MM-dd');
-                if (!acc[dateKey]) {
-                    acc[dateKey] = [];
-                }
-                acc[dateKey].push(route);
-                return acc;
-            }, {} as GroupedRoutes);
-            setGroupedRoutes(grouped);
+            setAllRoutes(routes);
         } catch (error) {
             toast({ title: "Error", description: "No se pudo cargar la ruta de pagos.", variant: "destructive" });
         } finally {
@@ -100,6 +97,22 @@ export default function RutaDePagoPage() {
     useEffect(() => {
         fetchRoute();
     }, [fetchRoute]);
+    
+    const groupedRoutes = useMemo(() => {
+        const filtered = selectedDate
+            ? allRoutes.filter(route => format(parseISO(route.nextPaymentDate), 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd'))
+            : allRoutes;
+
+        return filtered.reduce((acc, route) => {
+            const dateKey = format(parseISO(route.nextPaymentDate), 'yyyy-MM-dd');
+            if (!acc[dateKey]) {
+                acc[dateKey] = [];
+            }
+            acc[dateKey].push(route);
+            return acc;
+        }, {} as GroupedRoutes);
+    }, [allRoutes, selectedDate]);
+
 
     const handleRowClick = (credit: PaymentRouteEntry) => {
         setSelectedCredit(credit);
@@ -202,6 +215,37 @@ export default function RutaDePagoPage() {
                         </Link>
                     </Button>
                 </div>
+                 <div className="pt-4 flex items-center gap-2">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant={"outline"}
+                                className={cn(
+                                "w-[240px] justify-start text-left font-normal",
+                                !selectedDate && "text-muted-foreground"
+                                )}
+                            >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {selectedDate ? format(selectedDate, "PPP", { locale: es }) : <span>Filtrar por fecha...</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                                mode="single"
+                                selected={selectedDate}
+                                onSelect={setSelectedDate}
+                                initialFocus
+                                locale={es}
+                            />
+                        </PopoverContent>
+                    </Popover>
+                    {selectedDate && (
+                         <Button variant="ghost" size="icon" onClick={() => setSelectedDate(undefined)}>
+                            <X className="h-4 w-4" />
+                            <span className="sr-only">Limpiar filtro</span>
+                        </Button>
+                    )}
+                </div>
             </CardHeader>
             <CardContent>
                 {loading ? (
@@ -242,8 +286,8 @@ export default function RutaDePagoPage() {
                 ) : (
                     <div className="text-center text-muted-foreground py-16">
                         <ClipboardList className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                        <h3 className="text-lg font-semibold">No hay cobros pendientes</h3>
-                        <p className="text-sm">No hay clientes con fechas de pago próximas.</p>
+                        <h3 className="text-lg font-semibold">{selectedDate ? 'No hay cobros para esta fecha' : 'No hay cobros pendientes'}</h3>
+                        <p className="text-sm">{selectedDate ? 'Intenta con otra fecha.' : 'No hay clientes con fechas de pago próximas.'}</p>
                     </div>
                 )}
             </CardContent>
