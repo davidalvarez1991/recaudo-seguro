@@ -739,14 +739,14 @@ export async function getPaymentRoute() {
 
 export async function getDailyCollectionGoal(cobradorUserId: string) {
     if (!cobradorUserId) return 0;
-    
+
     const cobradorData = await getUserData(cobradorUserId);
     if (!cobradorData || cobradorData.role !== 'cobrador') {
         return 0;
     }
 
     const creditsRef = collection(db, "credits");
-    const q = query(creditsRef, 
+    const q = query(creditsRef,
         where("cobradorId", "==", cobradorData.idNumber),
         where("estado", "==", "Activo")
     );
@@ -759,12 +759,13 @@ export async function getDailyCollectionGoal(cobradorUserId: string) {
     let dailyTotal = 0;
     const timeZone = 'America/Bogota';
     const nowInTimeZone = toZonedTime(new Date(), timeZone);
+    const todayStart = startOfDay(nowInTimeZone);
 
     for (const doc of querySnapshot.docs) {
         const credit = doc.data();
         if (credit.paymentDates && Array.isArray(credit.paymentDates)) {
             const installmentAmount = (credit.valor + credit.commission) / credit.cuotas;
-            
+
             const paymentDueToday = credit.paymentDates.some((date: Timestamp | Date) => {
                 const jsDate = date instanceof Timestamp ? date.toDate() : date;
                 const zonedDate = toZonedTime(jsDate, timeZone);
@@ -772,21 +773,20 @@ export async function getDailyCollectionGoal(cobradorUserId: string) {
             });
 
             if (paymentDueToday) {
-                // Check if this installment has been paid
                 const paymentsRef = collection(db, "payments");
-                const todayStart = startOfDay(nowInTimeZone);
-                const todayEnd = endOfDay(nowInTimeZone);
-                
-                const paymentsQuery = query(paymentsRef, 
+                const paymentsQuery = query(paymentsRef,
                     where("creditId", "==", doc.id),
-                    where("type", "==", "cuota"),
-                    where("date", ">=", todayStart),
-                    where("date", "<=", todayEnd)
+                    where("type", "==", "cuota")
                 );
                 const paymentsSnapshot = await getDocs(paymentsQuery);
                 
-                // If no 'cuota' payment was made today, add it to the goal
-                if (paymentsSnapshot.empty) {
+                const paidToday = paymentsSnapshot.docs.some(paymentDoc => {
+                    const paymentData = paymentDoc.data();
+                    const paymentDateZoned = toZonedTime(paymentData.date.toDate(), timeZone);
+                    return isSameDay(paymentDateZoned, todayStart);
+                });
+
+                if (!paidToday) {
                     dailyTotal += installmentAmount;
                 }
             }
