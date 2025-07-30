@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { format, isToday, isTomorrow, isPast, parseISO, isSameDay } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 import { RenewCreditForm } from "@/components/forms/renew-credit-form";
 import { Badge } from "@/components/ui/badge";
@@ -112,12 +113,18 @@ export default function RutaDePagoPage() {
     
     const groupedRoutes = useMemo(() => {
         const lowercasedFilter = searchTerm.toLowerCase();
+        const timeZone = 'America/Bogota';
 
         const filtered = allRoutes.filter(route => {
-            const dateMatch = filterDate ? isSameDay(parseISO(route.nextPaymentDate), filterDate) : true;
+            // Convert server date to Colombia timezone before comparison
+            const routeDate = toZonedTime(parseISO(route.nextPaymentDate), timeZone);
+            
+            const dateMatch = filterDate ? isSameDay(routeDate, toZonedTime(filterDate, timeZone)) : true;
+            
             const searchMatch = searchTerm 
                 ? (route.clienteName.toLowerCase().includes(lowercasedFilter) || route.clienteId.toLowerCase().includes(lowercasedFilter))
                 : true;
+            
             return dateMatch && searchMatch;
         });
 
