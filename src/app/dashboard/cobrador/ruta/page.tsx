@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, HandCoins, Loader2, Map, Star, Handshake, Percent, XCircle, Calendar as CalendarIcon, X, CheckCircle2, Circle, Home, Phone, Search } from "lucide-react";
+import { ArrowLeft, ClipboardList, HandCoins, Loader2, Map, Star, Handshake, Percent, XCircle, Calendar as CalendarIcon, X, CheckCircle2, Circle, Home, Phone, Search, Filter } from "lucide-react";
 import Link from "next/link";
 import { getPaymentRoute, registerPayment, registerMissedPayment, registerPaymentAgreement } from "@/lib/actions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -89,7 +89,8 @@ export default function RutaDePagoPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [paymentType, setPaymentType] = useState<PaymentType>("cuota");
     const [agreementAmount, setAgreementAmount] = useState("");
-    const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+    const [filterDate, setFilterDate] = useState<Date | undefined>();
+    const [displayDate, setDisplayDate] = useState<Date | undefined>();
     const [searchTerm, setSearchTerm] = useState("");
     const { toast } = useToast();
 
@@ -113,7 +114,7 @@ export default function RutaDePagoPage() {
         const lowercasedFilter = searchTerm.toLowerCase();
 
         const filtered = allRoutes.filter(route => {
-            const dateMatch = selectedDate ? isSameDay(parseISO(route.nextPaymentDate), selectedDate) : true;
+            const dateMatch = filterDate ? isSameDay(parseISO(route.nextPaymentDate), filterDate) : true;
             const searchMatch = searchTerm 
                 ? (route.clienteName.toLowerCase().includes(lowercasedFilter) || route.clienteId.toLowerCase().includes(lowercasedFilter))
                 : true;
@@ -128,7 +129,7 @@ export default function RutaDePagoPage() {
             acc[dateKey].push(route);
             return acc;
         }, {} as GroupedRoutes);
-    }, [allRoutes, selectedDate, searchTerm]);
+    }, [allRoutes, filterDate, searchTerm]);
 
 
     const handleRowClick = (credit: PaymentRouteEntry) => {
@@ -136,6 +137,15 @@ export default function RutaDePagoPage() {
         setPaymentType("cuota");
         setAgreementAmount("");
         setIsModalOpen(true);
+    };
+    
+    const handleApplyDateFilter = () => {
+        setFilterDate(displayDate);
+    };
+
+    const handleClearDateFilter = () => {
+        setFilterDate(undefined);
+        setDisplayDate(undefined);
     };
 
     const handleConfirmAction = async () => {
@@ -249,25 +259,37 @@ export default function RutaDePagoPage() {
                                 variant={"outline"}
                                 className={cn(
                                 "w-full sm:w-[240px] justify-start text-left font-normal",
-                                !selectedDate && "text-muted-foreground"
+                                !filterDate && "text-muted-foreground"
                                 )}
                             >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
-                                {selectedDate ? format(selectedDate, "PPP", { locale: es }) : <span>Filtrar por fecha...</span>}
+                                {filterDate ? format(filterDate, "PPP", { locale: es }) : <span>Filtrar por fecha...</span>}
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
                             <Calendar
                                 mode="single"
-                                selected={selectedDate}
-                                onSelect={setSelectedDate}
+                                selected={displayDate}
+                                onSelect={setDisplayDate}
                                 initialFocus
                                 locale={es}
                             />
+                             <div className="p-2 border-t flex justify-end gap-2">
+                                <Button
+                                    variant="ghost"
+                                    onClick={() => (document.querySelector('[data-radix-popper-content-wrapper]') as HTMLElement)?.click()}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button onClick={handleApplyDateFilter} disabled={!displayDate}>
+                                    <Filter className="mr-2 h-4 w-4" />
+                                    Aplicar Filtro
+                                </Button>
+                            </div>
                         </PopoverContent>
                     </Popover>
-                    {selectedDate && (
-                         <Button variant="ghost" size="icon" onClick={() => setSelectedDate(undefined)}>
+                    {filterDate && (
+                         <Button variant="ghost" size="icon" onClick={handleClearDateFilter}>
                             <X className="h-4 w-4" />
                             <span className="sr-only">Limpiar filtro</span>
                         </Button>
@@ -329,8 +351,8 @@ export default function RutaDePagoPage() {
                 ) : (
                     <div className="text-center text-muted-foreground py-16">
                         <ClipboardList className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                        <h3 className="text-lg font-semibold">{searchTerm || selectedDate ? 'No se encontraron clientes' : 'No hay cobros pendientes'}</h3>
-                        <p className="text-sm">{searchTerm || selectedDate ? 'Intenta con otros filtros.' : 'No hay clientes con fechas de pago próximas.'}</p>
+                        <h3 className="text-lg font-semibold">{searchTerm || filterDate ? 'No se encontraron clientes' : 'No hay cobros pendientes'}</h3>
+                        <p className="text-sm">{searchTerm || filterDate ? 'Intenta con otros filtros.' : 'No hay clientes con fechas de pago próximas.'}</p>
                     </div>
                 )}
             </CardContent>
@@ -438,5 +460,3 @@ export default function RutaDePagoPage() {
         </Card>
     );
 }
-
-    
