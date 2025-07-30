@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, HandCoins, Loader2, Map, Star, Handshake, Percent, XCircle, Calendar as CalendarIcon, X, CheckCircle2, Circle, Home, Phone } from "lucide-react";
+import { ArrowLeft, ClipboardList, HandCoins, Loader2, Map, Star, Handshake, Percent, XCircle, Calendar as CalendarIcon, X, CheckCircle2, Circle, Home, Phone, Search } from "lucide-react";
 import Link from "next/link";
 import { getPaymentRoute, registerPayment, registerMissedPayment, registerPaymentAgreement } from "@/lib/actions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -90,6 +90,7 @@ export default function RutaDePagoPage() {
     const [paymentType, setPaymentType] = useState<PaymentType>("cuota");
     const [agreementAmount, setAgreementAmount] = useState("");
     const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+    const [searchTerm, setSearchTerm] = useState("");
     const { toast } = useToast();
 
     const fetchRoute = useCallback(async () => {
@@ -109,9 +110,15 @@ export default function RutaDePagoPage() {
     }, [fetchRoute]);
     
     const groupedRoutes = useMemo(() => {
-        const filtered = selectedDate
-            ? allRoutes.filter(route => format(parseISO(route.nextPaymentDate), 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd'))
-            : allRoutes;
+        const lowercasedFilter = searchTerm.toLowerCase();
+
+        const filtered = allRoutes.filter(route => {
+            const dateMatch = selectedDate ? format(parseISO(route.nextPaymentDate), 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd') : true;
+            const searchMatch = searchTerm 
+                ? (route.clienteName.toLowerCase().includes(lowercasedFilter) || route.clienteId.toLowerCase().includes(lowercasedFilter))
+                : true;
+            return dateMatch && searchMatch;
+        });
 
         return filtered.reduce((acc, route) => {
             const dateKey = format(parseISO(route.nextPaymentDate), 'yyyy-MM-dd');
@@ -121,7 +128,7 @@ export default function RutaDePagoPage() {
             acc[dateKey].push(route);
             return acc;
         }, {} as GroupedRoutes);
-    }, [allRoutes, selectedDate]);
+    }, [allRoutes, selectedDate, searchTerm]);
 
 
     const handleRowClick = (credit: PaymentRouteEntry) => {
@@ -225,13 +232,23 @@ export default function RutaDePagoPage() {
                         </Link>
                     </Button>
                 </div>
-                 <div className="pt-4 flex items-center gap-2">
+                 <div className="pt-4 flex flex-col sm:flex-row gap-2">
+                     <div className="relative flex-grow">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            type="search"
+                            placeholder="Buscar por nombre o cédula..."
+                            className="w-full pl-8"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button
                                 variant={"outline"}
                                 className={cn(
-                                "w-[240px] justify-start text-left font-normal",
+                                "w-full sm:w-[240px] justify-start text-left font-normal",
                                 !selectedDate && "text-muted-foreground"
                                 )}
                             >
@@ -312,8 +329,8 @@ export default function RutaDePagoPage() {
                 ) : (
                     <div className="text-center text-muted-foreground py-16">
                         <ClipboardList className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                        <h3 className="text-lg font-semibold">{selectedDate ? 'No hay cobros para esta fecha' : 'No hay cobros pendientes'}</h3>
-                        <p className="text-sm">{selectedDate ? 'Intenta con otra fecha.' : 'No hay clientes con fechas de pago próximas.'}</p>
+                        <h3 className="text-lg font-semibold">{searchTerm || selectedDate ? 'No se encontraron clientes' : 'No hay cobros pendientes'}</h3>
+                        <p className="text-sm">{searchTerm || selectedDate ? 'Intenta con otros filtros.' : 'No hay clientes con fechas de pago próximas.'}</p>
                     </div>
                 )}
             </CardContent>
