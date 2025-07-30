@@ -366,39 +366,51 @@ export default function RutaDePagoPage() {
                                 </AccordionItem>
                             </Accordion>
 
-                            <RadioGroup value={paymentType} onValueChange={(value: any) => setPaymentType(value)} className="gap-3 pt-4">
-                                <Label htmlFor="payment-cuota" className="flex items-start gap-4 rounded-md border p-3 cursor-pointer hover:bg-muted/50">
+                           <RadioGroup value={paymentType} onValueChange={(value: any) => setPaymentType(value)} className="gap-3 pt-4">
+                                <Label htmlFor="payment-cuota" className="flex items-start gap-4 rounded-md border p-4 cursor-pointer hover:bg-muted/50">
                                     <RadioGroupItem value="cuota" id="payment-cuota" className="mt-1" />
-                                    <div className="flex justify-between w-full">
-                                        <p className="font-semibold">Pagar Cuota</p>
-                                        <p className="font-bold">{formatCurrency(selectedCredit.installmentAmount + selectedCredit.lateFee)}</p>
+                                    <div className="flex justify-between items-center w-full">
+                                        <div className="flex-1">
+                                            <p className="font-semibold">Pagar Cuota</p>
+                                            <p className="text-xs text-muted-foreground">Registra el pago de la cuota actual, incluyendo mora si aplica.</p>
+                                        </div>
+                                        <p className="font-bold ml-4">{formatCurrency(selectedCredit.installmentAmount + selectedCredit.lateFee)}</p>
                                     </div>
                                 </Label>
-                                <Label htmlFor="payment-comision" className="flex items-start gap-4 rounded-md border p-3 cursor-pointer hover:bg-muted/50">
+                                <Label htmlFor="payment-comision" className="flex items-start gap-4 rounded-md border p-4 cursor-pointer hover:bg-muted/50">
                                     <RadioGroupItem value="comision" id="payment-comision" className="mt-1" />
-                                    <div className="flex justify-between w-full">
-                                        <p className="font-semibold flex items-center gap-1.5"><Percent className="h-4 w-4" /> Comisión</p>
-                                        <p className="font-bold">{formatCurrency(selectedCredit.commission)}</p>
+                                    <div className="flex justify-between items-center w-full">
+                                        <div className="flex-1">
+                                            <p className="font-semibold flex items-center gap-1.5"><Percent className="h-4 w-4" /> Pagar Comisión Total</p>
+                                            <p className="text-xs text-muted-foreground">Cubre el valor total de la comisión del crédito.</p>
+                                        </div>
+                                        <p className="font-bold ml-4">{formatCurrency(selectedCredit.commission)}</p>
                                     </div>
                                 </Label>
-                                <Label htmlFor="payment-total" className="flex items-start gap-4 rounded-md border p-3 cursor-pointer hover:bg-muted/50">
+                                <Label htmlFor="payment-total" className="flex items-start gap-4 rounded-md border p-4 cursor-pointer hover:bg-muted/50">
                                     <RadioGroupItem value="total" id="payment-total" className="mt-1" />
-                                    <div className="flex justify-between w-full">
-                                        <p className="font-semibold">Pagar Total</p>
-                                        <p className="font-bold">{formatCurrency(selectedCredit.totalDebt)}</p>
+                                    <div className="flex justify-between items-center w-full">
+                                        <div className="flex-1">
+                                            <p className="font-semibold">Pagar Saldo Total</p>
+                                            <p className="text-xs text-muted-foreground">Liquida completamente la deuda pendiente del cliente.</p>
+                                        </div>
+                                        <p className="font-bold ml-4">{formatCurrency(selectedCredit.totalDebt)}</p>
                                     </div>
                                 </Label>
-                                <Label htmlFor="payment-acuerdo" className="flex flex-col gap-2 rounded-md border p-3 cursor-pointer hover:bg-muted/50">
+                                <Label htmlFor="payment-acuerdo" className="flex flex-col gap-2 rounded-md border p-4 cursor-pointer hover:bg-muted/50">
                                     <div className="flex items-start gap-4">
                                       <RadioGroupItem value="acuerdo" id="payment-acuerdo" className="mt-1" />
-                                      <div className="flex justify-between w-full">
-                                        <p className="font-semibold flex items-center gap-1.5"><Handshake className="h-4 w-4" /> Acuerdo</p>
-                                        <p className="font-bold">{agreementAmount ? formatCurrency(parseFloat(agreementAmount.replace(/\D/g, ''))) : '$0'}</p>
+                                      <div className="flex justify-between items-center w-full">
+                                        <div className="flex-1">
+                                            <p className="font-semibold flex items-center gap-1.5"><Handshake className="h-4 w-4" /> Realizar Acuerdo</p>
+                                            <p className="text-xs text-muted-foreground">Registra un abono y reprograma las fechas de pago futuras.</p>
+                                        </div>
+                                        <p className="font-bold ml-4">{agreementAmount ? formatCurrency(parseFloat(agreementAmount.replace(/\D/g, ''))) : '$0'}</p>
                                       </div>
                                     </div>
                                     {paymentType === 'acuerdo' && (
                                         <div className="pl-8 pt-1">
-                                          <Input placeholder="Valor del acuerdo..." value={agreementAmount} onChange={(e) => setAgreementAmount(formatCurrencyForInput(e.target.value))} />
+                                          <Input placeholder="Valor del abono (opcional)..." value={agreementAmount} onChange={(e) => setAgreementAmount(formatCurrencyForInput(e.target.value))} />
                                         </div>
                                     )}
                                 </Label>
