@@ -2,10 +2,11 @@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { CobradorDashboardClient } from "@/components/dashboard/cobrador-dashboard-client";
 import { CreditSimulator } from "@/components/dashboard/credit-simulator";
-import { getUserData } from "@/lib/actions";
+import { getUserData, getDailyCollectionGoal } from "@/lib/actions";
 import { cookies } from "next/headers";
 import { Separator } from "@/components/ui/separator";
 import { ClientReputationSearch } from "@/components/dashboard/client-reputation-search";
+import { Target } from "lucide-react";
 
 type CommissionTier = {
   minAmount: number;
@@ -27,6 +28,11 @@ type ProviderData = {
     [key: string]: any;
 } | null;
 
+const formatCurrency = (value: number) => {
+    if (isNaN(value)) return "$0";
+    return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+};
+
 export default async function CobradorDashboard() {
   const cookieStore = cookies();
   const userId = cookieStore.get('loggedInUser')?.value;
@@ -35,6 +41,7 @@ export default async function CobradorDashboard() {
   let commissionTiers: CommissionTier[] = [{ minAmount: 0, maxAmount: 50000000, percentage: 20 }]; // Default tier
   let lateInterestRate = 0;
   let isLateInterestActive = false;
+  let dailyGoal = 0;
 
   if (userId) {
     const userData: UserData = await getUserData(userId);
@@ -53,6 +60,7 @@ export default async function CobradorDashboard() {
                 isLateInterestActive = providerData.isLateInterestActive || false;
             }
         }
+        dailyGoal = await getDailyCollectionGoal(userId);
     }
   }
 
@@ -60,11 +68,22 @@ export default async function CobradorDashboard() {
     <div className="space-y-8">
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="space-y-1">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+              <div className="space-y-1 flex-1">
                   <CardTitle className="text-3xl">Bienvenido, {userName}</CardTitle>
                   <CardDescription>Este es tu panel de gestión de clientes y créditos.</CardDescription>
               </div>
+              <Card className="w-full md:w-auto md:min-w-[280px] bg-primary text-primary-foreground shadow-lg">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-4">
+                    <Target className="h-10 w-10 text-primary-foreground/80"/>
+                    <div>
+                      <p className="text-sm font-medium text-primary-foreground/90">Meta del Día</p>
+                      <p className="text-3xl font-bold">{formatCurrency(dailyGoal)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
           </div>
         </CardHeader>
         <CardContent className="space-y-8">

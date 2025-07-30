@@ -551,9 +551,8 @@ export async function getCreditsByCliente() {
     const sortedCredits = allCredits.sort((a,b) => {
         // This assumes credit IDs are sortable timestamps, which might not be the case.
         // A better approach is to sort by creation date if available.
-        // Let's rely on Firestore's default ordering for now or add an explicit `createdAt` field.
-        // For now, no client-side sort to avoid issues.
-        return allCredits;
+        // Let's rely on Firestore's default ordering for now or add an client-side sort to avoid issues.
+        return 0; // Keep original order
     });
 
     return sortedCredits;
@@ -604,7 +603,7 @@ export async function getHistoricalCreditsByCliente() {
     });
 
     const allCredits = await Promise.all(creditsPromises);
-    return allCredits.sort((a, b) => new Date(b.fecha).getTime() - new Date(b.fecha).getTime());
+    return allCredits.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 }
 
 export async function getPaymentsByCreditId(creditId: string) {
@@ -623,7 +622,7 @@ export async function getPaymentsByCreditId(creditId: string) {
         return {
             id: doc.id,
             amount: data.amount,
-            date: data.date instanceof Timestamp ? data.date.toDate().toISOString() : data.date,
+            date: data.date instanceof Timestamp ? data.date.toISOString() : data.date,
             type: data.type,
         };
     });
@@ -736,6 +735,65 @@ export async function getPaymentRoute() {
     const routeEntries = (await Promise.all(routeEntriesPromises)).filter(Boolean);
 
     return (routeEntries as any[]).sort((a, b) => new Date(a.nextPaymentDate).getTime() - new Date(b.nextPaymentDate).getTime());
+}
+
+export async function getDailyCollectionGoal(cobradorUserId: string) {
+    if (!cobradorUserId) return 0;
+    
+    const cobradorData = await getUserData(cobradorUserId);
+    if (!cobradorData || cobradorData.role !== 'cobrador') {
+        return 0;
+    }
+
+    const creditsRef = collection(db, "credits");
+    const q = query(creditsRef, 
+        where("cobradorId", "==", cobradorData.idNumber),
+        where("estado", "==", "Activo")
+    );
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+        return 0;
+    }
+
+    let dailyTotal = 0;
+    const timeZone = 'America/Bogota';
+    const nowInTimeZone = toZonedTime(new Date(), timeZone);
+
+    for (const doc of querySnapshot.docs) {
+        const credit = doc.data();
+        if (credit.paymentDates && Array.isArray(credit.paymentDates)) {
+            const installmentAmount = (credit.valor + credit.commission) / credit.cuotas;
+            
+            const paymentDueToday = credit.paymentDates.some((date: Timestamp | Date) => {
+                const jsDate = date instanceof Timestamp ? date.toDate() : date;
+                const zonedDate = toZonedTime(jsDate, timeZone);
+                return isToday(zonedDate);
+            });
+
+            if (paymentDueToday) {
+                // Check if this installment has been paid
+                const paymentsRef = collection(db, "payments");
+                const todayStart = startOfDay(nowInTimeZone);
+                const todayEnd = endOfDay(nowInTimeZone);
+                
+                const paymentsQuery = query(paymentsRef, 
+                    where("creditId", "==", doc.id),
+                    where("type", "==", "cuota"),
+                    where("date", ">=", todayStart),
+                    where("date", "<=", todayEnd)
+                );
+                const paymentsSnapshot = await getDocs(paymentsQuery);
+                
+                // If no 'cuota' payment was made today, add it to the goal
+                if (paymentsSnapshot.empty) {
+                    dailyTotal += installmentAmount;
+                }
+            }
+        }
+    }
+
+    return dailyTotal;
 }
 
 
