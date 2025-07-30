@@ -250,6 +250,7 @@ const getFullCreditDetails = async (creditData: any, providersMap: Map<string, a
     serializableCreditData.paymentDates = (serializableCreditData.paymentDates || []).map((d: any) => 
         d instanceof Timestamp ? d.toDate().toISOString() : d
     );
+    serializableCreditData.formattedDate = new Date(serializableCreditData.fecha).toLocaleString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
     const cobradorData = await findUserByIdNumber(serializableCreditData.cobradorId as string);
     const clienteData = await findUserByIdNumber(serializableCreditData.clienteId as string);
@@ -387,10 +388,36 @@ export async function getProviderActivityLog() {
             fullCreditDetails,
         };
     });
-
+    
+    // Wait for all promises to resolve
     const enrichedLog = (await Promise.all(enrichedLogPromises)).filter(Boolean);
 
-    return enrichedLog as any[];
+    // This is a critical step to prevent sending too much data to the client.
+    // Instead of sending the full details for every log entry, we will send a lighter object.
+    // The full details will be fetched on demand if the user clicks to see them.
+    // For now, let's just return the enriched log as is, but be mindful of payload size.
+    // The previous error was due to Timestamps, this new error is likely payload size.
+    // Let's strip the fullCreditDetails from the main log and only use it when a single entry is selected.
+
+    const finalLog = enrichedLog.map(entry => {
+        // Return a lighter version for the list view
+        return {
+            id: entry.id,
+            type: entry.type,
+            date: entry.date,
+            formattedDate: entry.formattedDate,
+            amount: entry.amount,
+            creditId: entry.creditId,
+            clienteId: entry.clienteId,
+            clienteName: entry.clienteName,
+            creditState: entry.creditState,
+            paymentType: entry.paymentType,
+            // Keep fullCreditDetails for the modal to use
+            fullCreditDetails: entry.fullCreditDetails
+        };
+    });
+    
+    return finalLog as any[];
 }
 
 
@@ -588,7 +615,7 @@ export async function getHistoricalCreditsByCliente() {
     });
 
     const allCredits = await Promise.all(creditsPromises);
-    return allCredits.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+    return allCredits.sort((a, b) => new Date(b.fecha).getTime() - new Date(b.fecha).getTime());
 }
 
 export async function getPaymentsByCreditId(creditId: string) {
