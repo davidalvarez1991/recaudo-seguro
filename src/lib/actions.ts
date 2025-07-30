@@ -737,66 +737,6 @@ export async function getPaymentRoute() {
     return (routeEntries as any[]).sort((a, b) => new Date(a.nextPaymentDate).getTime() - new Date(b.nextPaymentDate).getTime());
 }
 
-export async function getDailyCollectionGoal(cobradorUserId: string) {
-    if (!cobradorUserId) return 0;
-
-    const cobradorData = await getUserData(cobradorUserId);
-    if (!cobradorData || cobradorData.role !== 'cobrador') {
-        return 0;
-    }
-
-    const creditsRef = collection(db, "credits");
-    const q = query(creditsRef,
-        where("cobradorId", "==", cobradorData.idNumber),
-        where("estado", "==", "Activo")
-    );
-    const querySnapshot = await getDocs(q);
-
-    if (querySnapshot.empty) {
-        return 0;
-    }
-
-    let dailyTotal = 0;
-    const timeZone = 'America/Bogota';
-    const nowInTimeZone = toZonedTime(new Date(), timeZone);
-    const todayStart = startOfDay(nowInTimeZone);
-
-    for (const doc of querySnapshot.docs) {
-        const credit = doc.data();
-        if (credit.paymentDates && Array.isArray(credit.paymentDates)) {
-            const installmentAmount = (credit.valor + credit.commission) / credit.cuotas;
-
-            const paymentDueToday = credit.paymentDates.some((date: Timestamp | Date) => {
-                const jsDate = date instanceof Timestamp ? date.toDate() : date;
-                const zonedDate = toZonedTime(jsDate, timeZone);
-                return isToday(zonedDate);
-            });
-
-            if (paymentDueToday) {
-                const paymentsRef = collection(db, "payments");
-                const paymentsQuery = query(paymentsRef,
-                    where("creditId", "==", doc.id),
-                    where("type", "==", "cuota")
-                );
-                const paymentsSnapshot = await getDocs(paymentsQuery);
-                
-                const paidToday = paymentsSnapshot.docs.some(paymentDoc => {
-                    const paymentData = paymentDoc.data();
-                    const paymentDateZoned = toZonedTime(paymentData.date.toDate(), timeZone);
-                    return isSameDay(paymentDateZoned, todayStart);
-                });
-
-                if (!paidToday) {
-                    dailyTotal += installmentAmount;
-                }
-            }
-        }
-    }
-
-    return dailyTotal;
-}
-
-
 // --- Data Mutation Actions ---
 
 export async function registerCobrador(values: z.infer<typeof CobradorRegisterSchema>) {
@@ -1200,6 +1140,7 @@ export async function registerPayment(creditId: string, amount: number, type: "c
         date: Timestamp.now(),
         cobradorId: cobradorData.idNumber,
         providerId: creditData.providerId,
+        clienteId: creditData.clienteId,
     });
     
     // Update credit status if it's not a commission-only payment
@@ -1306,6 +1247,7 @@ export async function registerPaymentAgreement(creditId: string, amount: number)
           date: Timestamp.now(),
           cobradorId: cobradorData.idNumber,
           providerId: creditData.providerId,
+          clienteId: creditData.clienteId,
       });
     }
     

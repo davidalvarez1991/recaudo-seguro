@@ -2,11 +2,13 @@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { CobradorDashboardClient } from "@/components/dashboard/cobrador-dashboard-client";
 import { CreditSimulator } from "@/components/dashboard/credit-simulator";
-import { getUserData, getDailyCollectionGoal } from "@/lib/actions";
+import { getUserData, getPaymentRoute } from "@/lib/actions";
 import { cookies } from "next/headers";
 import { Separator } from "@/components/ui/separator";
 import { ClientReputationSearch } from "@/components/dashboard/client-reputation-search";
 import { Target } from "lucide-react";
+import { isToday, parseISO } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
 
 type CommissionTier = {
   minAmount: number;
@@ -60,7 +62,17 @@ export default async function CobradorDashboard() {
                 isLateInterestActive = providerData.isLateInterestActive || false;
             }
         }
-        dailyGoal = await getDailyCollectionGoal(userId);
+        
+        // Calculate daily goal from payment route
+        const paymentRoute = await getPaymentRoute();
+        const timeZone = 'America/Bogota';
+        dailyGoal = paymentRoute.reduce((total, route) => {
+            const routeDate = toZonedTime(parseISO(route.nextPaymentDate), timeZone);
+            if (isToday(routeDate)) {
+                return total + route.installmentAmount + route.lateFee;
+            }
+            return total;
+        }, 0);
     }
   }
 
