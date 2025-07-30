@@ -73,8 +73,6 @@ export default function CreditosPage() {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [amountFilter, setAmountFilter] = useState("");
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [agreementAmount, setAgreementAmount] = useState("");
   const { toast } = useToast();
 
@@ -264,29 +262,17 @@ export default function CreditosPage() {
   }
 
   const filteredCreditos = useMemo(() => {
-    const amount = amountFilter ? parseFloat(amountFilter.replace(/\D/g, '')) : NaN;
+    const lowercasedFilter = searchTerm.toLowerCase();
     return creditos.filter(credito => {
-      const nameMatch = searchTerm ? 
-        (credito.clienteName?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (credito.clienteId?.toLowerCase().includes(searchTerm.toLowerCase()))
-        : true;
+        if (!searchTerm) return true;
 
-      const amountMatch = !isNaN(amount) ? credito.valor === amount : true;
-      
-      const dateMatch = dateRange?.from ? isWithinInterval(new Date(credito.fecha), {
-          start: dateRange.from,
-          end: dateRange.to || dateRange.from,
-      }) : true;
+        const nameMatch = credito.clienteName?.toLowerCase().includes(lowercasedFilter);
+        const idMatch = credito.clienteId?.toLowerCase().includes(lowercasedFilter);
+        const stateMatch = credito.estado.toLowerCase().includes(lowercasedFilter);
 
-      return nameMatch && amountMatch && dateMatch;
+        return nameMatch || idMatch || stateMatch;
     });
-  }, [creditos, searchTerm, amountFilter, dateRange]);
-  
-  const clearFilters = () => {
-    setSearchTerm("");
-    setAmountFilter("");
-    setDateRange(undefined);
-  };
+  }, [creditos, searchTerm]);
 
   return (
     <TooltipProvider>
@@ -311,46 +297,12 @@ export default function CreditosPage() {
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                     type="search"
-                    placeholder="Buscar por nombre o cédula..."
+                    placeholder="Buscar por nombre, cédula o estado (Ej: Pagado)..."
                     className="w-full pl-8"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full sm:w-auto justify-start">
-                            <Filter className="mr-2 h-4 w-4" />
-                            <span>Filtros Avanzados</span>
-                            {(dateRange?.from || amountFilter) && <Badge variant="secondary" className="ml-2">Activo</Badge>}
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-80 space-y-4">
-                        <div>
-                            <Label htmlFor="date-range">Rango de Fechas (Creación)</Label>
-                            <Calendar
-                                id="date-range"
-                                mode="range"
-                                selected={dateRange}
-                                onSelect={setDateRange}
-                                locale={es}
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="amount-filter">Monto del Crédito</Label>
-                            <Input
-                                id="amount-filter"
-                                placeholder="Ej: 500.000"
-                                value={amountFilter}
-                                onChange={(e) => setAmountFilter(formatCurrencyForInput(e.target.value))}
-                            />
-                        </div>
-                    </PopoverContent>
-                </Popover>
-                 <Button variant="ghost" size="icon" onClick={clearFilters} className="w-full sm:w-auto">
-                    <X className="h-4 w-4" />
-                    <span className="sr-only">Limpiar filtros</span>
-                </Button>
             </div>
         </CardHeader>
         <CardContent className="pt-6">
@@ -391,8 +343,8 @@ export default function CreditosPage() {
           ) : (
             <div className="text-center text-muted-foreground py-8">
                 <ClipboardList className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                <h3 className="text-lg font-semibold">{searchTerm || amountFilter || dateRange ? 'No se encontraron créditos' : 'No hay créditos registrados'}</h3>
-                <p className="text-sm">{searchTerm || amountFilter || dateRange ? 'Intenta con otros filtros.' : 'Cuando crees tu primer crédito, aparecerá aquí.'}</p>
+                <h3 className="text-lg font-semibold">{searchTerm ? 'No se encontraron créditos' : 'No hay créditos registrados'}</h3>
+                <p className="text-sm">{searchTerm ? 'Intenta con otros filtros.' : 'Cuando crees tu primer crédito, aparecerá aquí.'}</p>
             </div>
           )}
         </CardContent>

@@ -55,8 +55,6 @@ export default function RegistrosPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [amountFilter, setAmountFilter] = useState("");
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [currentPage, setCurrentPage] = useState(1);
   const { toast } = useToast();
   const router = useRouter();
@@ -149,50 +147,39 @@ export default function RegistrosPage() {
     return null;
   }
   
-  const formatCurrencyForInput = (value: string): string => {
-    if (!value) return "";
-    const numberValue = parseInt(value.replace(/\D/g, ''), 10);
-    if (isNaN(numberValue)) return "";
-    return new Intl.NumberFormat('es-CO').format(numberValue);
-  };
+  const getEntryTypeString = (entry: ActivityLogEntry): string => {
+    if (entry.type === 'credit') {
+      return "crédito nuevo";
+    }
+    if (entry.type === 'payment') {
+      return `pago ${entry.paymentType || ''}`.trim();
+    }
+    return '';
+  }
 
   const filteredLog = useMemo(() => {
-    const amount = amountFilter ? parseFloat(amountFilter.replace(/\D/g, '')) : NaN;
+    const lowercasedFilter = searchTerm.toLowerCase();
 
-    const filtered = activityLog.filter(entry => {
-      const nameMatch = searchTerm ? 
-        (entry.clienteName?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (entry.clienteId?.toLowerCase().includes(searchTerm.toLowerCase()))
-        : true;
-      
-      const amountMatch = !isNaN(amount) ? entry.amount === amount : true;
-      
-      const dateMatch = dateRange?.from ? isWithinInterval(new Date(entry.date), {
-          start: dateRange.from,
-          end: dateRange.to || dateRange.from,
-      }) : true;
-      
-      return nameMatch && amountMatch && dateMatch;
+    return activityLog.filter(entry => {
+      if (!searchTerm) return true;
+
+      const nameMatch = entry.clienteName?.toLowerCase().includes(lowercasedFilter);
+      const idMatch = entry.clienteId?.toLowerCase().includes(lowercasedFilter);
+      const typeMatch = getEntryTypeString(entry).toLowerCase().includes(lowercasedFilter);
+
+      return nameMatch || idMatch || typeMatch;
     });
-
-    return filtered;
-  }, [activityLog, searchTerm, amountFilter, dateRange]);
+  }, [activityLog, searchTerm]);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, amountFilter, dateRange]);
+  }, [searchTerm]);
 
   const totalPages = Math.ceil(filteredLog.length / ITEMS_PER_PAGE);
   const paginatedLog = filteredLog.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
-  
-  const clearFilters = () => {
-    setSearchTerm("");
-    setAmountFilter("");
-    setDateRange(undefined);
-  };
 
   return (
     <>
@@ -223,47 +210,12 @@ export default function RegistrosPage() {
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                     type="search"
-                    placeholder="Buscar por nombre o cédula..."
+                    placeholder="Buscar por cliente, cédula o tipo (Ej: Pago, Crédito)..."
                     className="w-full pl-8"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                 <Popover>
-                    <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full sm:w-auto justify-start">
-                            <Filter className="mr-2 h-4 w-4" />
-                            <span>Filtros Avanzados</span>
-                            {(dateRange?.from || amountFilter) && <Badge variant="secondary" className="ml-2">Activo</Badge>}
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-80 space-y-4">
-                        <div>
-                            <Label htmlFor="date-range">Rango de Fechas</Label>
-                             <Calendar
-                                id="date-range"
-                                mode="range"
-                                selected={dateRange}
-                                onSelect={setDateRange}
-                                locale={es}
-                                numberOfMonths={1}
-                            />
-                        </div>
-                        <div>
-                            <Label htmlFor="amount-filter">Monto del Registro</Label>
-                            <Input
-                                id="amount-filter"
-                                placeholder="Ej: 68.000"
-                                value={amountFilter}
-                                onChange={(e) => setAmountFilter(formatCurrencyForInput(e.target.value))}
-                            />
-                        </div>
-                    </PopoverContent>
-                </Popover>
-                <Button variant="ghost" size="icon" onClick={clearFilters} className="w-full sm:w-auto">
-                    <X className="h-4 w-4" />
-                    <span className="sr-only">Limpiar filtros</span>
-                </Button>
             </div>
         </CardHeader>
         <CardContent className="pt-6">
@@ -324,8 +276,8 @@ export default function RegistrosPage() {
           ) : (
               <div className="text-center text-muted-foreground py-8">
                   <ClipboardList className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                  <h3 className="text-lg font-semibold">{searchTerm || amountFilter || dateRange ? 'No se encontraron registros' : 'No hay actividad registrada'}</h3>
-                  <p className="text-sm">{searchTerm || amountFilter || dateRange ? 'Intenta con otros filtros.' : 'Cuando un cobrador cree un crédito o registre un pago, aparecerá aquí.'}</p>
+                  <h3 className="text-lg font-semibold">{searchTerm ? 'No se encontraron registros' : 'No hay actividad registrada'}</h3>
+                  <p className="text-sm">{searchTerm ? 'Intenta con otros filtros.' : 'Cuando un cobrador cree un crédito o registre un pago, aparecerá aquí.'}</p>
               </div>
           )}
         </CardContent>
