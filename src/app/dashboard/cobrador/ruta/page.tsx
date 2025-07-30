@@ -10,7 +10,7 @@ import { getPaymentRoute, registerPayment, registerMissedPayment, registerPaymen
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { format, isToday, isTomorrow, isPast, parseISO } from 'date-fns';
+import { format, isToday, isTomorrow, isPast, parseISO, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { RenewCreditForm } from "@/components/forms/renew-credit-form";
 import { Badge } from "@/components/ui/badge";
@@ -113,7 +113,7 @@ export default function RutaDePagoPage() {
         const lowercasedFilter = searchTerm.toLowerCase();
 
         const filtered = allRoutes.filter(route => {
-            const dateMatch = selectedDate ? format(parseISO(route.nextPaymentDate), 'yyyy-MM-dd') === format(selectedDate, 'yyyy-MM-dd') : true;
+            const dateMatch = selectedDate ? isSameDay(parseISO(route.nextPaymentDate), selectedDate) : true;
             const searchMatch = searchTerm 
                 ? (route.clienteName.toLowerCase().includes(lowercasedFilter) || route.clienteId.toLowerCase().includes(lowercasedFilter))
                 : true;
@@ -438,3 +438,5 @@ export default function RutaDePagoPage() {
         </Card>
     );
 }
+
+    
