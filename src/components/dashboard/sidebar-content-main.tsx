@@ -7,7 +7,7 @@ import {
   SidebarMenuButton,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Home, Settings, ClipboardList, Users, HandCoins, LayoutDashboard, Download, History } from "lucide-react";
+import { Home, Settings, ClipboardList, Users, HandCoins, LayoutDashboard, Download, History, Map } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -136,6 +136,21 @@ export function SidebarContentMain({ role }: SidebarContentMainProps) {
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
+
+             <SidebarMenuItem>
+               <SidebarMenuButton 
+                asChild
+                isActive={isActive(`/dashboard/cobrador/ruta`)}
+                tooltip="Ruta de Pago"
+                onClick={handleLinkClick}
+               >
+                <Link href={`/dashboard/cobrador/ruta`}>
+                  <Map />
+                  <span>Ruta de Pago</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
           </SidebarMenu>
         </SidebarContent>
       );

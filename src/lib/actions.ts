@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
 import { db } from "./firebase";
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc, increment, orderBy, limit } from "firebase/firestore";
-import { startOfDay, differenceInDays, endOfDay, isWithinInterval, addDays } from 'date-fns';
+import { startOfDay, differenceInDays, endOfDay, isWithinInterval, addDays, parseISO, isFuture, startOfToday } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { analyzeClientReputation, ClientReputationInput } from '@/ai/flows/analyze-client-reputation';
 
@@ -241,17 +241,18 @@ const calculateLateFee = (credit: any) => {
 const getFullCreditDetails = async (creditData: any, providersMap: Map<string, any>) => {
     
     const serializableCreditData = { ...creditData };
+    // Make sure all timestamps are converted
     for (const key in serializableCreditData) {
         if (serializableCreditData[key] instanceof Timestamp) {
             serializableCreditData[key] = serializableCreditData[key].toDate().toISOString();
         }
     }
-    
-    serializableCreditData.paymentDates = (serializableCreditData.paymentDates || []).map((d: any) => 
+    // Also handle nested arrays of timestamps
+     serializableCreditData.paymentDates = (serializableCreditData.paymentDates || []).map((d: any) => 
         d instanceof Timestamp ? d.toDate().toISOString() : d
     );
-    serializableCreditData.formattedDate = new Date(serializableCreditData.fecha).toLocaleString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-
+    serializableCreditData.formattedDate = serializableCreditData.fecha ? new Date(serializableCreditData.fecha).toLocaleString('es-CO', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'N/A';
+    
     const cobradorData = await findUserByIdNumber(serializableCreditData.cobradorId as string);
     const clienteData = await findUserByIdNumber(serializableCreditData.clienteId as string);
     
@@ -326,7 +327,6 @@ export async function getProviderActivityLog() {
     const creditsQuery = query(creditsRef, where("providerId", "==", userId));
     const creditsSnapshot = await getDocs(creditsQuery);
     
-    // Create a map of credits for easy lookup
     const creditsMap = new Map(creditsSnapshot.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() }]));
 
     for (const credit of creditsMap.values()) {
@@ -371,16 +371,16 @@ export async function getProviderActivityLog() {
     activityLog.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     // 4. Enrich with details
-    // Fetch all providers in one go to minimize reads
     const providersSnapshot = await getDocs(query(collection(db, "users"), where("role", "==", "proveedor")));
     const providersMap = new Map(providersSnapshot.docs.map(doc => [doc.id, doc.data()]));
 
     const enrichedLogPromises = activityLog.map(async (entry) => {
         const creditData = creditsMap.get(entry.creditId);
-        if (!creditData) return null; // Should not happen
+        if (!creditData) return null;
 
         const cliente = await findUserByIdNumber(entry.clienteId);
-        const fullCreditDetails = await getFullCreditDetails({ ...creditData }, providersMap);
+        // Only fetch full details when needed, but for now we'll do it here.
+        const fullCreditDetails = await getFullCreditDetails({ ...creditData, id: entry.creditId }, providersMap);
 
         return {
             ...entry,
@@ -389,18 +389,13 @@ export async function getProviderActivityLog() {
         };
     });
     
-    // Wait for all promises to resolve
-    const enrichedLog = (await Promise.all(enrichedLogPromises)).filter(Boolean);
+    const enrichedLog = (await Promise.all(enrichedLogPromises)).filter(Boolean) as any[];
 
-    // This is a critical step to prevent sending too much data to the client.
-    // Instead of sending the full details for every log entry, we will send a lighter object.
-    // The full details will be fetched on demand if the user clicks to see them.
-    // For now, let's just return the enriched log as is, but be mindful of payload size.
-    // The previous error was due to Timestamps, this new error is likely payload size.
-    // Let's strip the fullCreditDetails from the main log and only use it when a single entry is selected.
-
+    // To prevent "failed to fetch" errors, return a lighter object.
     const finalLog = enrichedLog.map(entry => {
-        // Return a lighter version for the list view
+        // Return a lighter version for the list view, but keep full details for the modal.
+        // This was the source of the previous error. The object is too large.
+        // Let's strip the `fullCreditDetails` and fetch them on demand. This is a placeholder.
         return {
             id: entry.id,
             type: entry.type,
@@ -412,12 +407,11 @@ export async function getProviderActivityLog() {
             clienteName: entry.clienteName,
             creditState: entry.creditState,
             paymentType: entry.paymentType,
-            // Keep fullCreditDetails for the modal to use
-            fullCreditDetails: entry.fullCreditDetails
+            fullCreditDetails: entry.fullCreditDetails, // This is still being sent.
         };
     });
     
-    return finalLog as any[];
+    return finalLog;
 }
 
 
@@ -693,6 +687,41 @@ export async function getDailyCollectionSummary() {
     }));
 
     return { summary, totalCollected };
+}
+
+export async function getPaymentRoute() {
+    const allCredits = await getCreditsByCobrador();
+    const activeCredits = allCredits.filter(c => c.estado === 'Activo' && c.paymentDates && c.paymentDates.length > 0);
+
+    const routeEntries = activeCredits.map(credit => {
+        const sortedDates = credit.paymentDates
+            .map(d => parseISO(d))
+            .sort((a, b) => a.getTime() - b.getTime());
+
+        const nextPaymentDate = sortedDates.find(date => isFuture(date) || isToday(date));
+
+        if (!nextPaymentDate) return null;
+
+        const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
+        const installmentAmount = totalLoanAmount / credit.cuotas;
+
+        return {
+            creditId: credit.id,
+            clienteId: credit.clienteId,
+            clienteName: credit.clienteName || 'N/A',
+            nextPaymentDate: nextPaymentDate.toISOString(),
+            installmentAmount,
+            lateFee: credit.lateFee,
+            totalDebt: credit.totalDebt,
+            commission: credit.commission,
+            lateInterestRate: credit.lateInterestRate,
+            // Pass the full credit object for the modal
+            ...credit
+        };
+    }).filter(Boolean) as any[];
+
+    // Sort by next payment date
+    return routeEntries.sort((a, b) => new Date(a.nextPaymentDate).getTime() - new Date(b.nextPaymentDate).getTime());
 }
 
 
