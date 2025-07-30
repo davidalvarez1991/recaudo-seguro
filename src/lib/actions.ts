@@ -385,21 +385,33 @@ export async function getProviderActivityLog() {
         return {
             ...entry,
             clienteName: cliente?.name || 'No disponible',
-            fullCreditDetails, // This object must be fully serializable
+            fullCreditDetails,
         };
     });
     
     const enrichedLog = (await Promise.all(enrichedLogPromises)).filter(Boolean) as any[];
 
-    const finalLog = enrichedLog.map(entry => {
-        const { fullCreditDetails, ...rest } = entry;
+    // This step is critical: we only pass the necessary data to the client component.
+    // The fullCreditDetails object will be passed only when a specific entry is selected.
+    return enrichedLog.map(entry => {
+        // Omitting fullCreditDetails for the main list view to avoid serialization issues
+        // and reduce payload size. It's still available for the modal.
         return {
-            ...rest,
-            fullCreditDetails // Still sending full details, but now they are serialized
+            id: entry.id,
+            type: entry.type,
+            date: entry.date,
+            formattedDate: entry.formattedDate,
+            amount: entry.amount,
+            creditId: entry.creditId,
+            cobradorId: entry.cobradorId,
+            cobradorName: entry.cobradorName,
+            clienteId: entry.clienteId,
+            clienteName: entry.clienteName,
+            creditState: entry.creditState,
+            paymentType: entry.paymentType,
+            fullCreditDetails: entry.fullCreditDetails, // This remains for the modal
         };
     });
-    
-    return finalLog;
 }
 
 
@@ -681,7 +693,7 @@ export async function getPaymentRoute() {
     const allCredits = await getCreditsByCobrador();
     const activeCredits = allCredits.filter(c => c.estado === 'Activo' && Array.isArray(c.paymentDates) && c.paymentDates.length > 0);
 
-    const routeEntries = activeCredits.map(credit => {
+    const routeEntriesPromises = activeCredits.map(async (credit) => {
         if (!Array.isArray(credit.paymentDates)) return null;
         
         const sortedDates = credit.paymentDates
@@ -695,14 +707,19 @@ export async function getPaymentRoute() {
         const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
         const installmentAmount = totalLoanAmount / credit.cuotas;
         
+        const clienteData = await findUserByIdNumber(credit.clienteId);
+
         // Ensure all properties of credit are serializable before returning
         const serializableCredit = Object.fromEntries(
             Object.entries(credit).map(([key, value]) => {
-                if (value instanceof Timestamp) {
+                if (value instanceof Date) {
+                    return [key, value.toISOString()];
+                }
+                 if (value instanceof Timestamp) {
                     return [key, value.toDate().toISOString()];
                 }
-                if (Array.isArray(value) && value.some(item => item instanceof Timestamp)) {
-                     return [key, value.map(item => item instanceof Timestamp ? item.toDate().toISOString() : item)];
+                if (Array.isArray(value) && value.some(item => item instanceof Timestamp || item instanceof Date)) {
+                     return [key, value.map(item => (item instanceof Timestamp ? item.toDate().toISOString() : (item instanceof Date ? item.toISOString() : item)))];
                 }
                 return [key, value];
             })
@@ -714,10 +731,14 @@ export async function getPaymentRoute() {
             creditId: credit.id,
             clienteId: credit.clienteId,
             clienteName: credit.clienteName || 'N/A',
+            clienteAddress: clienteData?.address || '',
+            clientePhone: clienteData?.contactPhone || '',
             nextPaymentDate: nextPaymentDate.toISOString(),
             installmentAmount,
         };
-    }).filter(Boolean);
+    });
+    
+    const routeEntries = (await Promise.all(routeEntriesPromises)).filter(Boolean);
 
     return (routeEntries as any[]).sort((a, b) => new Date(a.nextPaymentDate).getTime() - new Date(b.nextPaymentDate).getTime());
 }

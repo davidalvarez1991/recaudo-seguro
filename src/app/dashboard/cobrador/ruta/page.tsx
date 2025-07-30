@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, HandCoins, Loader2, Map, Star, Handshake, Percent, XCircle, Calendar as CalendarIcon, X, CheckCircle2, Circle } from "lucide-react";
+import { ArrowLeft, ClipboardList, HandCoins, Loader2, Map, Star, Handshake, Percent, XCircle, Calendar as CalendarIcon, X, CheckCircle2, Circle, Home, Phone } from "lucide-react";
 import Link from "next/link";
 import { getPaymentRoute, registerPayment, registerMissedPayment, registerPaymentAgreement } from "@/lib/actions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -26,6 +26,8 @@ type PaymentRouteEntry = {
   creditId: string;
   clienteId: string;
   clienteName: string;
+  clienteAddress: string;
+  clientePhone: string;
   nextPaymentDate: string;
   installmentAmount: number;
   lateFee: number;
@@ -69,6 +71,14 @@ const formatDateGroup = (dateStr: string) => {
     if (isTomorrow(date)) return `Mañana, ${format(date, "d 'de' MMMM", { locale: es })}`;
     return format(date, "EEEE, d 'de' MMMM", { locale: es });
 };
+
+const generateWhatsAppLink = (phone: string, clientName: string) => {
+    const message = encodeURIComponent(`Hola ${clientName}, ¿cómo estás? Te escribo para recordarte tu compromiso de pago del día de hoy.`);
+    // Assume numbers are for Colombia, prepend 57 if not present
+    const cleanPhone = phone.replace(/\s+/g, '');
+    const finalPhone = cleanPhone.startsWith('57') ? cleanPhone : `57${cleanPhone}`;
+    return `https://wa.me/${finalPhone}?text=${message}`;
+}
 
 export default function RutaDePagoPage() {
     const [allRoutes, setAllRoutes] = useState<PaymentRouteEntry[]>([]);
@@ -195,7 +205,7 @@ export default function RutaDePagoPage() {
     };
 
     const hasInterestOption = (selectedCredit?.lateInterestRate ?? 0) > 0;
-    const sortedGroupKeys = Object.keys(groupedRoutes).sort();
+    const sortedGroupKeys = Object.keys(groupedRoutes).sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
     
     return (
         <Card>
@@ -267,12 +277,28 @@ export default function RutaDePagoPage() {
                                 <AccordionContent className="px-1 pb-2">
                                     <div className="divide-y">
                                         {groupedRoutes[dateKey].map(route => (
-                                            <div key={route.creditId} onClick={() => handleRowClick(route)} className="flex items-center justify-between p-4 hover:bg-muted/50 cursor-pointer">
-                                                <div>
+                                            <div key={route.creditId} onClick={() => handleRowClick(route)} className="flex items-start justify-between p-4 hover:bg-muted/50 cursor-pointer">
+                                                <div className="flex-1 space-y-1.5">
                                                     <p className="font-semibold">{route.clienteName}</p>
                                                     <p className="text-sm text-muted-foreground">CC: {route.clienteId}</p>
+                                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                        <Home className="h-4 w-4" />
+                                                        <span>{route.clienteAddress || 'Sin dirección'}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                        <Phone className="h-4 w-4" />
+                                                         <a 
+                                                            href={generateWhatsAppLink(route.clientePhone, route.clienteName)}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="text-primary hover:underline"
+                                                          >
+                                                            {route.clientePhone || 'Sin teléfono'}
+                                                         </a>
+                                                    </div>
                                                 </div>
-                                                <div className="text-right">
+                                                <div className="text-right pl-4">
                                                     <p className="font-bold text-lg text-primary">{formatCurrency(route.installmentAmount + route.lateFee)}</p>
                                                     {route.lateFee > 0 && <p className="text-xs text-destructive">Incluye {formatCurrency(route.lateFee)} de mora</p>}
                                                 </div>
@@ -300,8 +326,8 @@ export default function RutaDePagoPage() {
                         <DialogDescription>Para el cliente <span className="font-semibold">{selectedCredit?.clienteName}</span>.</DialogDescription>
                     </DialogHeader>
                     {selectedCredit && (
-                        <div className="space-y-4">
-                            <Accordion type="single" collapsible className="w-full">
+                        <div className="py-4 space-y-4">
+                            <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
                                 <AccordionItem value="item-1">
                                     <AccordionTrigger>Cuotas: {selectedCredit.paidInstallments}/{selectedCredit.cuotas}</AccordionTrigger>
                                     <AccordionContent>
@@ -324,28 +350,28 @@ export default function RutaDePagoPage() {
                             </Accordion>
 
                             <RadioGroup value={paymentType} onValueChange={(value: any) => setPaymentType(value)} className="gap-3 pt-4">
-                                <Label htmlFor="payment-cuota" className="flex items-start gap-4 rounded-md border p-3 cursor-pointer">
+                                <Label htmlFor="payment-cuota" className="flex items-start gap-4 rounded-md border p-3 cursor-pointer hover:bg-muted/50">
                                     <RadioGroupItem value="cuota" id="payment-cuota" className="mt-1" />
                                     <div className="flex justify-between w-full">
                                         <p className="font-semibold">Pagar Cuota</p>
                                         <p className="font-bold">{formatCurrency(selectedCredit.installmentAmount + selectedCredit.lateFee)}</p>
                                     </div>
                                 </Label>
-                                <Label htmlFor="payment-comision" className="flex items-start gap-4 rounded-md border p-3 cursor-pointer">
+                                <Label htmlFor="payment-comision" className="flex items-start gap-4 rounded-md border p-3 cursor-pointer hover:bg-muted/50">
                                     <RadioGroupItem value="comision" id="payment-comision" className="mt-1" />
                                     <div className="flex justify-between w-full">
                                         <p className="font-semibold flex items-center gap-1.5"><Percent className="h-4 w-4" /> Comisión</p>
                                         <p className="font-bold">{formatCurrency(selectedCredit.commission)}</p>
                                     </div>
                                 </Label>
-                                <Label htmlFor="payment-total" className="flex items-start gap-4 rounded-md border p-3 cursor-pointer">
+                                <Label htmlFor="payment-total" className="flex items-start gap-4 rounded-md border p-3 cursor-pointer hover:bg-muted/50">
                                     <RadioGroupItem value="total" id="payment-total" className="mt-1" />
                                     <div className="flex justify-between w-full">
                                         <p className="font-semibold">Pagar Total</p>
                                         <p className="font-bold">{formatCurrency(selectedCredit.totalDebt)}</p>
                                     </div>
                                 </Label>
-                                <Label htmlFor="payment-acuerdo" className="flex flex-col gap-2 rounded-md border p-3 cursor-pointer">
+                                <Label htmlFor="payment-acuerdo" className="flex flex-col gap-2 rounded-md border p-3 cursor-pointer hover:bg-muted/50">
                                     <div className="flex items-start gap-4">
                                       <RadioGroupItem value="acuerdo" id="payment-acuerdo" className="mt-1" />
                                       <div className="flex justify-between w-full">
