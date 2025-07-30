@@ -11,7 +11,6 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { getUserData, saveProviderSettings } from "@/lib/actions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
 type CommissionTier = {
@@ -34,19 +33,7 @@ const formatCurrencyForInput = (value: number | string): string => {
     return new Intl.NumberFormat('es-CO').format(numberValue);
 };
 
-const fontMap: { [key: string]: string } = {
-    'Roboto': 'Roboto:wght@400;700&display=swap',
-    'Lato': 'Lato:wght@400;700&display=swap',
-    'Montserrat': 'Montserrat:wght@400;700&display=swap',
-    'Oswald': 'Oswald:wght@400;700&display=swap',
-    'Playfair Display': 'Playfair+Display:wght@400;700&display=swap',
-    'Merriweather': 'Merriweather:wght@400;700&display=swap',
-};
-
-const availableFonts = Object.keys(fontMap);
-
 export function SettingsForm({ providerId }: SettingsFormProps) {
-  const [fontFamily, setFontFamily] = useState('Roboto');
   const [commissionTiers, setCommissionTiers] = useState<CommissionTier[]>([]);
   const [lateInterestRate, setLateInterestRate] = useState("2");
   const [isLateInterestActive, setIsLateInterestActive] = useState(false);
@@ -62,7 +49,6 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
       try {
         const userData = await getUserData(providerId);
         if (userData) {
-          setFontFamily(userData.fontFamily || 'Roboto');
           setLateInterestRate((userData.lateInterestRate || 2).toString());
           setIsLateInterestActive(userData.isLateInterestActive || false);
           
@@ -81,19 +67,6 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
     fetchUserData();
   }, [providerId, toast]);
   
-    useEffect(() => {
-        if (fontFamily && fontMap[fontFamily]) {
-            const linkId = `google-font-${fontFamily.replace(' ', '-')}`;
-            if (document.getElementById(linkId)) return;
-
-            const fontUrl = `https://fonts.googleapis.com/css2?family=${fontMap[fontFamily].replace(/ /g, '+')}`;
-            const link = document.createElement('link');
-            link.id = linkId;
-            link.rel = 'stylesheet';
-            link.href = fontUrl;
-            document.head.appendChild(link);
-        }
-    }, [fontFamily]);
 
   const handleCommissionTierChange = (index: number, field: keyof CommissionTier, value: string) => {
     const numericValue = parseInt(value.replace(/\D/g, ''), 10);
@@ -141,7 +114,6 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
         }
     
         const settingsToSave = {
-            fontFamily,
             commissionTiers,
             lateInterestRate: rate,
             isLateInterestActive,
@@ -155,8 +127,6 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
             variant: "default",
             className: "bg-accent text-accent-foreground border-accent",
           });
-          // Force a reload to apply the new font everywhere
-          window.location.reload();
         } else {
            toast({ title: "Error", description: result.error, variant: "destructive" });
         }
@@ -176,42 +146,6 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
 
   return (
     <div className="space-y-8 pt-6">
-
-      {/* Font/Branding Section */}
-      <div className="space-y-6">
-        <div className="space-y-1">
-            <h3 className="text-lg font-medium">Identidad de Marca</h3>
-            <p className="text-sm text-muted-foreground">Elige una tipografía para representar tu marca.</p>
-        </div>
-        <Card className="max-w-md">
-            <CardContent className="p-6 flex flex-col gap-4">
-                <Label htmlFor="font-family-select" className="flex items-center gap-2">
-                  <Type className="h-4 w-4" />
-                  Tipografía de la Marca
-                </Label>
-                <Select value={fontFamily} onValueChange={setFontFamily}>
-                    <SelectTrigger id="font-family-select">
-                        <SelectValue placeholder="Selecciona una fuente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {availableFonts.map(font => (
-                           <SelectItem key={font} value={font} style={{ fontFamily: font }}>
-                                {font}
-                           </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                <div className="border rounded-md p-4 text-center">
-                    <p className="text-sm text-muted-foreground mb-2">Vista Previa:</p>
-                    <p className="text-3xl" style={{ fontFamily: fontFamily }}>
-                        Tu Marca Aquí
-                    </p>
-                </div>
-            </CardContent>
-        </Card>
-      </div>
-
-      <Separator />
 
       {/* Commission Section */}
       <Card className="border-dashed">

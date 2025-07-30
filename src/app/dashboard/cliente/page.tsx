@@ -19,7 +19,6 @@ type CreditData = {
   clienteName?: string;
   clienteId?: string;
   providerName?: string;
-  providerFont?: string;
   valor: number;
   commission: number;
   cuotas: number;
@@ -161,7 +160,7 @@ export default function ClienteDashboard() {
                      <Avatar className="h-6 w-6">
                         <AvatarFallback>{getAvatarFallback(credit.providerName)}</AvatarFallback>
                      </Avatar>
-                     <span className="font-semibold" style={{ fontFamily: credit.providerFont || 'inherit' }}>{credit.providerName || 'Proveedor Desconocido'}</span>
+                     <span className="font-semibold">{credit.providerName || 'Proveedor Desconocido'}</span>
                   </div>
                   <span className="text-xs text-muted-foreground ml-8">{formatCurrency(credit.totalLoanAmount)}</span>
                 </TabsTrigger>

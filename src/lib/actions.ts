@@ -385,7 +385,7 @@ export async function getProviderActivityLog() {
         return {
             ...entry,
             clienteName: cliente?.name || 'No disponible',
-            fullCreditDetails,
+            fullCreditDetails, // Pass this to the client
         };
     });
     
@@ -394,8 +394,6 @@ export async function getProviderActivityLog() {
     // This step is critical: we only pass the necessary data to the client component.
     // The fullCreditDetails object will be passed only when a specific entry is selected.
     return enrichedLog.map(entry => {
-        // Omitting fullCreditDetails for the main list view to avoid serialization issues
-        // and reduce payload size. It's still available for the modal.
         return {
             id: entry.id,
             type: entry.type,
@@ -403,13 +401,13 @@ export async function getProviderActivityLog() {
             formattedDate: entry.formattedDate,
             amount: entry.amount,
             creditId: entry.creditId,
-            cobradorId: entry.cobradorId,
-            cobradorName: entry.cobradorName,
+            cobradorId: entry.fullCreditDetails.cobradorId,
+            cobradorName: entry.fullCreditDetails.cobradorName,
             clienteId: entry.clienteId,
             clienteName: entry.clienteName,
             creditState: entry.creditState,
             paymentType: entry.paymentType,
-            fullCreditDetails: entry.fullCreditDetails, // This remains for the modal
+            fullCreditDetails: entry.fullCreditDetails,
         };
     });
 }
@@ -508,13 +506,11 @@ export async function getCreditsByCliente() {
 
         // Fetch provider data for each credit
         let providerName = "Proveedor Desconocido";
-        let providerFont = "Inter";
         if (creditData.providerId) {
             const providerDoc = await getDoc(doc(db, "users", creditData.providerId));
             if (providerDoc.exists()) {
                 const providerData = providerDoc.data();
                 providerName = providerData.companyName || providerData.name || providerName;
-                providerFont = providerData.fontFamily || 'Inter';
             }
         }
 
@@ -537,7 +533,6 @@ export async function getCreditsByCliente() {
             clienteName: clienteData.name,
             clienteId: clienteData.idNumber,
             providerName: providerName,
-            providerFont: providerFont,
             valor: creditData.valor,
             commission: creditData.commission,
             cuotas: creditData.cuotas,
@@ -1259,7 +1254,7 @@ export async function registerPaymentAgreement(creditId: string, amount: number)
     return { success: "Acuerdo registrado. El calendario de pagos ha sido actualizado." };
 }
 
-export async function saveProviderSettings(providerId: string, settings: { commissionTiers?: CommissionTier[], lateInterestRate?: number, isLateInterestActive?: boolean, fontFamily?: string }) {
+export async function saveProviderSettings(providerId: string, settings: { commissionTiers?: CommissionTier[], lateInterestRate?: number, isLateInterestActive?: boolean }) {
   if (!providerId) return { error: "ID de proveedor no válido." };
   
   const providerRef = doc(db, "users", providerId);
@@ -1278,9 +1273,6 @@ export async function saveProviderSettings(providerId: string, settings: { commi
       }
       if (settings.isLateInterestActive !== undefined) {
         updateData.isLateInterestActive = settings.isLateInterestActive;
-      }
-       if (settings.fontFamily !== undefined) {
-        updateData.fontFamily = settings.fontFamily;
       }
       
       if (Object.keys(updateData).length > 0) {
