@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { DateRange } from "react-day-picker";
 import { format, endOfDay } from "date-fns";
 import { es } from "date-fns/locale";
-import { getCreditsByProvider } from "@/lib/actions";
+import { downloadProviderCredits } from "@/lib/actions";
 import * as XLSX from "xlsx";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -55,7 +55,7 @@ export default function DescargasPage() {
 
         setLoading(true);
         try {
-            const allRecords: Registro[] = await getCreditsByProvider();
+            const allRecords: Registro[] = await downloadProviderCredits();
             
             const fromDate = dateRange.from;
             const toDate = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
