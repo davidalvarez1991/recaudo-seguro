@@ -772,6 +772,7 @@ export async function getPaymentRoute() {
     let collectedToday = 0;
     paymentsSnapshot.forEach(doc => {
         const payment = doc.data();
+        if (!payment.date) return; // Defensive check to prevent crash
         const paymentDate = toZonedTime(payment.date.toDate(), timeZone);
         if (isSameDay(today, paymentDate)) {
              collectedToday += payment.amount || 0;
