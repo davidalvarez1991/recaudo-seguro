@@ -288,6 +288,7 @@ const getFullCreditDetails = async (creditData: any, providersMap: Map<string, a
     const todayStart = startOfDay(toZonedTime(new Date(), timeZone));
     const todayEnd = endOfDay(toZonedTime(new Date(), timeZone));
     const dailyCollectedAmount = payments.reduce((sum, p) => {
+        if (!p.date) return sum;
         const paymentDateUTC = p.date.toDate();
         const paymentDateInTimeZone = toZonedTime(paymentDateUTC, timeZone);
         if (isWithinInterval(paymentDateInTimeZone, { start: todayStart, end: todayEnd })) {
@@ -376,39 +377,31 @@ export async function getProviderActivityLog() {
     const providersMap = new Map(providersSnapshot.docs.map(doc => [doc.id, doc.data()]));
 
     const enrichedLogPromises = activityLog.map(async (entry) => {
-        const creditData = creditsMap.get(entry.creditId);
-        if (!creditData) return null;
+        try {
+            const creditData = creditsMap.get(entry.creditId);
+            if (!creditData) return null;
 
-        const cliente = await findUserByIdNumber(entry.clienteId);
-        const fullCreditDetails = await getFullCreditDetails({ ...creditData, id: entry.creditId }, providersMap);
+            const cliente = await findUserByIdNumber(entry.clienteId);
+            const fullCreditDetails = await getFullCreditDetails({ ...creditData, id: entry.creditId }, providersMap);
+            
+            if (!fullCreditDetails) return null;
 
-        return {
-            ...entry,
-            clienteName: cliente?.name || 'No disponible',
-            fullCreditDetails,
-        };
+            return {
+                ...entry,
+                clienteName: cliente?.name || 'No disponible',
+                cobradorId: fullCreditDetails.cobradorId,
+                cobradorName: fullCreditDetails.cobradorName,
+                fullCreditDetails,
+            };
+        } catch (error) {
+            console.error(`Failed to process activity log entry ${entry.id}:`, error);
+            return null; // Skip problematic entries
+        }
     });
     
     const enrichedLog = (await Promise.all(enrichedLogPromises)).filter(Boolean) as any[];
 
-    return enrichedLog.map(entry => {
-        const creditData = entry.fullCreditDetails || {};
-        return {
-            id: entry.id,
-            type: entry.type,
-            date: entry.date,
-            formattedDate: entry.formattedDate,
-            amount: entry.amount,
-            creditId: entry.creditId,
-            cobradorId: creditData.cobradorId,
-            cobradorName: creditData.cobradorName,
-            clienteId: entry.clienteId,
-            clienteName: entry.clienteName,
-            creditState: entry.creditState,
-            paymentType: entry.paymentType,
-            fullCreditDetails: entry.fullCreditDetails,
-        };
-    });
+    return enrichedLog;
 }
 
 

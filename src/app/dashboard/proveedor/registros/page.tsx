@@ -220,7 +220,10 @@ export default function RegistrosPage() {
         </CardHeader>
         <CardContent className="pt-6">
           {loading ? (
-             <p>Cargando registros...</p>
+             <div className="flex justify-center items-center h-40">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="ml-4 text-muted-foreground">Cargando registros...</p>
+             </div>
           ) : paginatedLog.length > 0 ? (
             <Table>
                 <TableHeader>
