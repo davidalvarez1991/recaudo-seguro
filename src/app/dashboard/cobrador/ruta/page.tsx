@@ -4,13 +4,13 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, HandCoins, Loader2, Map, Star, Handshake, Percent, XCircle, Calendar as CalendarIcon, X, CheckCircle2, Circle, Home, Phone, Search, Filter } from "lucide-react";
+import { ArrowLeft, ClipboardList, HandCoins, Loader2, Map, Star, Handshake, Percent, XCircle, Calendar as CalendarIcon, X, CheckCircle2, Circle, Home, Phone, Search } from "lucide-react";
 import Link from "next/link";
 import { getPaymentRoute, registerPayment, registerMissedPayment, registerPaymentAgreement } from "@/lib/actions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { format, isToday, isTomorrow, isPast, parseISO, isSameDay } from 'date-fns';
+import { format, isToday, isTomorrow, isPast, parseISO } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 import { RenewCreditForm } from "@/components/forms/renew-credit-form";
@@ -19,8 +19,6 @@ import { cn } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 
 
 type PaymentRouteEntry = {
@@ -92,8 +90,6 @@ export default function RutaDePagoPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [paymentType, setPaymentType] = useState<PaymentType>("cuota");
     const [agreementAmount, setAgreementAmount] = useState("");
-    const [filterDate, setFilterDate] = useState<Date | undefined>();
-    const [displayDate, setDisplayDate] = useState<Date | undefined>();
     const [searchTerm, setSearchTerm] = useState("");
     const { toast } = useToast();
 
@@ -115,18 +111,10 @@ export default function RutaDePagoPage() {
     
     const groupedRoutes = useMemo(() => {
         const lowercasedFilter = searchTerm.toLowerCase();
-        const timeZone = 'America/Bogota';
 
         const filtered = allRoutes.filter(route => {
-            const routeDate = toZonedTime(parseISO(route.nextPaymentDate), timeZone);
-            
-            const dateMatch = filterDate ? isSameDay(routeDate, toZonedTime(filterDate, timeZone)) : true;
-            
-            const searchMatch = searchTerm 
-                ? (route.clienteName.toLowerCase().includes(lowercasedFilter) || route.clienteId.toLowerCase().includes(lowercasedFilter))
-                : true;
-            
-            return dateMatch && searchMatch;
+            if (!searchTerm) return true;
+            return route.clienteName.toLowerCase().includes(lowercasedFilter) || route.clienteId.toLowerCase().includes(lowercasedFilter);
         });
 
         return filtered.reduce((acc, route) => {
@@ -137,7 +125,7 @@ export default function RutaDePagoPage() {
             acc[dateKey].push(route);
             return acc;
         }, {} as GroupedRoutes);
-    }, [allRoutes, filterDate, searchTerm]);
+    }, [allRoutes, searchTerm]);
 
 
     const handleRowClick = (credit: PaymentRouteEntry) => {
@@ -145,15 +133,6 @@ export default function RutaDePagoPage() {
         setPaymentType("cuota");
         setAgreementAmount("");
         setIsModalOpen(true);
-    };
-    
-    const handleApplyDateFilter = () => {
-        setFilterDate(displayDate);
-    };
-
-    const handleClearDateFilter = () => {
-        setFilterDate(undefined);
-        setDisplayDate(undefined);
     };
 
     const handleConfirmAction = async () => {
@@ -261,47 +240,6 @@ export default function RutaDePagoPage() {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button
-                                variant={"outline"}
-                                className={cn(
-                                "w-full sm:w-[240px] justify-start text-left font-normal",
-                                !filterDate && "text-muted-foreground"
-                                )}
-                            >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {filterDate ? format(filterDate, "PPP", { locale: es }) : <span>Filtrar por fecha...</span>}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                                mode="single"
-                                selected={displayDate}
-                                onSelect={setDisplayDate}
-                                initialFocus
-                                locale={es}
-                            />
-                             <div className="p-2 border-t flex justify-end gap-2">
-                                <Button
-                                    variant="ghost"
-                                    onClick={() => (document.querySelector('[data-radix-popper-content-wrapper]') as HTMLElement)?.click()}
-                                >
-                                    Cancelar
-                                </Button>
-                                <Button onClick={handleApplyDateFilter} disabled={!displayDate}>
-                                    <Filter className="mr-2 h-4 w-4" />
-                                    Aplicar Filtro
-                                </Button>
-                            </div>
-                        </PopoverContent>
-                    </Popover>
-                    {filterDate && (
-                         <Button variant="ghost" size="icon" onClick={handleClearDateFilter}>
-                            <X className="h-4 w-4" />
-                            <span className="sr-only">Limpiar filtro</span>
-                        </Button>
-                    )}
                 </div>
             </CardHeader>
             <CardContent>
@@ -359,8 +297,8 @@ export default function RutaDePagoPage() {
                 ) : (
                     <div className="text-center text-muted-foreground py-16">
                         <ClipboardList className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                        <h3 className="text-lg font-semibold">{searchTerm || filterDate ? 'No se encontraron clientes' : 'No hay cobros pendientes'}</h3>
-                        <p className="text-sm">{searchTerm || filterDate ? 'Intenta con otros filtros.' : 'No hay clientes con fechas de pago próximas.'}</p>
+                        <h3 className="text-lg font-semibold">{searchTerm ? 'No se encontraron clientes' : 'No hay cobros pendientes'}</h3>
+                        <p className="text-sm">{searchTerm ? 'Intenta con otros filtros.' : 'No hay clientes con fechas de pago próximas.'}</p>
                     </div>
                 )}
             </CardContent>
