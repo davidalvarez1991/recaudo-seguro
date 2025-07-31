@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
 import { db } from "./firebase";
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc, increment, orderBy, limit } from "firebase/firestore";
-import { startOfDay, differenceInDays, endOfDay, isWithinInterval, addDays, parseISO, isFuture, isToday } from 'date-fns';
+import { startOfDay, differenceInDays, endOfDay, isWithinInterval, addDays, parseISO, isFuture, isToday, isSameDay } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { analyzeClientReputation, ClientReputationInput } from '@/ai/flows/analyze-client-reputation';
 
@@ -765,15 +765,18 @@ export async function getPaymentRoute() {
 
     // Calculate collected today
     const paymentsRef = collection(db, "payments");
-    const todayStart = startOfDay(toZonedTime(new Date(), timeZone));
-    const todayEnd = endOfDay(toZonedTime(new Date(), timeZone));
-    const paymentsQuery = query(paymentsRef, 
-        where("cobradorId", "==", cobradorData.idNumber),
-        where("date", ">=", todayStart),
-        where("date", "<=", todayEnd)
-    );
+    const today = toZonedTime(new Date(), timeZone);
+    const paymentsQuery = query(paymentsRef, where("cobradorId", "==", cobradorData.idNumber));
     const paymentsSnapshot = await getDocs(paymentsQuery);
-    const collectedToday = paymentsSnapshot.docs.reduce((sum, doc) => sum + (doc.data().amount || 0), 0);
+    
+    let collectedToday = 0;
+    paymentsSnapshot.forEach(doc => {
+        const payment = doc.data();
+        const paymentDate = toZonedTime(payment.date.toDate(), timeZone);
+        if (isSameDay(today, paymentDate)) {
+             collectedToday += payment.amount || 0;
+        }
+    });
 
     return { routes: sortedRoutes, dailyGoal, collectedToday };
 }
