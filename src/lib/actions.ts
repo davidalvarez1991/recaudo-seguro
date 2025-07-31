@@ -1487,3 +1487,54 @@ export async function getCobradoresDailySummary() {
 
     return Promise.all(summaryPromises);
 }
+
+export async function getCobradorSelfDailySummary() {
+    const cobradorUserId = cookies().get('loggedInUser')?.value;
+    if (!cobradorUserId) return { successfulPayments: 0, renewedCredits: 0, missedPayments: 0 };
+    
+    const cobrador = await getUserData(cobradorUserId);
+    if (!cobrador || cobrador.role !== 'cobrador') {
+        return { successfulPayments: 0, renewedCredits: 0, missedPayments: 0 };
+    }
+    const cobradorId = cobrador.idNumber;
+    const providerId = cobrador.providerId;
+
+    const timeZone = 'America/Bogota';
+    const today = toZonedTime(new Date(), timeZone);
+    const todayStart = startOfDay(today);
+    const todayEnd = endOfDay(today);
+
+    // Payments
+    const paymentsRef = collection(db, "payments");
+    const paymentsQuery = query(paymentsRef, where("cobradorId", "==", cobradorId));
+    const paymentsSnapshot = await getDocs(paymentsQuery);
+    const todayPayments = paymentsSnapshot.docs
+        .map(doc => doc.data())
+        .filter(p => p.date && isWithinInterval(toZonedTime(p.date.toDate(), timeZone), { start: todayStart, end: todayEnd }));
+    const successfulPayments = new Set(todayPayments.filter(p => p.type === 'cuota' || p.type === 'total').map(p => p.clienteId)).size;
+
+    // Credits (for renewals and missed payments)
+    const creditsRef = collection(db, "credits");
+    const creditsQuery = query(creditsRef, where("cobradorId", "==", cobradorId));
+    const creditsSnapshot = await getDocs(creditsQuery);
+    
+    let renewedCredits = 0;
+    let missedPayments = 0;
+    const missedClients = new Set();
+
+    creditsSnapshot.docs.forEach(doc => {
+        const credit = doc.data();
+        if (credit.updatedAt && isWithinInterval(toZonedTime(credit.updatedAt.toDate(), timeZone), { start: todayStart, end: todayEnd })) {
+            if (credit.estado === 'Renovado') {
+                renewedCredits++;
+            }
+            if (credit.missedPaymentDays > 0) {
+                missedClients.add(credit.clienteId);
+            }
+        }
+    });
+    
+    missedPayments = missedClients.size;
+    
+    return { successfulPayments, renewedCredits, missedPayments };
+}

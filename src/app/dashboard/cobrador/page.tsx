@@ -2,11 +2,12 @@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { CobradorDashboardClient } from "@/components/dashboard/cobrador-dashboard-client";
 import { CreditSimulator } from "@/components/dashboard/credit-simulator";
-import { getUserData, getPaymentRoute } from "@/lib/actions";
+import { getUserData, getPaymentRoute, getCobradorSelfDailySummary } from "@/lib/actions";
 import { cookies } from "next/headers";
 import { Separator } from "@/components/ui/separator";
 import { ClientReputationSearch } from "@/components/dashboard/client-reputation-search";
-import { Target, TrendingUp } from "lucide-react";
+import { Target, TrendingUp, CheckCircle, Star, AlertTriangle, RefreshCw } from "lucide-react";
+import { DailyStats } from "@/components/dashboard/daily-stats";
 
 type CommissionTier = {
   minAmount: number;
@@ -43,6 +44,8 @@ export default async function CobradorDashboard() {
   let isLateInterestActive = false;
   let dailyGoal = 0;
   let collectedToday = 0;
+  
+  const dailySummary = await getCobradorSelfDailySummary();
 
   if (userId) {
     const userData: UserData = await getUserData(userId);
@@ -104,6 +107,10 @@ export default async function CobradorDashboard() {
           </div>
         </CardHeader>
         <CardContent className="space-y-8">
+            <DailyStats initialData={dailySummary} />
+
+            <Separator />
+            
             <ClientReputationSearch />
 
             <Separator />
