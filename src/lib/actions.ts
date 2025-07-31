@@ -385,15 +385,14 @@ export async function getProviderActivityLog() {
         return {
             ...entry,
             clienteName: cliente?.name || 'No disponible',
-            fullCreditDetails, // Pass this to the client
+            fullCreditDetails,
         };
     });
     
     const enrichedLog = (await Promise.all(enrichedLogPromises)).filter(Boolean) as any[];
 
-    // This step is critical: we only pass the necessary data to the client component.
-    // The fullCreditDetails object will be passed only when a specific entry is selected.
     return enrichedLog.map(entry => {
+        const creditData = entry.fullCreditDetails || {};
         return {
             id: entry.id,
             type: entry.type,
@@ -401,8 +400,8 @@ export async function getProviderActivityLog() {
             formattedDate: entry.formattedDate,
             amount: entry.amount,
             creditId: entry.creditId,
-            cobradorId: entry.fullCreditDetails.cobradorId,
-            cobradorName: entry.fullCreditDetails.cobradorName,
+            cobradorId: creditData.cobradorId,
+            cobradorName: creditData.cobradorName,
             clienteId: entry.clienteId,
             clienteName: entry.clienteName,
             creditState: entry.creditState,
@@ -770,7 +769,7 @@ export async function getPaymentRoute() {
     const paymentsSnapshot = await getDocs(paymentsQuery);
     
     let collectedToday = 0;
-    paymentsSnapshot.docs.forEach(doc => {
+    paymentsSnapshot.forEach(doc => {
         const payment = doc.data();
         if (payment.date) {
             const paymentDate = toZonedTime(payment.date.toDate(), timeZone);
