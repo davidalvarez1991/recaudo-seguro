@@ -97,8 +97,8 @@ export default function RutaDePagoPage() {
     const fetchRoute = useCallback(async () => {
         setLoading(true);
         try {
-            const routes = await getPaymentRoute();
-            setAllRoutes(routes);
+            const routesData = await getPaymentRoute();
+            setAllRoutes(routesData.routes || []);
         } catch (error) {
             toast({ title: "Error", description: "No se pudo cargar la ruta de pagos.", variant: "destructive" });
         } finally {
