@@ -686,7 +686,8 @@ export async function getDailyCollectionSummary() {
 export async function getPaymentRoute() {
     const allCredits = await getCreditsByCobrador();
     const activeCredits = allCredits.filter(c => c.estado === 'Activo' && Array.isArray(c.paymentDates) && c.paymentDates.length > 0);
-
+    const timeZone = 'America/Bogota';
+    
     const routeEntriesPromises = activeCredits.map(async (credit) => {
         if (!Array.isArray(credit.paymentDates)) return null;
         
@@ -702,6 +703,19 @@ export async function getPaymentRoute() {
         const installmentAmount = totalLoanAmount / credit.cuotas;
         
         const clienteData = await findUserByIdNumber(credit.clienteId);
+
+        // Check if a payment has been made today for this credit
+        const paymentsRef = collection(db, "payments");
+        const paymentsQuery = query(paymentsRef, where("creditId", "==", credit.id));
+        const paymentsSnapshot = await getDocs(paymentsQuery);
+        const todayStart = startOfDay(toZonedTime(new Date(), timeZone));
+        const todayEnd = endOfDay(toZonedTime(new Date(), timeZone));
+
+        const isPaidToday = paymentsSnapshot.docs.some(pDoc => {
+            const payment = pDoc.data();
+            const paymentDateInTimeZone = toZonedTime(payment.date.toDate(), timeZone);
+            return isWithinInterval(paymentDateInTimeZone, { start: todayStart, end: todayEnd });
+        });
 
         // Ensure all properties of credit are serializable before returning
         const serializableCredit = Object.fromEntries(
@@ -729,6 +743,7 @@ export async function getPaymentRoute() {
             clientePhone: clienteData?.contactPhone || '',
             nextPaymentDate: nextPaymentDate.toISOString(),
             installmentAmount,
+            isPaidToday,
         };
     });
     

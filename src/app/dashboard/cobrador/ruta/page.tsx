@@ -33,6 +33,7 @@ type PaymentRouteEntry = {
   totalDebt: number;
   commission: number;
   lateInterestRate?: number;
+  isPaidToday: boolean;
   // All fields from Credito type needed for the modal
   id: string;
   valor: number;
@@ -262,15 +263,25 @@ export default function RutaDePagoPage() {
                                 <AccordionContent className="px-1 pb-2">
                                     <div className="divide-y">
                                         {groupedRoutes[dateKey].map(route => (
-                                            <div key={route.creditId} onClick={() => handleRowClick(route)} className="flex items-start justify-between p-4 hover:bg-muted/50 cursor-pointer">
+                                            <div 
+                                                key={route.creditId} 
+                                                onClick={() => handleRowClick(route)} 
+                                                className={cn(
+                                                    "flex items-start justify-between p-4 hover:bg-muted/50 cursor-pointer transition-colors",
+                                                    route.isPaidToday && "bg-green-100/50 hover:bg-green-100/60"
+                                                )}
+                                            >
                                                 <div className="flex-1 space-y-1.5">
-                                                    <p className="font-semibold">{route.clienteName}</p>
-                                                    <p className="text-sm text-muted-foreground">CC: {route.clienteId}</p>
-                                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                    <p className={cn("font-semibold flex items-center gap-2", route.isPaidToday && "text-muted-foreground")}>
+                                                      {route.isPaidToday && <CheckCircle2 className="h-5 w-5 text-green-600" />}
+                                                      {route.clienteName}
+                                                    </p>
+                                                    <p className={cn("text-sm text-muted-foreground", route.isPaidToday && "line-through")}>CC: {route.clienteId}</p>
+                                                     <div className={cn("flex items-center gap-2 text-sm", route.isPaidToday ? "text-muted-foreground/80" : "text-muted-foreground")}>
                                                         <Home className="h-4 w-4" />
                                                         <span>{route.clienteAddress || 'Sin dirección'}</span>
                                                     </div>
-                                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                    <div className={cn("flex items-center gap-2 text-sm", route.isPaidToday ? "text-muted-foreground/80" : "text-muted-foreground")}>
                                                         <Phone className="h-4 w-4" />
                                                          <a 
                                                             href={generateWhatsAppLink(route.clientePhone, route.clienteName)}
@@ -284,8 +295,10 @@ export default function RutaDePagoPage() {
                                                     </div>
                                                 </div>
                                                 <div className="text-right pl-4">
-                                                    <p className="font-bold text-lg text-primary">{formatCurrency(route.installmentAmount + route.lateFee)}</p>
-                                                    {route.lateFee > 0 && <p className="text-xs text-destructive">Incluye {formatCurrency(route.lateFee)} de mora</p>}
+                                                    <p className={cn("font-bold text-lg text-primary", route.isPaidToday && "text-muted-foreground line-through")}>
+                                                        {formatCurrency(route.installmentAmount + route.lateFee)}
+                                                    </p>
+                                                    {route.lateFee > 0 && !route.isPaidToday && <p className="text-xs text-destructive">Incluye {formatCurrency(route.lateFee)} de mora</p>}
                                                 </div>
                                             </div>
                                         ))}
@@ -406,5 +419,3 @@ export default function RutaDePagoPage() {
         </Card>
     );
 }
-
-    
