@@ -6,9 +6,7 @@ import { getUserData, getPaymentRoute } from "@/lib/actions";
 import { cookies } from "next/headers";
 import { Separator } from "@/components/ui/separator";
 import { ClientReputationSearch } from "@/components/dashboard/client-reputation-search";
-import { Target } from "lucide-react";
-import { isToday, parseISO } from 'date-fns';
-import { toZonedTime } from 'date-fns-tz';
+import { Target, TrendingUp } from "lucide-react";
 
 type CommissionTier = {
   minAmount: number;
@@ -44,6 +42,7 @@ export default async function CobradorDashboard() {
   let lateInterestRate = 0;
   let isLateInterestActive = false;
   let dailyGoal = 0;
+  let collectedToday = 0;
 
   if (userId) {
     const userData: UserData = await getUserData(userId);
@@ -63,16 +62,9 @@ export default async function CobradorDashboard() {
             }
         }
         
-        // Calculate daily goal from payment route
-        const paymentRoute = await getPaymentRoute();
-        const timeZone = 'America/Bogota';
-        dailyGoal = paymentRoute.reduce((total, route) => {
-            const routeDate = toZonedTime(parseISO(route.nextPaymentDate), timeZone);
-            if (isToday(routeDate)) {
-                return total + route.installmentAmount + route.lateFee;
-            }
-            return total;
-        }, 0);
+        const paymentRouteData = await getPaymentRoute();
+        dailyGoal = paymentRouteData.dailyGoal;
+        collectedToday = paymentRouteData.collectedToday;
     }
   }
 
@@ -80,22 +72,35 @@ export default async function CobradorDashboard() {
     <div className="space-y-8">
       <Card>
         <CardHeader>
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex flex-col md:flex-row items-start justify-between gap-6">
               <div className="space-y-1 flex-1">
                   <CardTitle className="text-3xl">Bienvenido, {userName}</CardTitle>
                   <CardDescription>Este es tu panel de gestión de clientes y créditos.</CardDescription>
               </div>
-              <Card className="w-full md:w-auto md:min-w-[280px] bg-primary text-primary-foreground shadow-lg">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-4">
-                    <Target className="h-10 w-10 text-primary-foreground/80"/>
-                    <div>
-                      <p className="text-sm font-medium text-primary-foreground/90">Meta del Día</p>
-                      <p className="text-3xl font-bold">{formatCurrency(dailyGoal)}</p>
+              <div className="w-full md:w-auto md:min-w-[280px] space-y-2">
+                <Card className="bg-primary text-primary-foreground shadow-lg">
+                    <CardContent className="p-4">
+                    <div className="flex items-center gap-4">
+                        <Target className="h-10 w-10 text-primary-foreground/80"/>
+                        <div>
+                        <p className="text-sm font-medium text-primary-foreground/90">Meta del Día</p>
+                        <p className="text-3xl font-bold">{formatCurrency(dailyGoal)}</p>
+                        </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                    </CardContent>
+                </Card>
+                <Card className="bg-green-600 text-primary-foreground shadow-lg">
+                    <CardContent className="p-4">
+                    <div className="flex items-center gap-4">
+                        <TrendingUp className="h-10 w-10 text-primary-foreground/80"/>
+                        <div>
+                        <p className="text-sm font-medium text-primary-foreground/90">Recaudado Hoy</p>
+                        <p className="text-3xl font-bold">{formatCurrency(collectedToday)}</p>
+                        </div>
+                    </div>
+                    </CardContent>
+                </Card>
+              </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-8">

@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
 import { db } from "./firebase";
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc, increment, orderBy, limit } from "firebase/firestore";
-import { startOfDay, differenceInDays, endOfDay, isWithinInterval, addDays, parseISO, isFuture, isToday, isSameDay } from 'date-fns';
+import { startOfDay, differenceInDays, endOfDay, isWithinInterval, addDays, parseISO, isFuture, isToday } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { analyzeClientReputation, ClientReputationInput } from '@/ai/flows/analyze-client-reputation';
 
@@ -684,9 +684,19 @@ export async function getDailyCollectionSummary() {
 }
 
 export async function getPaymentRoute() {
+    const cobradorIdCookie = cookies().get('loggedInUser');
+    if (!cobradorIdCookie) return { routes: [], dailyGoal: 0, collectedToday: 0 };
+
+    const cobradorDocRef = doc(db, "users", cobradorIdCookie.value);
+    const cobradorSnap = await getDoc(cobradorDocRef);
+    if (!cobradorSnap.exists()) return { routes: [], dailyGoal: 0, collectedToday: 0 };
+    const cobradorData = cobradorSnap.data();
+
     const allCredits = await getCreditsByCobrador();
     const activeCredits = allCredits.filter(c => c.estado === 'Activo' && Array.isArray(c.paymentDates) && c.paymentDates.length > 0);
     const timeZone = 'America/Bogota';
+    
+    let dailyGoal = 0;
     
     const routeEntriesPromises = activeCredits.map(async (credit) => {
         if (!Array.isArray(credit.paymentDates)) return null;
@@ -695,16 +705,15 @@ export async function getPaymentRoute() {
             .map(d => parseISO(d))
             .sort((a, b) => a.getTime() - b.getTime());
 
-        const nextPaymentDate = sortedDates.find(date => isFuture(date) || isToday(date));
+        const nextPaymentDate = sortedDates.find(date => isFuture(date) || isToday(toZonedTime(date, timeZone)));
 
         if (!nextPaymentDate) return null;
-
+        
         const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
         const installmentAmount = totalLoanAmount / credit.cuotas;
         
         const clienteData = await findUserByIdNumber(credit.clienteId);
-
-        // Check if a payment has been made today for this credit
+        
         const paymentsRef = collection(db, "payments");
         const paymentsQuery = query(paymentsRef, where("creditId", "==", credit.id));
         const paymentsSnapshot = await getDocs(paymentsQuery);
@@ -716,8 +725,12 @@ export async function getPaymentRoute() {
             const paymentDateInTimeZone = toZonedTime(payment.date.toDate(), timeZone);
             return isWithinInterval(paymentDateInTimeZone, { start: todayStart, end: todayEnd });
         });
+        
+        const nextPaymentZoned = toZonedTime(nextPaymentDate, timeZone);
+        if (isToday(nextPaymentZoned)) {
+            dailyGoal += installmentAmount + credit.lateFee;
+        }
 
-        // Ensure all properties of credit are serializable before returning
         const serializableCredit = Object.fromEntries(
             Object.entries(credit).map(([key, value]) => {
                 if (value instanceof Date) {
@@ -748,8 +761,21 @@ export async function getPaymentRoute() {
     });
     
     const routeEntries = (await Promise.all(routeEntriesPromises)).filter(Boolean);
+    const sortedRoutes = (routeEntries as any[]).sort((a, b) => new Date(a.nextPaymentDate).getTime() - new Date(b.nextPaymentDate).getTime());
 
-    return (routeEntries as any[]).sort((a, b) => new Date(a.nextPaymentDate).getTime() - new Date(b.nextPaymentDate).getTime());
+    // Calculate collected today
+    const paymentsRef = collection(db, "payments");
+    const todayStart = startOfDay(toZonedTime(new Date(), timeZone));
+    const todayEnd = endOfDay(toZonedTime(new Date(), timeZone));
+    const paymentsQuery = query(paymentsRef, 
+        where("cobradorId", "==", cobradorData.idNumber),
+        where("date", ">=", todayStart),
+        where("date", "<=", todayEnd)
+    );
+    const paymentsSnapshot = await getDocs(paymentsQuery);
+    const collectedToday = paymentsSnapshot.docs.reduce((sum, doc) => sum + (doc.data().amount || 0), 0);
+
+    return { routes: sortedRoutes, dailyGoal, collectedToday };
 }
 
 // --- Data Mutation Actions ---
