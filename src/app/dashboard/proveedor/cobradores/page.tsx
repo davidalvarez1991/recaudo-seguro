@@ -4,7 +4,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, UserCircle, MoreHorizontal, Pencil, Trash2, DollarSign, CheckCircle, Star, AlertTriangle, Loader2 } from "lucide-react";
+import { ArrowLeft, UserCircle, MoreHorizontal, Pencil, Trash2, AlertTriangle, Loader2, RefreshCw, CheckCircle, Star } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getCobradoresDailySummary, deleteCobrador } from "@/lib/actions";
@@ -14,7 +14,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { EditCobradorForm } from "@/components/forms/edit-cobrador-form";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { Separator } from "@/components/ui/separator";
 
 type CobradorSummary = {
   id: string;
@@ -111,19 +110,25 @@ export default function GestionCobradoresPage() {
     <>
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="space-y-1">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="space-y-1 flex-1">
                 <h1 className="text-3xl font-bold tracking-tight">Gestión de Cobradores</h1>
                 <p className="text-muted-foreground">
                 Visualiza y administra el rendimiento diario de tus cobradores.
                 </p>
             </div>
-            <Button asChild variant="outline" className="w-full sm:w-auto">
-                <Link href="/dashboard/proveedor">
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Volver al Panel
-                </Link>
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <Button onClick={fetchCobradores} variant="outline" className="w-full" disabled={loading}>
+                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                    Actualizar
+                </Button>
+                <Button asChild variant="outline" className="w-full">
+                    <Link href="/dashboard/proveedor">
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Volver al Panel
+                    </Link>
+                </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
