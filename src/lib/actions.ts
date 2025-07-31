@@ -770,12 +770,13 @@ export async function getPaymentRoute() {
     const paymentsSnapshot = await getDocs(paymentsQuery);
     
     let collectedToday = 0;
-    paymentsSnapshot.forEach(doc => {
+    paymentsSnapshot.docs.forEach(doc => {
         const payment = doc.data();
-        if (!payment.date) return; // Defensive check to prevent crash
-        const paymentDate = toZonedTime(payment.date.toDate(), timeZone);
-        if (isSameDay(today, paymentDate)) {
-             collectedToday += payment.amount || 0;
+        if (payment.date) {
+            const paymentDate = toZonedTime(payment.date.toDate(), timeZone);
+            if (isSameDay(today, paymentDate)) {
+                 collectedToday += payment.amount || 0;
+            }
         }
     });
 
@@ -1400,4 +1401,63 @@ export async function getClientReputationData(clienteId: string) {
         console.error("Error getting client reputation data:", error);
         return { error: "Ocurrió un error al consultar la reputación del cliente." };
     }
+}
+
+export async function getCobradoresDailySummary() {
+    const providerId = cookies().get('loggedInUser')?.value;
+    if (!providerId) return [];
+
+    const timeZone = 'America/Bogota';
+    const today = toZonedTime(new Date(), timeZone);
+    const todayStart = startOfDay(today);
+    const todayEnd = endOfDay(today);
+
+    // 1. Get all cobradores for the provider
+    const cobradoresList = await getCobradoresByProvider();
+
+    // 2. Get all payments for the provider for today
+    const paymentsRef = collection(db, "payments");
+    const paymentsQuery = query(paymentsRef, where("providerId", "==", providerId));
+    const paymentsSnapshot = await getDocs(paymentsQuery);
+    
+    const todayPayments = paymentsSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(p => p.date && isWithinInterval(toZonedTime(p.date.toDate(), timeZone), { start: todayStart, end: todayEnd }));
+
+    // 3. Get all credits for the provider
+    const creditsRef = collection(db, "credits");
+    const creditsQuery = query(creditsRef, where("providerId", "==", providerId));
+    const creditsSnapshot = await getDocs(creditsQuery);
+    
+    const todayRenewedCredits = creditsSnapshot.docs
+        .map(doc => doc.data())
+        .filter(c => c.estado === 'Renovado' && c.updatedAt && isWithinInterval(toZonedTime(c.updatedAt.toDate(), timeZone), { start: todayStart, end: todayEnd }));
+        
+    const todayMissedPaymentCredits = creditsSnapshot.docs
+        .map(doc => doc.data())
+        .filter(c => c.missedPaymentDays > 0 && c.updatedAt && isWithinInterval(toZonedTime(c.updatedAt.toDate(), timeZone), { start: todayStart, end: todayEnd }));
+
+    // 4. Process data for each cobrador
+    const summaryPromises = cobradoresList.map(async (cobrador) => {
+        const cobradorId = cobrador.idNumber;
+
+        const cobradorPayments = todayPayments.filter(p => p.cobradorId === cobradorId);
+        const totalCollected = cobradorPayments.reduce((sum, p) => sum + p.amount, 0);
+
+        const successfulPayments = new Set(cobradorPayments.filter(p => p.type === 'cuota' || p.type === 'total').map(p => p.clienteId)).size;
+        
+        const renewedCredits = todayRenewedCredits.filter(c => c.cobradorId === cobradorId).length;
+        
+        const missedPayments = new Set(todayMissedPaymentCredits.filter(c => c.cobradorId === cobradorId).map(c => c.clienteId)).size;
+
+        return {
+            ...cobrador,
+            totalCollected,
+            successfulPayments,
+            renewedCredits,
+            missedPayments,
+        };
+    });
+
+    return Promise.all(summaryPromises);
 }

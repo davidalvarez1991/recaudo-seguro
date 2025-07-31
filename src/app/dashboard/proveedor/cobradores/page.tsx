@@ -2,20 +2,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, UserCircle, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, UserCircle, MoreHorizontal, Pencil, Trash2, DollarSign, CheckCircle, Star, AlertTriangle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { getCobradoresByProvider, deleteCobrador } from "@/lib/actions";
+import { getCobradoresDailySummary, deleteCobrador } from "@/lib/actions";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EditCobradorForm } from "@/components/forms/edit-cobrador-form";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { Separator } from "@/components/ui/separator";
 
-type Cobrador = {
+type CobradorSummary = {
   id: string;
   name: string;
   idNumber: string;
@@ -23,12 +24,21 @@ type Cobrador = {
   providerId: string;
   createdAt: string; 
   updatedAt?: string;
+  totalCollected: number;
+  successfulPayments: number;
+  renewedCredits: number;
+  missedPayments: number;
+};
+
+const formatCurrency = (value: number) => {
+    if (isNaN(value)) return "$0";
+    return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 };
 
 export default function GestionCobradoresPage() {
-  const [cobradores, setCobradores] = useState<Cobrador[]>([]);
+  const [cobradores, setCobradores] = useState<CobradorSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCobrador, setSelectedCobrador] = useState<Cobrador | null>(null);
+  const [selectedCobrador, setSelectedCobrador] = useState<CobradorSummary | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -38,13 +48,13 @@ export default function GestionCobradoresPage() {
   const fetchCobradores = async () => {
     setLoading(true);
     try {
-      const data = await getCobradoresByProvider();
-      setCobradores(data as Cobrador[]);
+      const data = await getCobradoresDailySummary();
+      setCobradores(data);
     } catch (error) {
       console.error("Failed to fetch cobradores", error);
       toast({
         title: "Error",
-        description: "No se pudieron cargar los cobradores.",
+        description: "No se pudieron cargar los datos de los cobradores.",
         variant: "destructive",
       });
     } finally {
@@ -56,12 +66,12 @@ export default function GestionCobradoresPage() {
     fetchCobradores();
   }, []);
   
-  const handleEdit = (cobrador: Cobrador) => {
+  const handleEdit = (cobrador: CobradorSummary) => {
     setSelectedCobrador(cobrador);
     setIsEditModalOpen(true);
   };
 
-  const handleDelete = (cobrador: Cobrador) => {
+  const handleDelete = (cobrador: CobradorSummary) => {
     setSelectedCobrador(cobrador);
     setIsDeleteAlertOpen(true);
   };
@@ -105,7 +115,7 @@ export default function GestionCobradoresPage() {
             <div className="space-y-1">
                 <h1 className="text-3xl font-bold tracking-tight">Gestión de Cobradores</h1>
                 <p className="text-muted-foreground">
-                Visualiza y administra las cuentas de tus cobradores.
+                Visualiza y administra el rendimiento diario de tus cobradores.
                 </p>
             </div>
             <Button asChild variant="outline" className="w-full sm:w-auto">
@@ -118,11 +128,13 @@ export default function GestionCobradoresPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-              <p>Cargando cobradores...</p>
+             <div className="flex justify-center items-center h-40">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+             </div>
           ) : cobradores.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {cobradores.map((cobrador) => (
-                <Card key={cobrador.id} className="flex flex-col">
+                <Card key={cobrador.id} className="flex flex-col bg-muted/30">
                   <CardHeader className="flex flex-row items-start justify-between">
                       <div className="flex items-center gap-4">
                           <UserCircle className="w-12 h-12 text-muted-foreground" />
@@ -149,14 +161,33 @@ export default function GestionCobradoresPage() {
                           </DropdownMenuContent>
                       </DropdownMenu>
                   </CardHeader>
-                  <CardContent className="flex-grow">
-                    <div>
-                      <span className="text-sm text-muted-foreground">Estado</span>
-                      <Badge variant={'default'} className="ml-2">
+                  <CardContent className="flex-grow space-y-4">
+                    <div className="p-4 rounded-lg bg-primary text-primary-foreground text-center">
+                        <p className="text-sm font-medium uppercase tracking-wide text-primary-foreground/80">Recaudado Hoy</p>
+                        <p className="text-3xl font-bold">{formatCurrency(cobrador.totalCollected)}</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="p-2 bg-background rounded-md">
+                            <p className="font-bold text-xl text-green-600">{cobrador.successfulPayments}</p>
+                            <p className="text-xs text-muted-foreground flex items-center justify-center gap-1"><CheckCircle className="h-3 w-3"/> Pagos</p>
+                        </div>
+                         <div className="p-2 bg-background rounded-md">
+                            <p className="font-bold text-xl text-amber-600">{cobrador.renewedCredits}</p>
+                            <p className="text-xs text-muted-foreground flex items-center justify-center gap-1"><Star className="h-3 w-3"/> Renovados</p>
+                        </div>
+                         <div className="p-2 bg-background rounded-md">
+                            <p className="font-bold text-xl text-red-600">{cobrador.missedPayments}</p>
+                            <p className="text-xs text-muted-foreground flex items-center justify-center gap-1"><AlertTriangle className="h-3 w-3"/> En Mora</p>
+                        </div>
+                    </div>
+
+                  </CardContent>
+                   <CardFooter>
+                      <Badge variant={'default'} className="w-full justify-center py-1">
                         Activo
                       </Badge>
-                    </div>
-                  </CardContent>
+                  </CardFooter>
                 </Card>
               ))}
             </div>
