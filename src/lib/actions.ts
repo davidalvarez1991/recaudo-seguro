@@ -939,6 +939,9 @@ export async function updateClient(values: z.infer<typeof EditClientSchema>) {
 
 
 export async function deleteCobrador(idNumber: string) {
+    const batch = writeBatch(db);
+
+    // Find the cobrador to delete
     const usersRef = collection(db, "users");
     const q = query(usersRef, where("idNumber", "==", idNumber), where("role", "==", "cobrador"));
     const querySnapshot = await getDocs(q);
@@ -947,13 +950,32 @@ export async function deleteCobrador(idNumber: string) {
         return { error: "Cobrador no encontrado." };
     }
     
-    const batch = writeBatch(db);
-    querySnapshot.docs.forEach(doc => {
-        batch.delete(doc.ref);
-    });
-    await batch.commit();
+    const cobradorDoc = querySnapshot.docs[0];
+    batch.delete(cobradorDoc.ref);
 
-    return { success: true };
+    // Find and delete all credits associated with this cobrador
+    const creditsRef = collection(db, "credits");
+    const creditsQuery = query(creditsRef, where("cobradorId", "==", idNumber));
+    const creditsSnapshot = await getDocs(creditsQuery);
+
+    for (const creditDoc of creditsSnapshot.docs) {
+        // For each credit, find and delete all associated payments
+        const paymentsRef = collection(db, "payments");
+        const paymentsQuery = query(paymentsRef, where("creditId", "==", creditDoc.id));
+        const paymentsSnapshot = await getDocs(paymentsQuery);
+        paymentsSnapshot.forEach(paymentDoc => batch.delete(paymentDoc.ref));
+        
+        // Delete the credit itself
+        batch.delete(creditDoc.ref);
+    }
+    
+    try {
+        await batch.commit();
+        return { success: true };
+    } catch (e) {
+        console.error(e);
+        return { error: "No se pudo eliminar al cobrador y sus datos asociados." };
+    }
 }
 
 export async function deleteClientAndCredits(clienteId: string) {
@@ -1686,26 +1708,39 @@ export async function deleteProvider(providerId: string) {
     }
 
     const batch = writeBatch(db);
-    const providerRef = doc(db, "users", providerId);
 
-    // Delete provider
+    // 1. Delete provider document
+    const providerRef = doc(db, "users", providerId);
     batch.delete(providerRef);
 
-    // Find and delete associated cobradores
+    // 2. Find and delete associated cobradores
     const cobradoresRef = collection(db, "users");
     const cobradoresQuery = query(cobradoresRef, where("providerId", "==", providerId));
     const cobradoresSnapshot = await getDocs(cobradoresQuery);
     cobradoresSnapshot.forEach(doc => batch.delete(doc.ref));
     
-    // Note: This does not delete credits or payments to preserve financial history.
-    // A real-world app might archive this data instead.
+    // 3. Find and delete all credits (and their payments) associated with the provider
+    const creditsRef = collection(db, "credits");
+    const creditsQuery = query(creditsRef, where("providerId", "==", providerId));
+    const creditsSnapshot = await getDocs(creditsQuery);
+    
+    for (const creditDoc of creditsSnapshot.docs) {
+        // For each credit, find and delete all associated payments
+        const paymentsRef = collection(db, "payments");
+        const paymentsQuery = query(paymentsRef, where("creditId", "==", creditDoc.id));
+        const paymentsSnapshot = await getDocs(paymentsQuery);
+        paymentsSnapshot.forEach(paymentDoc => batch.delete(paymentDoc.ref));
+        
+        // Delete the credit itself
+        batch.delete(creditDoc.ref);
+    }
 
     try {
         await batch.commit();
         return { success: true };
     } catch (e) {
         console.error(e);
-        return { error: "No se pudo eliminar el proveedor y sus asociados." };
+        return { error: "No se pudo eliminar el proveedor y sus datos asociados." };
     }
 }
 
@@ -1771,3 +1806,5 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
         return { error: "No se pudo guardar la configuración." };
     }
 }
+
+    
