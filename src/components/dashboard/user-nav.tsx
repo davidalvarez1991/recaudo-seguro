@@ -2,16 +2,12 @@
 "use client"
 
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { logout } from "@/lib/actions";
 import { LogOut, Loader2 } from "lucide-react";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 
 export function UserNav() {
   const [isPending, startTransition] = useTransition();
@@ -27,19 +23,29 @@ export function UserNav() {
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-9 w-9 rounded-full">
-          <LogOut className="h-5 w-5" />
-          <span className="sr-only">Abrir menú de usuario</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="end" forceMount>
-        <DropdownMenuItem onClick={handleLogout} disabled={isPending}>
-            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LogOut className="mr-2 h-4 w-4" />}
-          <span>Cerrar sesión</span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <TooltipProvider>
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="relative h-9 w-9 rounded-full" 
+                    onClick={handleLogout} 
+                    disabled={isPending}
+                    aria-label="Cerrar sesión"
+                >
+                    {isPending ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                        <LogOut className="h-5 w-5" />
+                    )}
+                    <span className="sr-only">Cerrar sesión</span>
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+                <p>Cerrar sesión</p>
+            </TooltipContent>
+        </Tooltip>
+    </TooltipProvider>
   );
 }
