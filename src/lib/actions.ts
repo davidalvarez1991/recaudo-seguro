@@ -1021,19 +1021,21 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     } = validatedFields.data;
     
     let existingClient = await findUserByIdNumber(idNumber);
-    if (!existingClient) {
-        const hashedPassword = await bcrypt.hash(idNumber, 10);
-        await addDoc(collection(db, "users"),{
-            idNumber,
-            name,
-            password: hashedPassword,
-            role: 'cliente',
-            providerId,
-            address,
-            contactPhone,
-            createdAt: new Date().toISOString()
-        });
+    if (existingClient) {
+        return { error: "El número de identificación ya está registrado. Por favor, verifica si el nombre o la cédula están mal escritos." };
     }
+
+    const hashedPassword = await bcrypt.hash(idNumber, 10);
+    await addDoc(collection(db, "users"),{
+        idNumber,
+        name,
+        password: hashedPassword,
+        role: 'cliente',
+        providerId,
+        address,
+        contactPhone,
+        createdAt: new Date().toISOString()
+    });
 
     const valor = parseFloat(creditAmount.replace(/\./g, '').replace(',', '.'));
     const commission = calculateCommission(valor, provider.commissionTiers);
