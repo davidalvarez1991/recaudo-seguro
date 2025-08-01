@@ -941,7 +941,6 @@ export async function updateClient(values: z.infer<typeof EditClientSchema>) {
 export async function deleteCobrador(idNumber: string) {
     const batch = writeBatch(db);
 
-    // Find the cobrador to delete
     const usersRef = collection(db, "users");
     const q = query(usersRef, where("idNumber", "==", idNumber), where("role", "==", "cobrador"));
     const querySnapshot = await getDocs(q);
@@ -953,19 +952,16 @@ export async function deleteCobrador(idNumber: string) {
     const cobradorDoc = querySnapshot.docs[0];
     batch.delete(cobradorDoc.ref);
 
-    // Find and delete all credits associated with this cobrador
     const creditsRef = collection(db, "credits");
     const creditsQuery = query(creditsRef, where("cobradorId", "==", idNumber));
     const creditsSnapshot = await getDocs(creditsQuery);
 
     for (const creditDoc of creditsSnapshot.docs) {
-        // For each credit, find and delete all associated payments
         const paymentsRef = collection(db, "payments");
         const paymentsQuery = query(paymentsRef, where("creditId", "==", creditDoc.id));
         const paymentsSnapshot = await getDocs(paymentsQuery);
         paymentsSnapshot.forEach(paymentDoc => batch.delete(paymentDoc.ref));
         
-        // Delete the credit itself
         batch.delete(creditDoc.ref);
     }
     
@@ -990,7 +986,6 @@ export async function deleteClientAndCredits(clienteId: string) {
     const creditQuery = query(creditsRef, where("clienteId", "==", clienteId));
     const creditSnapshot = await getDocs(creditQuery);
     
-    // Also delete payments associated with each credit
     for (const creditDoc of creditSnapshot.docs) {
         const paymentsRef = collection(db, "payments");
         const paymentsQuery = query(paymentsRef, where("creditId", "==", creditDoc.id));
@@ -1043,26 +1038,25 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     } = validatedFields.data;
     
     let existingClient = await findUserByIdNumber(idNumber);
-    if (existingClient) {
-        return { error: "El número de identificación ya está registrado. Por favor, verifica si el nombre o la cédula están mal escritos." };
-    }
 
-    const fullName = [firstName, secondName, firstLastName, secondLastName].filter(Boolean).join(" ");
-    const hashedPassword = await bcrypt.hash(idNumber, 10);
-    await addDoc(collection(db, "users"),{
-        idNumber,
-        name: fullName,
-        firstName,
-        secondName,
-        firstLastName,
-        secondLastName,
-        password: hashedPassword,
-        role: 'cliente',
-        providerId,
-        address,
-        contactPhone,
-        createdAt: new Date().toISOString()
-    });
+    if (!existingClient) {
+        const fullName = [firstName, secondName, firstLastName, secondLastName].filter(Boolean).join(" ");
+        const hashedPassword = await bcrypt.hash(idNumber, 10);
+        await addDoc(collection(db, "users"),{
+            idNumber,
+            name: fullName,
+            firstName,
+            secondName,
+            firstLastName,
+            secondLastName,
+            password: hashedPassword,
+            role: 'cliente',
+            providerId,
+            address,
+            contactPhone,
+            createdAt: new Date().toISOString()
+        });
+    }
 
     const valor = parseFloat(creditAmount.replace(/\./g, '').replace(',', '.'));
     const commission = calculateCommission(valor, provider.commissionTiers);
@@ -1709,29 +1703,24 @@ export async function deleteProvider(providerId: string) {
 
     const batch = writeBatch(db);
 
-    // 1. Delete provider document
     const providerRef = doc(db, "users", providerId);
     batch.delete(providerRef);
 
-    // 2. Find and delete associated cobradores
     const cobradoresRef = collection(db, "users");
     const cobradoresQuery = query(cobradoresRef, where("providerId", "==", providerId));
     const cobradoresSnapshot = await getDocs(cobradoresQuery);
     cobradoresSnapshot.forEach(doc => batch.delete(doc.ref));
     
-    // 3. Find and delete all credits (and their payments) associated with the provider
     const creditsRef = collection(db, "credits");
     const creditsQuery = query(creditsRef, where("providerId", "==", providerId));
     const creditsSnapshot = await getDocs(creditsQuery);
     
     for (const creditDoc of creditsSnapshot.docs) {
-        // For each credit, find and delete all associated payments
         const paymentsRef = collection(db, "payments");
         const paymentsQuery = query(paymentsRef, where("creditId", "==", creditDoc.id));
         const paymentsSnapshot = await getDocs(paymentsQuery);
         paymentsSnapshot.forEach(paymentDoc => batch.delete(paymentDoc.ref));
         
-        // Delete the credit itself
         batch.delete(creditDoc.ref);
     }
 
