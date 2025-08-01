@@ -393,7 +393,7 @@ export async function getProviderActivityLog() {
             return {
                 ...entry,
                 clienteName: cliente?.name || 'No disponible',
-                cobradorId: fullCreditDetails.cobradorId,
+                cobradorId: creditData.cobradorId,
                 cobradorName: fullCreditDetails.cobradorName,
                 fullCreditDetails,
             };
@@ -1537,4 +1537,54 @@ export async function getCobradorSelfDailySummary() {
     missedPayments = missedClients.size;
     
     return { successfulPayments, renewedCredits, missedPayments };
+}
+
+export async function getProviderFinancialSummary() {
+  const providerId = cookies().get('loggedInUser')?.value;
+  if (!providerId) return { activeCapital: 0, collectedCommission: 0 };
+
+  let activeCapital = 0;
+  let collectedCommission = 0;
+
+  // Get all credits for the provider
+  const creditsRef = collection(db, "credits");
+  const creditsQuery = query(creditsRef, where("providerId", "==", providerId));
+  const creditsSnapshot = await getDocs(creditsQuery);
+
+  const allProviderCredits = creditsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+  // Get all payments for the provider to avoid N+1 queries
+  const paymentsRef = collection(db, "payments");
+  const paymentsQuery = query(paymentsRef, where("providerId", "==", providerId));
+  const paymentsSnapshot = await getDocs(paymentsQuery);
+  const allProviderPayments = paymentsSnapshot.docs.map(doc => doc.data());
+
+  for (const credit of allProviderCredits) {
+    const creditPayments = allProviderPayments.filter(p => p.creditId === credit.id && (p.type === 'cuota' || p.type === 'total'));
+    const paidAmount = creditPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    // Calculate commission proportion for paid amount
+    const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
+    if (totalLoanAmount > 0) {
+      const paidProportion = paidAmount / totalLoanAmount;
+      collectedCommission += (credit.commission || 0) * paidProportion;
+    }
+
+    // Calculate remaining capital for active credits
+    if (credit.estado === 'Activo') {
+        const totalCapitalPaid = creditPayments.reduce((sum, p) => {
+             if (totalLoanAmount > 0) {
+                 const capitalProportionOfPayment = (credit.valor || 0) / totalLoanAmount;
+                 return sum + (p.amount * capitalProportionOfPayment);
+             }
+             return sum;
+        }, 0);
+        activeCapital += (credit.valor || 0) - totalCapitalPaid;
+    }
+  }
+
+  return { 
+    activeCapital: Math.max(0, activeCapital), // Ensure it doesn't go negative
+    collectedCommission 
+  };
 }

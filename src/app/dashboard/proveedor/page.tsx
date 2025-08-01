@@ -1,10 +1,10 @@
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Eye } from "lucide-react";
+import { UserPlus, Eye, TrendingUp, Landmark } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
-import { getCobradoresByProvider, getUserData } from "@/lib/actions";
+import { getCobradoresByProvider, getUserData, getProviderFinancialSummary } from "@/lib/actions";
 import { CobradorRegistrationModal } from "@/components/proveedor/cobrador-registration-modal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cookies } from "next/headers";
@@ -16,16 +16,24 @@ type UserData = {
     [key: string]: any;
 } | null;
 
+const formatCurrency = (value: number) => {
+    if (isNaN(value)) return "$0";
+    return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+};
+
 export default async function ProveedorDashboard() {
   const cookieStore = cookies();
   const userId = cookieStore.get('loggedInUser')?.value;
   
   let companyName = "Perfil de Proveedor";
+  let financialSummary = { activeCapital: 0, collectedCommission: 0 };
+
   if (userId) {
     const userData: UserData = await getUserData(userId);
     if (userData && userData.companyName) {
       companyName = userData.companyName;
     }
+    financialSummary = await getProviderFinancialSummary();
   }
 
   const cobradores = await getCobradoresByProvider();
@@ -76,7 +84,29 @@ export default async function ProveedorDashboard() {
           </div>
         </CardHeader>
         <CardContent className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="bg-blue-50 dark:bg-blue-900/30 border-blue-200">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-blue-800 dark:text-blue-200">Capital Activo en la Calle</CardTitle>
+                  <Landmark className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-blue-900 dark:text-blue-300">{formatCurrency(financialSummary.activeCapital)}</div>
+                </CardContent>
+              </Card>
+              <Card className="bg-green-50 dark:bg-green-900/30 border-green-200">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-green-800 dark:text-green-200">Ganancia Total Recaudada</CardTitle>
+                  <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-green-900 dark:text-green-300">{formatCurrency(financialSummary.collectedCommission)}</div>
+                </CardContent>
+              </Card>
+            </div>
           
+          <Separator />
+
           <ClientReputationSearch />
 
           <Separator />
