@@ -51,7 +51,10 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     resolver: zodResolver(ClientCreditSchema),
     defaultValues: {
       idNumber: "",
-      name: "",
+      firstName: "",
+      secondName: "",
+      firstLastName: "",
+      secondLastName: "",
       address: "",
       contactPhone: "",
       guarantorName: "",
@@ -235,19 +238,60 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nombre Completo</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="John Doe" disabled={isPending} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-2 gap-4">
+                     <FormField
+                        control={form.control}
+                        name="firstName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Primer Nombre</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="John" disabled={isPending} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="secondName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Segundo Nombre</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="(Opcional)" disabled={isPending} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="firstLastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Primer Apellido</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="Doe" disabled={isPending} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="secondLastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Segundo Apellido</FormLabel>
+                            <FormControl>
+                              <Input {...field} placeholder="(Opcional)" disabled={isPending} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                  </div>
                   <FormField
                     control={form.control}
                     name="address"

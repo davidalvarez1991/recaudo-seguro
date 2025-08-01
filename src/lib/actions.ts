@@ -1013,7 +1013,7 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     }
     
     const { 
-        idNumber, name, address, contactPhone, 
+        idNumber, firstName, secondName, firstLastName, secondLastName, address, contactPhone, 
         creditAmount, installments, requiresGuarantor, requiresReferences,
         guarantorName, guarantorIdNumber, guarantorAddress, guarantorPhone,
         familyReferenceName, familyReferencePhone, familyReferenceAddress,
@@ -1025,10 +1025,15 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
         return { error: "El número de identificación ya está registrado. Por favor, verifica si el nombre o la cédula están mal escritos." };
     }
 
+    const fullName = [firstName, secondName, firstLastName, secondLastName].filter(Boolean).join(" ");
     const hashedPassword = await bcrypt.hash(idNumber, 10);
     await addDoc(collection(db, "users"),{
         idNumber,
-        name,
+        name: fullName,
+        firstName,
+        secondName,
+        firstLastName,
+        secondLastName,
         password: hashedPassword,
         role: 'cliente',
         providerId,
