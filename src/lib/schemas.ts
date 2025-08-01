@@ -27,6 +27,9 @@ export const RegisterSchema = z.object({
   confirmPassword: z.string().min(6, {
     message: "La confirmación de contraseña debe tener al menos 6 caracteres.",
   }),
+  termsAccepted: z.boolean().refine((data) => data === true, {
+    message: "Debes aceptar los términos y condiciones para continuar.",
+  }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Las contraseñas no coinciden.",
   path: ["confirmPassword"],

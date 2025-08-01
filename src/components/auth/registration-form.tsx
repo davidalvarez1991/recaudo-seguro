@@ -11,6 +11,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,9 @@ import { useTransition } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Checkbox } from "@/components/ui/checkbox";
+import { TermsDialog } from "@/components/auth/terms-dialog";
+import { Separator } from "@/components/ui/separator";
 
 type RegistrationFormProps = {
   role: "cliente" | "proveedor";
@@ -39,6 +43,7 @@ export function RegistrationForm({ role }: RegistrationFormProps) {
       email: "",
       password: "",
       confirmPassword: "",
+      termsAccepted: false,
     },
   });
 
@@ -167,7 +172,38 @@ export function RegistrationForm({ role }: RegistrationFormProps) {
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isPending}>
+        
+        {role === 'proveedor' && (
+          <>
+            <Separator />
+            <FormField
+              control={form.control}
+              name="termsAccepted"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={isPending}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>
+                      Acepto los términos y condiciones.
+                    </FormLabel>
+                    <FormDescription>
+                       Al registrarte, confirmas que has leído y aceptas nuestros <TermsDialog />.
+                    </FormDescription>
+                     <FormMessage />
+                  </div>
+                </FormItem>
+              )}
+            />
+          </>
+        )}
+
+        <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isPending || (role === 'proveedor' && !form.watch('termsAccepted'))}>
           {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Crear cuenta de {role}
         </Button>
