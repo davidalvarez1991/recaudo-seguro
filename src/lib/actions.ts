@@ -580,7 +580,7 @@ export async function getHistoricalCreditsByCliente() {
         if (creditData.providerId) {
             const providerDoc = await getDoc(doc(db, "users", creditData.providerId));
             if (providerDoc.exists()) {
-                providerName = providerDoc.data().companyName || "Proveedor";
+                providerName = (providerDoc.data().companyName || "Proveedor").toUpperCase();
             }
         }
         

@@ -65,7 +65,7 @@ export default function HistorialClientePage() {
         const formattedToday = format(today, "d 'de' MMMM, yyyy", { locale: es });
 
         const providerData = await getUserData(credit.providerId);
-        const providerName = providerData?.companyName || credit.providerName || 'N/A';
+        const providerName = (providerData?.companyName || credit.providerName || 'N/A').toUpperCase();
         const paymentRecords = await getPaymentsByCreditId(credit.id);
 
         // Header
