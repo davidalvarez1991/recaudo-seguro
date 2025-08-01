@@ -1,10 +1,10 @@
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Eye, TrendingUp, Landmark } from "lucide-react";
+import { UserPlus, Eye, TrendingUp, Landmark, Users, DollarSign } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
-import { getCobradoresByProvider, getUserData, getProviderFinancialSummary } from "@/lib/actions";
+import { getCobradoresByProvider, getUserData, getProviderFinancialSummary, getAdminSettings } from "@/lib/actions";
 import { CobradorRegistrationModal } from "@/components/proveedor/cobrador-registration-modal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cookies } from "next/headers";
@@ -26,14 +26,22 @@ export default async function ProveedorDashboard() {
   const userId = cookieStore.get('loggedInUser')?.value;
   
   let companyName = "Perfil de Proveedor";
-  let financialSummary = { activeCapital: 0, collectedCommission: 0 };
+  let financialSummary = { activeCapital: 0, collectedCommission: 0, uniqueClientCount: 0 };
+  let adminSettings = { pricePerClient: 3500 };
+  let subscriptionCost = 0;
 
   if (userId) {
     const userData: UserData = await getUserData(userId);
     if (userData && userData.companyName) {
       companyName = userData.companyName;
     }
-    financialSummary = await getProviderFinancialSummary();
+    const [summary, settings] = await Promise.all([
+      getProviderFinancialSummary(),
+      getAdminSettings()
+    ]);
+    financialSummary = summary;
+    adminSettings = settings;
+    subscriptionCost = financialSummary.uniqueClientCount * adminSettings.pricePerClient;
   }
 
   const cobradores = await getCobradoresByProvider();
@@ -76,12 +84,32 @@ export default async function ProveedorDashboard() {
     <div className="space-y-8">
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+           <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Card className="bg-purple-50 dark:bg-purple-900/30 border-purple-200">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium text-purple-800 dark:text-purple-200">Clientes Únicos</CardTitle>
+                      <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold text-purple-900 dark:text-purple-300">{financialSummary.uniqueClientCount}</div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-teal-50 dark:bg-teal-900/30 border-teal-200">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium text-teal-800 dark:text-teal-200">Suscripción Mensual</CardTitle>
+                      <DollarSign className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold text-teal-900 dark:text-teal-300">{formatCurrency(subscriptionCost)}</div>
+                    </CardContent>
+                  </Card>
+                </div>
               <div className="space-y-1">
                   <CardTitle className="text-3xl">{companyName.toUpperCase()}</CardTitle>
                   <CardDescription>Bienvenido a tu panel de gestión.</CardDescription>
               </div>
-          </div>
+            </div>
         </CardHeader>
         <CardContent className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

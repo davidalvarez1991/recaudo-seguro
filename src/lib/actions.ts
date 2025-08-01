@@ -277,7 +277,7 @@ const getFullCreditDetails = async (creditData: any, providersMap: Map<string, a
         const remainingBalance = totalLoanAmount - paidAmount;
         const paidInstallments = payments.filter(p => p.type === 'cuota').length;
         
-        const providerSettings = providersMap.get(serializableCreditData.providerId) || {};
+        const providerSettings = providersMap.get(serializableCreditData.providerId) || { isLateInterestActive: false, lateInterestRate: 0 };
         const lateFee = calculateLateFee({
             ...serializableCreditData,
             lateInterestRate: providerSettings.isLateInterestActive ? (providerSettings.lateInterestRate || 0) : 0,
@@ -317,8 +317,8 @@ const getFullCreditDetails = async (creditData: any, providersMap: Map<string, a
             dailyCollectedAmount,
         };
     } catch(e) {
-        console.error("Error in getFullCreditDetails:", e);
-        return null;
+        console.error("Error in getFullCreditDetails for credit " + creditData.id, e);
+        return null; // Return null on error to filter out later
     }
 };
 
@@ -1570,10 +1570,11 @@ export async function getCobradorSelfDailySummary() {
 
 export async function getProviderFinancialSummary() {
   const providerId = cookies().get('loggedInUser')?.value;
-  if (!providerId) return { activeCapital: 0, collectedCommission: 0 };
+  if (!providerId) return { activeCapital: 0, collectedCommission: 0, uniqueClientCount: 0 };
 
   let activeCapital = 0;
   let collectedCommission = 0;
+  const uniqueClientIds = new Set<string>();
 
   // Get all credits for the provider
   const creditsRef = collection(db, "credits");
@@ -1589,6 +1590,8 @@ export async function getProviderFinancialSummary() {
   const allProviderPayments = paymentsSnapshot.docs.map(doc => doc.data());
 
   for (const credit of allProviderCredits) {
+    uniqueClientIds.add(credit.clienteId);
+
     const creditPayments = allProviderPayments.filter(p => p.creditId === credit.id && (p.type === 'cuota' || p.type === 'total'));
     const paidAmount = creditPayments.reduce((sum, p) => sum + p.amount, 0);
 
@@ -1614,7 +1617,8 @@ export async function getProviderFinancialSummary() {
 
   return { 
     activeCapital: Math.max(0, activeCapital), // Ensure it doesn't go negative
-    collectedCommission 
+    collectedCommission,
+    uniqueClientCount: uniqueClientIds.size
   };
 }
 
