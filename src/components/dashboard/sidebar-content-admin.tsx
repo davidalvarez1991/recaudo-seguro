@@ -23,7 +23,7 @@ export function SidebarContentAdmin() {
     }
   };
 
-  const isActive = (path: string) => pathname === path;
+  const isActive = (path: string) => pathname.startsWith(path);
 
   return (
     <SidebarContent>
@@ -31,7 +31,7 @@ export function SidebarContentAdmin() {
         <SidebarMenuItem>
            <SidebarMenuButton
             asChild
-            isActive={isActive(`/dashboard/${role}`)}
+            isActive={isActive(`/dashboard/${role}`) && pathname === `/dashboard/${role}`}
             tooltip="Inicio"
             onClick={handleLinkClick}
           >
@@ -43,14 +43,21 @@ export function SidebarContentAdmin() {
         </SidebarMenuItem>
         
         <SidebarMenuItem>
-           <SidebarMenuButton tooltip="Gestión de Usuarios" onClick={handleLinkClick}>
-            <Users />
-            <span>Usuarios</span>
+           <SidebarMenuButton
+            asChild
+            isActive={isActive(`/dashboard/admin/proveedores`)}
+            tooltip="Gestión de Proveedores" 
+            onClick={handleLinkClick}
+           >
+            <Link href="/dashboard/admin/proveedores">
+              <Users />
+              <span>Proveedores</span>
+            </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
         
         <SidebarMenuItem>
-           <SidebarMenuButton tooltip="Configuración" onClick={handleLinkClick}>
+           <SidebarMenuButton tooltip="Configuración" disabled>
             <Settings />
             <span>Configuración</span>
           </SidebarMenuButton>

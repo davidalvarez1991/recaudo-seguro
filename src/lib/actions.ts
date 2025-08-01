@@ -84,6 +84,10 @@ export async function login(values: z.infer<typeof LoginSchema>) {
     if (!user || !user.password) {
         return { error: "Cédula o contraseña incorrecta." };
     }
+
+    if (user.role === 'proveedor' && !user.isActive) {
+        return { error: "Tu cuenta de proveedor está inactiva. Contacta al administrador." };
+    }
     
     const passwordsMatch = await bcrypt.compare(password, user.password);
 
@@ -126,6 +130,7 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: 'pr
         name: role === 'proveedor' ? companyName : "Nuevo Cliente",
         email,
         whatsappNumber,
+        isActive: true, // Proveedores start as active by default
         createdAt: new Date().toISOString()
     });
     
@@ -419,6 +424,14 @@ export async function getCreditsByCobrador() {
     const cobrador = cobradorSnap.data();
     
     if (!cobrador || cobrador.role !== 'cobrador') return [];
+
+    if (cobrador.providerId) {
+        const provider = await getUserData(cobrador.providerId);
+        if (provider && !provider.isActive) {
+            // If provider is inactive, cobrador cannot operate.
+            return [];
+        }
+    }
     
     const providerDocRef = doc(db, "users", cobrador.providerId);
     const providerSnap = await getDoc(providerDocRef);
@@ -825,6 +838,10 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
         return { error: "Acción no autorizada." };
     }
 
+    if (!provider.isActive) {
+        return { error: "Tu cuenta de proveedor está inactiva. No puedes registrar cobradores." };
+    }
+
     if (await findUserByIdNumber(values.idNumber)) {
         return { error: "El número de identificación ya está en uso." };
     }
@@ -982,6 +999,10 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     const providerSnap = await getDoc(providerDocRef);
     if (!providerSnap.exists()) return { error: "Proveedor no encontrado."};
     const provider = providerSnap.data();
+
+    if (!provider.isActive) {
+        return { error: "La cuenta de tu proveedor está inactiva. No puedes crear nuevos créditos." };
+    }
     
     const validatedFields = ClientCreditSchema.safeParse(values);
 
@@ -1068,6 +1089,10 @@ export async function createNewCreditForClient(values: z.infer<typeof NewCreditS
     const providerSnap = await getDoc(providerDocRef);
     if (!providerSnap.exists()) return { error: "Proveedor no encontrado." };
     const provider = providerSnap.data();
+    
+    if (!provider.isActive) {
+        return { error: "La cuenta de tu proveedor está inactiva. No puedes crear nuevos créditos." };
+    }
 
     const { clienteId, creditAmount, installments } = values;
 
@@ -1113,6 +1138,10 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
     const providerSnap = await getDoc(providerDocRef);
     if (!providerSnap.exists()) return { error: "Proveedor no encontrado."};
     const provider = providerSnap.data();
+    
+    if (!provider.isActive) {
+        return { error: "La cuenta de tu proveedor está inactiva. No puedes renovar créditos." };
+    }
 
     const { clienteId, oldCreditId, additionalAmount, installments } = values;
 
@@ -1587,4 +1616,68 @@ export async function getProviderFinancialSummary() {
     activeCapital: Math.max(0, activeCapital), // Ensure it doesn't go negative
     collectedCommission 
   };
+}
+
+// --- Admin Actions ---
+
+export async function getAllProviders() {
+    const providersRef = collection(db, "users");
+    const q = query(providersRef, where("role", "==", "proveedor"));
+    const querySnapshot = await getDocs(q);
+
+    return querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            companyName: data.companyName || 'Sin Nombre',
+            email: data.email || 'Sin Correo',
+            idNumber: data.idNumber,
+            isActive: data.isActive !== false, // Default to true if undefined
+        };
+    });
+}
+
+export async function toggleProviderStatus(providerId: string, newStatus: boolean) {
+    const adminId = cookies().get('loggedInUser')?.value;
+    if (adminId !== ADMIN_ID) {
+        return { error: "Acción no autorizada." };
+    }
+    const providerRef = doc(db, "users", providerId);
+    try {
+        await updateDoc(providerRef, { isActive: newStatus });
+        return { success: true };
+    } catch (e) {
+        console.error(e);
+        return { error: "No se pudo actualizar el estado." };
+    }
+}
+
+export async function deleteProvider(providerId: string) {
+    const adminId = cookies().get('loggedInUser')?.value;
+    if (adminId !== ADMIN_ID) {
+        return { error: "Acción no autorizada." };
+    }
+
+    const batch = writeBatch(db);
+    const providerRef = doc(db, "users", providerId);
+
+    // Delete provider
+    batch.delete(providerRef);
+
+    // Find and delete associated cobradores
+    const cobradoresRef = collection(db, "users");
+    const cobradoresQuery = query(cobradoresRef, where("providerId", "==", providerId));
+    const cobradoresSnapshot = await getDocs(cobradoresQuery);
+    cobradoresSnapshot.forEach(doc => batch.delete(doc.ref));
+    
+    // Note: This does not delete credits or payments to preserve financial history.
+    // A real-world app might archive this data instead.
+
+    try {
+        await batch.commit();
+        return { success: true };
+    } catch (e) {
+        console.error(e);
+        return { error: "No se pudo eliminar el proveedor y sus asociados." };
+    }
 }

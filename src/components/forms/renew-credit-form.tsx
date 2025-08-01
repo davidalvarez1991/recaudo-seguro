@@ -129,7 +129,7 @@ export function RenewCreditForm({ clienteId, oldCreditId, remainingBalance, onFo
       if (validDates.length !== installments) {
            toast({
               title: "Fechas no coinciden",
-              description: `Debes seleccionar exactamente ${installments} fechas. Has seleccionado ${validDates.length}.`,
+              description: `Debes seleccionar exactamente ${installments} fechas. Has seleccionado ${validates.length}.`,
               variant: "destructive"
           });
           return;
