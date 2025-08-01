@@ -1,11 +1,6 @@
 
 "use client"
 
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,7 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { logout } from "@/lib/actions";
 import { LogOut, Loader2 } from "lucide-react";
-import { useTransition, useState, useEffect } from "react";
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 export function UserNav() {
@@ -35,10 +30,8 @@ export function UserNav() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-9 w-9 rounded-full">
-          <Avatar className="h-9 w-9">
-            <AvatarImage src={"https://placehold.co/100x100.png"} data-ai-hint="user avatar" alt="@user" />
-            <AvatarFallback>U</AvatarFallback>
-          </Avatar>
+          <LogOut className="h-5 w-5" />
+          <span className="sr-only">Abrir menú de usuario</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
