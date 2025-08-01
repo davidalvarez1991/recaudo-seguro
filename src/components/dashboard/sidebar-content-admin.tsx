@@ -57,9 +57,16 @@ export function SidebarContentAdmin() {
         </SidebarMenuItem>
         
         <SidebarMenuItem>
-           <SidebarMenuButton tooltip="Configuración" disabled>
-            <Settings />
-            <span>Configuración</span>
+           <SidebarMenuButton 
+            asChild
+            isActive={isActive(`/dashboard/admin/settings`)}
+            tooltip="Configuración"
+            onClick={handleLinkClick}
+           >
+            <Link href="/dashboard/admin/settings">
+              <Settings />
+              <span>Configuración</span>
+            </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>

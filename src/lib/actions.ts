@@ -293,7 +293,7 @@ const getFullCreditDetails = async (creditData: any, providersMap: Map<string, a
         const todayStart = startOfDay(toZonedTime(new Date(), timeZone));
         const todayEnd = endOfDay(toZonedTime(new Date(), timeZone));
         const dailyCollectedAmount = payments.reduce((sum, p) => {
-            if (!p.date) return sum;
+            if (!p.date || !(p.date instanceof Timestamp)) return sum;
             const paymentDateUTC = p.date.toDate();
             const paymentDateInTimeZone = toZonedTime(paymentDateUTC, timeZone);
             if (isWithinInterval(paymentDateInTimeZone, { start: todayStart, end: todayEnd })) {
@@ -1622,19 +1622,34 @@ export async function getProviderFinancialSummary() {
 
 export async function getAllProviders() {
     const providersRef = collection(db, "users");
-    const q = query(providersRef, where("role", "==", "proveedor"));
-    const querySnapshot = await getDocs(q);
+    const providersQuery = query(providersRef, where("role", "==", "proveedor"));
+    const providersSnapshot = await getDocs(providersQuery);
 
-    return querySnapshot.docs.map(doc => {
-        const data = doc.data();
+    const creditsRef = collection(db, "credits");
+    const creditsSnapshot = await getDocs(creditsRef);
+    const allCredits = creditsSnapshot.docs.map(doc => doc.data());
+
+    const providersData = providersSnapshot.docs.map(providerDoc => {
+        const providerData = providerDoc.data();
+        const providerId = providerDoc.id;
+
+        const uniqueClientIds = new Set(
+            allCredits
+                .filter(credit => credit.providerId === providerId)
+                .map(credit => credit.clienteId)
+        );
+
         return {
-            id: doc.id,
-            companyName: data.companyName || 'Sin Nombre',
-            email: data.email || 'Sin Correo',
-            idNumber: data.idNumber,
-            isActive: data.isActive !== false, // Default to true if undefined
+            id: providerId,
+            companyName: providerData.companyName || 'Sin Nombre',
+            email: providerData.email || 'Sin Correo',
+            idNumber: providerData.idNumber,
+            isActive: providerData.isActive !== false, // Default to true if undefined
+            uniqueClientCount: uniqueClientIds.size,
         };
     });
+
+    return providersData;
 }
 
 export async function toggleProviderStatus(providerId: string, newStatus: boolean) {
@@ -1679,5 +1694,29 @@ export async function deleteProvider(providerId: string) {
     } catch (e) {
         console.error(e);
         return { error: "No se pudo eliminar el proveedor y sus asociados." };
+    }
+}
+
+export async function getAdminSettings() {
+    const settingsRef = doc(db, "settings", "app_config");
+    const settingsSnap = await getDoc(settingsRef);
+    if (!settingsSnap.exists()) {
+        return { pricePerClient: 3500 }; // Default value
+    }
+    return settingsSnap.data() as { pricePerClient: number };
+}
+
+export async function saveAdminSettings(settings: { pricePerClient: number }) {
+    const adminId = cookies().get('loggedInUser')?.value;
+    if (adminId !== ADMIN_ID) {
+        return { error: "Acción no autorizada." };
+    }
+    const settingsRef = doc(db, "settings", "app_config");
+    try {
+        await setDoc(settingsRef, settings, { merge: true });
+        return { success: true };
+    } catch (e) {
+        console.error("Error saving admin settings:", e);
+        return { error: "No se pudo guardar la configuración." };
     }
 }

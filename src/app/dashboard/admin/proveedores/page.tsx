@@ -2,16 +2,17 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, User, MoreHorizontal, Pencil, Trash2, Loader2, RefreshCw, CheckCircle, Ban, Eye } from "lucide-react";
+import { ArrowLeft, User, MoreHorizontal, Pencil, Trash2, Loader2, RefreshCw, CheckCircle, Ban, Users as UsersIcon, DollarSign } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { getAllProviders, toggleProviderStatus, deleteProvider } from "@/lib/actions";
+import { getAllProviders, toggleProviderStatus, deleteProvider, getAdminSettings } from "@/lib/actions";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { Separator } from "@/components/ui/separator";
 
 type Provider = {
   id: string;
@@ -19,10 +20,17 @@ type Provider = {
   idNumber: string;
   email: string;
   isActive: boolean;
+  uniqueClientCount: number;
+};
+
+const formatCurrency = (value: number) => {
+    if (isNaN(value)) return "$0";
+    return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 };
 
 export default function AdminProvidersPage() {
   const [providers, setProviders] = useState<Provider[]>([]);
+  const [pricePerClient, setPricePerClient] = useState(3500);
   const [loading, setLoading] = useState(true);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
@@ -34,8 +42,12 @@ export default function AdminProvidersPage() {
   const fetchProviders = async () => {
     setLoading(true);
     try {
-      const data = await getAllProviders();
-      setProviders(data);
+      const [providersData, settingsData] = await Promise.all([
+        getAllProviders(),
+        getAdminSettings(),
+      ]);
+      setProviders(providersData);
+      setPricePerClient(settingsData.pricePerClient || 3500);
     } catch (error) {
       console.error("Failed to fetch providers", error);
       toast({
@@ -132,7 +144,7 @@ export default function AdminProvidersPage() {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {providers.map((provider) => (
                 <Card key={provider.id} className="flex flex-col">
-                  <CardHeader className="flex flex-row items-start justify-between">
+                  <CardHeader className="flex flex-row items-start justify-between pb-4">
                       <div className="flex items-center gap-4">
                           <User className="w-12 h-12 text-muted-foreground" />
                           <div className="grid gap-1">
@@ -159,7 +171,19 @@ export default function AdminProvidersPage() {
                           </DropdownMenuContent>
                       </DropdownMenu>
                   </CardHeader>
-                  <CardContent className="flex-grow flex items-center justify-between">
+                  <CardContent className="flex-grow space-y-4">
+                     <div className="grid grid-cols-2 gap-4 text-center">
+                        <div className="p-3 bg-muted/50 rounded-md">
+                            <p className="text-sm text-muted-foreground flex items-center justify-center gap-1.5"><UsersIcon className="h-4 w-4"/> Clientes Únicos</p>
+                            <p className="text-2xl font-bold">{provider.uniqueClientCount}</p>
+                        </div>
+                        <div className="p-3 bg-muted/50 rounded-md">
+                             <p className="text-sm text-muted-foreground flex items-center justify-center gap-1.5"><DollarSign className="h-4 w-4"/>Suscripción</p>
+                             <p className="text-2xl font-bold text-primary">{formatCurrency(provider.uniqueClientCount * pricePerClient)}</p>
+                        </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Estado</p>
                       <Badge variant={provider.isActive ? "secondary" : "destructive"}>
@@ -175,7 +199,7 @@ export default function AdminProvidersPage() {
                         {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : (provider.isActive ? <Ban className="mr-2 h-4 w-4"/> : <CheckCircle className="mr-2 h-4 w-4"/>)}
                         {provider.isActive ? 'Desactivar' : 'Activar'}
                     </Button>
-                  </CardContent>
+                  </CardFooter>
                 </Card>
               ))}
             </div>
