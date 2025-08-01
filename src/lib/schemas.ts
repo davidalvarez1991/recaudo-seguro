@@ -121,6 +121,16 @@ export const EditCobradorSchema = z.object({
   }).optional().or(z.literal('')),
 });
 
+export const EditProviderSchema = z.object({
+  originalIdNumber: z.string(),
+  companyName: z.string().min(3, { message: "El nombre de la empresa debe tener al menos 3 caracteres." }),
+  idNumber: z.string().min(6, { message: "El número de identificación debe tener al menos 6 caracteres." }),
+  email: z.string().email({ message: "Por favor, introduce una dirección de correo electrónico válida." }),
+  whatsappNumber: z.string().min(10, { message: "El número de WhatsApp debe tener al menos 10 dígitos." }),
+  password: z.string().min(6, { message: "La nueva contraseña debe tener al menos 6 caracteres." }).optional().or(z.literal('')),
+});
+
+
 export const EditClientSchema = z.object({
   originalIdNumber: z.string(),
   idNumber: z.string().min(6, { message: "La cédula debe tener al menos 6 caracteres." }),

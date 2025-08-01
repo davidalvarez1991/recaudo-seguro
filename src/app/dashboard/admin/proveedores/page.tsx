@@ -10,15 +10,17 @@ import { Badge } from "@/components/ui/badge";
 import { getAllProviders, toggleProviderStatus, deleteProvider, getAdminSettings } from "@/lib/actions";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { EditProviderForm } from "@/components/forms/edit-provider-form";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { Separator } from "@/components/ui/separator";
 
 type Provider = {
   id: string;
   companyName: string;
   idNumber: string;
   email: string;
+  whatsappNumber: string;
   isActive: boolean;
   uniqueClientCount: number;
 };
@@ -34,6 +36,7 @@ export default function AdminProvidersPage() {
   const [loading, setLoading] = useState(true);
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
@@ -63,6 +66,16 @@ export default function AdminProvidersPage() {
   useEffect(() => {
     fetchProviders();
   }, []);
+
+  const handleEdit = (provider: Provider) => {
+    setSelectedProvider(provider);
+    setIsEditModalOpen(true);
+  };
+  
+  const handleFormSubmit = () => {
+    setIsEditModalOpen(false);
+    fetchProviders();
+  };
 
   const handleDelete = (provider: Provider) => {
     setSelectedProvider(provider);
@@ -159,9 +172,9 @@ export default function AdminProvidersPage() {
                               </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                              <DropdownMenuItem disabled>
+                              <DropdownMenuItem onClick={() => handleEdit(provider)}>
                                   <Pencil className="mr-2 h-4 w-4" />
-                                  Editar (Próximamente)
+                                  Editar
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={() => handleDelete(provider)} className="text-destructive focus:text-destructive">
@@ -217,6 +230,20 @@ export default function AdminProvidersPage() {
         </CardContent>
       </Card>
       
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Proveedor</DialogTitle>
+            <DialogDescription>
+              Actualiza la información del proveedor. Solo los campos completados serán modificados.
+            </DialogDescription>
+          </DialogHeader>
+          {selectedProvider && (
+            <EditProviderForm provider={selectedProvider} onFormSubmit={handleFormSubmit} />
+          )}
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

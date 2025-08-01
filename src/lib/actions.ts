@@ -2,7 +2,7 @@
 "use server";
 
 import { z } from "zod";
-import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, SavePaymentScheduleSchema, RenewCreditSchema, EditClientSchema, NewCreditSchema } from "./schemas";
+import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, SavePaymentScheduleSchema, RenewCreditSchema, EditClientSchema, NewCreditSchema, EditProviderSchema } from "./schemas";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
@@ -1647,6 +1647,7 @@ export async function getAllProviders() {
             id: providerId,
             companyName: providerData.companyName || 'Sin Nombre',
             email: providerData.email || 'Sin Correo',
+            whatsappNumber: providerData.whatsappNumber || 'Sin Teléfono',
             idNumber: providerData.idNumber,
             isActive: providerData.isActive !== false, // Default to true if undefined
             uniqueClientCount: uniqueClientIds.size,
@@ -1699,6 +1700,45 @@ export async function deleteProvider(providerId: string) {
         console.error(e);
         return { error: "No se pudo eliminar el proveedor y sus asociados." };
     }
+}
+
+export async function updateProvider(values: z.infer<typeof EditProviderSchema>) {
+    const adminId = cookies().get('loggedInUser')?.value;
+    if (adminId !== ADMIN_ID) {
+        return { error: "Acción no autorizada." };
+    }
+    
+    const { originalIdNumber, idNumber, companyName, email, whatsappNumber, password } = values;
+
+    const usersRef = collection(db, "users");
+    const q = query(usersRef, where("idNumber", "==", originalIdNumber), where("role", "==", "proveedor"));
+    const querySnapshot = await getDocs(q);
+
+    if (querySnapshot.empty) {
+        return { error: "Proveedor no encontrado." };
+    }
+
+    if (originalIdNumber !== idNumber && await findUserByIdNumber(idNumber)) {
+        return { error: "El nuevo número de identificación ya está en uso." };
+    }
+    
+    const userDoc = querySnapshot.docs[0];
+    const updateData: { [key: string]: any } = {
+        idNumber,
+        companyName,
+        name: companyName,
+        email,
+        whatsappNumber,
+        updatedAt: Timestamp.now()
+    };
+
+    if (password) {
+        updateData.password = await bcrypt.hash(password, 10);
+    }
+
+    await updateDoc(doc(db, "users", userDoc.id), updateData);
+
+    return { success: "Proveedor actualizado exitosamente." };
 }
 
 export async function getAdminSettings() {
