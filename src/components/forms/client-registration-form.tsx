@@ -117,19 +117,28 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     if (!isValid) return;
 
     setIsPending(true);
-    const result = await createClientAndCredit(form.getValues());
-    
-    if (result && result.success && result.creditId) {
-      setCreatedCreditId(result.creditId);
-      setStep(2);
-    } else if (result && result.error) {
-       toast({
-        title: "Error en el registro",
-        description: result.error,
-        variant: "destructive",
-      });
+    try {
+        const result = await createClientAndCredit(form.getValues());
+        
+        if (result.success && result.creditId) {
+            setCreatedCreditId(result.creditId);
+            setStep(2);
+        } else {
+            toast({
+                title: "Error en el registro",
+                description: result.error,
+                variant: "destructive",
+            });
+        }
+    } catch (e) {
+         toast({
+            title: "Error de red",
+            description: "No se pudo conectar con el servidor.",
+            variant: "destructive",
+        });
+    } finally {
+        setIsPending(false);
     }
-    setIsPending(false);
   };
 
     const handleDateSelect = (dates: Date[] | undefined) => {
