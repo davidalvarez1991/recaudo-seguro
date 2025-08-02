@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
@@ -17,15 +17,18 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RegisterSchema } from "@/lib/schemas";
 import { register } from "@/lib/actions";
-import { useTransition } from "react";
+import { useTransition, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Check, ChevronsUpDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TermsDialog } from "@/components/auth/terms-dialog";
 import { Separator } from "@/components/ui/separator";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { colombianCities } from "@/lib/colombian-cities";
+import { cn } from "@/lib/utils";
+
 
 type RegistrationFormProps = {
   role: "cliente" | "proveedor";
@@ -33,6 +36,7 @@ type RegistrationFormProps = {
 
 export function RegistrationForm({ role }: RegistrationFormProps) {
   const [isPending, startTransition] = useTransition();
+  const [isCityPopoverOpen, setIsCityPopoverOpen] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -99,20 +103,60 @@ export function RegistrationForm({ role }: RegistrationFormProps) {
                   control={form.control}
                   name="city"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ciudad</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isPending}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecciona tu ciudad principal" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {colombianCities.map(city => (
-                            <SelectItem key={city} value={city}>{city}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Ciudad / Municipio</FormLabel>
+                      <Popover open={isCityPopoverOpen} onOpenChange={setIsCityPopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              className={cn(
+                                "w-full justify-between",
+                                !field.value && "text-muted-foreground"
+                              )}
+                              disabled={isPending}
+                            >
+                              {field.value
+                                ? colombianCities.find(
+                                    (city) => city === field.value
+                                  )
+                                : "Selecciona tu ciudad"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0">
+                          <Command>
+                            <CommandInput placeholder="Buscar ciudad..." />
+                             <CommandList>
+                                <CommandEmpty>No se encontró la ciudad.</CommandEmpty>
+                                <CommandGroup>
+                                {colombianCities.map((city) => (
+                                    <CommandItem
+                                    value={city}
+                                    key={city}
+                                    onSelect={() => {
+                                        form.setValue("city", city);
+                                        setIsCityPopoverOpen(false);
+                                    }}
+                                    >
+                                    <Check
+                                        className={cn(
+                                        "mr-2 h-4 w-4",
+                                        city === field.value
+                                            ? "opacity-100"
+                                            : "opacity-0"
+                                        )}
+                                    />
+                                    {city}
+                                    </CommandItem>
+                                ))}
+                                </CommandGroup>
+                             </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                       <FormMessage />
                     </FormItem>
                   )}
