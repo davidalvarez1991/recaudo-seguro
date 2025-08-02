@@ -1435,7 +1435,7 @@ export async function saveProviderSettings(providerId: string, settings: { commi
         updateData.isLateInterestActive = settings.isLateInterestActive;
       }
       if (settings.isContractGenerationActive !== undefined) {
-        updateData.isContractGenerationActive = settings.isLateInterestActive;
+        updateData.isContractGenerationActive = settings.isContractGenerationActive;
       }
        if (settings.contractTemplate !== undefined) {
         updateData.contractTemplate = settings.contractTemplate;
@@ -1508,6 +1508,45 @@ export async function acceptContract(creditId: string) {
         return { error: "No se pudo actualizar el estado de aceptación del contrato." };
     }
 }
+
+export async function getClientContracts() {
+    const { user: clienteData } = await getAuthenticatedUser();
+    if (!clienteData || clienteData.role !== 'cliente') return [];
+    
+    const contractsRef = collection(db, "contracts");
+    const q = query(contractsRef, 
+        where("clienteId", "==", clienteData.idNumber), 
+        where("acceptedAt", "!=", null)
+    );
+    const contractSnapshot = await getDocs(q);
+
+    if (contractSnapshot.empty) {
+        return [];
+    }
+    
+    const contractsPromises = contractSnapshot.docs.map(async (contractDoc) => {
+        const contractData = contractDoc.data();
+        const creditDoc = await getDoc(doc(db, "credits", contractData.creditId));
+        if (!creditDoc.exists()) return null;
+
+        const creditData = creditDoc.data();
+        const providerDoc = await getDoc(doc(db, "users", creditData.providerId));
+        const providerName = providerDoc.exists() ? providerDoc.data().companyName : "Proveedor Desconocido";
+
+        return {
+            id: contractDoc.id,
+            creditId: contractData.creditId,
+            providerName: providerName,
+            creditAmount: creditData.valor,
+            acceptedAt: (contractData.acceptedAt as Timestamp).toDate().toISOString(),
+            contractText: contractData.contractText,
+        };
+    });
+
+    const contracts = (await Promise.all(contractsPromises)).filter(Boolean);
+    return contracts.sort((a,b) => new Date(b.acceptedAt).getTime() - new Date(a.acceptedAt).getTime()) as any[];
+}
+
 
 // --- AI Actions ---
 
