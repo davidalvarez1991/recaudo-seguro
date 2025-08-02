@@ -155,7 +155,11 @@ export default function ClienteDashboard() {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3 h-auto">
               {credits.map((credit) => (
-                <TabsTrigger key={credit.id} value={credit.id} className="flex flex-col h-auto items-start p-2 text-left">
+                <TabsTrigger 
+                  key={credit.id} 
+                  value={credit.id} 
+                  className="flex flex-col h-auto items-start p-2 text-left data-[state=active]:bg-muted/50 data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary"
+                >
                   <div className="flex items-center gap-2">
                      <Avatar className="h-6 w-6">
                         <AvatarFallback>{getAvatarFallback(credit.providerName)}</AvatarFallback>
