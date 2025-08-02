@@ -25,7 +25,7 @@ type CommissionTier = {
 // --- Utility Functions ---
 const findUserByIdNumber = async (idNumber: string) => {
     const usersRef = collection(db, "users");
-    const q = query(usersRef, where("idNumber", "==", idNumber));
+    const q = query(usersRef, where("idNumber", "==", idNumber), limit(1));
     const querySnapshot = await getDocs(q);
     if (querySnapshot.empty) {
         return null;
@@ -33,15 +33,14 @@ const findUserByIdNumber = async (idNumber: string) => {
     const userDoc = querySnapshot.docs[0];
     const data = userDoc.data();
     
-    // Create a new object for serialization
     const serializableData: { [key: string]: any } = { id: userDoc.id };
 
-    // Copy all fields, converting Timestamps as they are found
     for (const key in data) {
-        if (data[key] instanceof Timestamp) {
-            serializableData[key] = data[key].toDate().toISOString();
+        const value = data[key];
+        if (value instanceof Timestamp) {
+            serializableData[key] = value.toDate().toISOString();
         } else {
-            serializableData[key] = data[key];
+            serializableData[key] = value;
         }
     }
     
@@ -191,12 +190,15 @@ export async function getUserData(userId: string) {
     }
     const user = { id: userSnap.id, ...userSnap.data() };
     
-    const serializableUser: { [key: string]: any } = { ...user };
+    const serializableUser: { [key: string]: any } = {};
     
     // Convert Timestamps to ISO strings to make them serializable
-    for (const key in serializableUser) {
-        if (serializableUser[key] instanceof Timestamp) {
-            serializableUser[key] = serializableUser[key].toDate().toISOString();
+    for (const key in user) {
+        const value = user[key as keyof typeof user];
+        if (value instanceof Timestamp) {
+            serializableUser[key] = value.toDate().toISOString();
+        } else {
+            serializableUser[key] = value;
         }
     }
 
@@ -1869,7 +1871,7 @@ export async function deleteProvider(providerId: string) {
     const creditsQuery = query(creditsRef, where("providerId", "==", providerId));
     const creditsSnapshot = await getDocs(creditsQuery);
     
-    for (const creditDoc of creditsSnapshot.docs) {
+    for (const creditDoc of creditSnapshot.docs) {
         const paymentsRef = collection(db, "payments");
         const paymentsQuery = query(paymentsRef, where("creditId", "==", creditDoc.id));
         const paymentsSnapshot = await getDocs(paymentsQuery);
@@ -1954,3 +1956,5 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
         return { error: "No se pudo guardar la configuración." };
     }
 }
+
+    
