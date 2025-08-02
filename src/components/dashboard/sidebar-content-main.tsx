@@ -7,7 +7,7 @@ import {
   SidebarMenuButton,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Home, Settings, ClipboardList, Users, HandCoins, LayoutDashboard, Download, History, Map } from "lucide-react";
+import { Home, Settings, ClipboardList, Users, HandCoins, LayoutDashboard, Download, History, Map, FileText } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -183,6 +183,19 @@ export function SidebarContentMain({ role }: SidebarContentMainProps) {
             <Link href={`/dashboard/cliente/historial`}>
               <History />
               <span>Historial</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+        <SidebarMenuItem>
+           <SidebarMenuButton
+            asChild
+            isActive={isActive(`/dashboard/cliente/contratos`)}
+            tooltip="Contratos"
+            onClick={handleLinkClick}
+          >
+            <Link href={`/dashboard/cliente/contratos`}>
+              <FileText />
+              <span>Contratos</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
