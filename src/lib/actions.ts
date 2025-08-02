@@ -27,12 +27,15 @@ const findUserByIdNumber = async (idNumber: string) => {
     const usersRef = collection(db, "users");
     const q = query(usersRef, where("idNumber", "==", idNumber), limit(1));
     const querySnapshot = await getDocs(q);
+
     if (querySnapshot.empty) {
         return null;
     }
+
     const userDoc = querySnapshot.docs[0];
     const data = userDoc.data();
     
+    // Manually create a serializable object
     const serializableData: { [key: string]: any } = { id: userDoc.id };
 
     for (const key in data) {
@@ -188,13 +191,13 @@ export async function getUserData(userId: string) {
     if (!userSnap.exists()) {
         return null;
     }
-    const user = { id: userSnap.id, ...userSnap.data() };
     
-    const serializableUser: { [key: string]: any } = {};
-    
+    const data = userSnap.data();
+    const serializableUser: { [key: string]: any } = { id: userSnap.id };
+
     // Convert Timestamps to ISO strings to make them serializable
-    for (const key in user) {
-        const value = user[key as keyof typeof user];
+    for (const key in data) {
+        const value = data[key];
         if (value instanceof Timestamp) {
             serializableUser[key] = value.toDate().toISOString();
         } else {
@@ -1124,7 +1127,8 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
         });
         clienteData = { id: newUserDocRef.id, idNumber, name: fullName, city: provider.city || 'N/A' };
     } else {
-        clienteData.name = fullName; // Use the provided name for the contract
+        // Client already exists, just use their data. We'll build the full name for the contract.
+        clienteData.name = fullName;
     }
 
     const valor = parseFloat(creditAmount.replace(/\./g, '').replace(',', '.'));

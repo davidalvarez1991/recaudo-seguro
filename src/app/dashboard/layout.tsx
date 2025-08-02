@@ -4,7 +4,7 @@ import { SidebarProvider, Sidebar, SidebarInset, SidebarTrigger } from "@/compon
 import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { getUserData, getUserRole } from "@/lib/actions";
+import { getUserData } from "@/lib/actions";
 import { redirect } from "next/navigation";
 import { SidebarContent } from "@/components/dashboard/sidebar-content";
 
@@ -24,6 +24,8 @@ export default async function DashboardLayout({
   const role = userData?.role;
 
   if (!role) {
+     // If role couldn't be determined, something is wrong.
+     // Clear the potentially invalid cookie and redirect to login.
      cookies().set('loggedInUser', '', { expires: new Date(0), path: '/' });
      redirect('/login');
   }
