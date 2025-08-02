@@ -3,31 +3,24 @@ import { UserNav } from "@/components/dashboard/user-nav";
 import { SidebarProvider, Sidebar, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
-import { cookies } from "next/headers";
-import { getUserData } from "@/lib/actions";
 import { redirect } from "next/navigation";
 import { SidebarContent } from "@/components/dashboard/sidebar-content";
+import { getAuthenticatedUser } from "@/lib/auth";
+import { cookies } from "next/headers";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const cookieStore = cookies();
-  const userId = cookieStore.get('loggedInUser')?.value;
+  const { user, role } = await getAuthenticatedUser();
 
-  if (!userId) {
+  if (!user || !role) {
+    // This case handles when cookies are present but invalid.
+    // Ensure cookies are cleared and user is redirected.
+    cookies().delete('loggedInUser');
+    cookies().delete('userRole');
     redirect('/login');
-  }
-
-  const userData = await getUserData(userId);
-  const role = userData?.role;
-
-  if (!role) {
-     // If role couldn't be determined, something is wrong.
-     // Clear the potentially invalid cookie and redirect to login.
-     cookies().set('loggedInUser', '', { expires: new Date(0), path: '/' });
-     redirect('/login');
   }
 
   return (

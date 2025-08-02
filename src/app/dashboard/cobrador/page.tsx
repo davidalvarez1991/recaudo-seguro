@@ -3,11 +3,11 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { CobradorDashboardClient } from "@/components/dashboard/cobrador-dashboard-client";
 import { CreditSimulator } from "@/components/dashboard/credit-simulator";
 import { getUserData, getPaymentRoute, getCobradorSelfDailySummary } from "@/lib/actions";
-import { cookies } from "next/headers";
 import { Separator } from "@/components/ui/separator";
 import { ClientReputationSearch } from "@/components/dashboard/client-reputation-search";
 import { Target, TrendingUp, CheckCircle, Star, AlertTriangle, RefreshCw } from "lucide-react";
 import { DailyStats } from "@/components/dashboard/daily-stats";
+import { getAuthenticatedUser } from "@/lib/auth";
 
 type CommissionTier = {
   minAmount: number;
@@ -35,8 +35,7 @@ const formatCurrency = (value: number) => {
 };
 
 export default async function CobradorDashboard() {
-  const cookieStore = cookies();
-  const userId = cookieStore.get('loggedInUser')?.value;
+  const { userId } = await getAuthenticatedUser();
   
   let userName = "Cobrador";
   let commissionTiers: CommissionTier[] = [{ minAmount: 0, maxAmount: 50000000, percentage: 20 }]; // Default tier

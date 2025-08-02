@@ -7,9 +7,9 @@ import Link from "next/link";
 import { getCobradoresByProvider, getUserData, getProviderFinancialSummary, getAdminSettings } from "@/lib/actions";
 import { CobradorRegistrationModal } from "@/components/proveedor/cobrador-registration-modal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { cookies } from "next/headers";
 import { DailySummaryContainer } from "@/components/proveedor/daily-summary-container";
 import { ClientReputationSearch } from "@/components/dashboard/client-reputation-search";
+import { getAuthenticatedUser } from "@/lib/auth";
 
 type UserData = {
     companyName?: string;
@@ -22,8 +22,7 @@ const formatCurrency = (value: number) => {
 };
 
 export default async function ProveedorDashboard() {
-  const cookieStore = cookies();
-  const userId = cookieStore.get('loggedInUser')?.value;
+  const { userId } = await getAuthenticatedUser();
   
   let companyName = "Perfil de Proveedor";
   let financialSummary = { activeCapital: 0, collectedCommission: 0, uniqueClientCount: 0 };

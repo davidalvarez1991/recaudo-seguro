@@ -3,12 +3,11 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { AdminSettingsForm } from "@/components/forms/admin-settings-form";
+import { getAuthenticatedUser } from "@/lib/auth";
 
-export default function SettingsPage() {
-  const cookieStore = cookies();
-  const adminId = cookieStore.get('loggedInUser')?.value || null;
+export default async function SettingsPage() {
+  const { userId } = await getAuthenticatedUser();
 
   return (
     <Card>
@@ -29,8 +28,8 @@ export default function SettingsPage() {
         </div>
       </CardHeader>
       <CardContent>
-        {adminId ? (
-          <AdminSettingsForm adminId={adminId} />
+        {userId ? (
+          <AdminSettingsForm adminId={userId} />
         ) : (
           <p className="text-destructive">No se pudo identificar al administrador. Por favor, inicie sesión de nuevo.</p>
         )}

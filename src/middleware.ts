@@ -4,13 +4,13 @@ import type { NextRequest } from 'next/server'
  
 export async function middleware(request: NextRequest) {
   const loggedInUserCookie = request.cookies.get('loggedInUser');
-  const userRoleCookie = request.cookies.get('userRole');
   const { pathname } = request.nextUrl;
 
   const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/register');
 
-  // If on an auth page, and user is logged in, redirect them away.
+  // If user is logged in, redirect them from auth pages to their dashboard.
   if (isAuthPage && loggedInUserCookie) {
+    const userRoleCookie = request.cookies.get('userRole');
     const role = userRoleCookie?.value;
     if (role && ['admin', 'proveedor', 'cobrador', 'cliente'].includes(role)) {
        const dashboardUrl = new URL(`/dashboard/${role}`, request.url);
@@ -18,9 +18,10 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // If user is not on an auth page and is not logged in, redirect to login.
-  if (!isAuthPage && !loggedInUserCookie && pathname.startsWith('/dashboard')) {
+  // If user is on a protected dashboard page and is not logged in, redirect to login.
+  if (pathname.startsWith('/dashboard') && !loggedInUserCookie) {
     const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('from', pathname); // Optional: add a redirect after login
     return NextResponse.redirect(loginUrl);
   }
  
@@ -32,5 +33,3 @@ export const config = {
     '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
 }
-
-    

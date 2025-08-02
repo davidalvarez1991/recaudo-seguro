@@ -3,12 +3,11 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { SettingsForm } from "@/components/forms/settings-form";
+import { getAuthenticatedUser } from "@/lib/auth";
 
-export default function SettingsPage() {
-  const cookieStore = cookies();
-  const providerId = cookieStore.get('loggedInUser')?.value || null;
+export default async function SettingsPage() {
+  const { userId } = await getAuthenticatedUser();
 
   return (
     <Card>
@@ -29,8 +28,8 @@ export default function SettingsPage() {
         </div>
       </CardHeader>
       <CardContent>
-        {providerId ? (
-          <SettingsForm providerId={providerId} />
+        {userId ? (
+          <SettingsForm providerId={userId} />
         ) : (
           <p className="text-destructive">No se pudo identificar al proveedor. Por favor, inicie sesión de nuevo.</p>
         )}

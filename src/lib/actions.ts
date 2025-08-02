@@ -3,7 +3,6 @@
 
 import { z } from "zod";
 import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, SavePaymentScheduleSchema, RenewCreditSchema, EditClientSchema, NewCreditSchema, EditProviderSchema } from "./schemas";
-import { cookies } from "next/cookies";
 import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
 import { db } from "./firebase";
@@ -12,6 +11,8 @@ import { startOfDay, differenceInDays, endOfDay, isWithinInterval, addDays, pars
 import { toZonedTime } from 'date-fns-tz';
 import { analyzeClientReputation, ClientReputationInput } from '@/ai/flows/analyze-client-reputation';
 import { es } from 'date-fns/locale';
+import { getAuthenticatedUser } from "./auth";
+import { cookies } from "next/headers";
 
 
 const ADMIN_ID = "admin_0703091991";
@@ -23,7 +24,7 @@ type CommissionTier = {
 };
 
 // --- Utility Functions ---
-const findUserByIdNumber = async (idNumber: string) => {
+export const findUserByIdNumber = async (idNumber: string) => {
     const usersRef = collection(db, "users");
     const q = query(usersRef, where("idNumber", "==", idNumber), limit(1));
     const querySnapshot = await getDocs(q);
@@ -35,9 +36,7 @@ const findUserByIdNumber = async (idNumber: string) => {
     const userDoc = querySnapshot.docs[0];
     const data = userDoc.data();
     
-    // Manually create a serializable object
     const serializableData: { [key: string]: any } = { id: userDoc.id };
-
     for (const key in data) {
         const value = data[key];
         if (value instanceof Timestamp) {
@@ -161,22 +160,6 @@ export async function logout() {
 
 // --- Data Fetching Actions ---
 
-export async function getUserRole(userId: string) {
-    // Special case for hardcoded admin
-    if (userId === ADMIN_ID) {
-        return 'admin';
-    }
-    const cookieRole = cookies().get('userRole')?.value;
-    if (cookieRole) {
-      return cookieRole;
-    }
-    // Fallback in case cookie is missing, but do not set it here.
-    const userDocRef = doc(db, "users", userId);
-    const userSnap = await getDoc(userDocRef);
-    if (!userSnap.exists()) return null;
-    return userSnap.data().role || null;
-}
-
 export async function getUserData(userId: string) {
     // Special case for hardcoded admin
     if (userId === ADMIN_ID) {
@@ -210,10 +193,10 @@ export async function getUserData(userId: string) {
 
 
 export async function getCobradoresByProvider() {
-    const providerIdCookie = cookies().get('loggedInUser');
-    if (!providerIdCookie) return [];
+    const { userId } = await getAuthenticatedUser();
+    if (!userId) return [];
     
-    const providerDocRef = doc(db, "users", providerIdCookie.value);
+    const providerDocRef = doc(db, "users", userId);
     const providerSnap = await getDoc(providerDocRef);
     if (!providerSnap.exists()) return [];
     const provider = providerSnap.data();
@@ -221,7 +204,7 @@ export async function getCobradoresByProvider() {
     if (!provider || provider.role !== 'proveedor') return [];
 
     const cobradoresRef = collection(db, "users");
-    const q = query(cobradoresRef, where("role", "==", "cobrador"), where("providerId", "==", providerIdCookie.value));
+    const q = query(cobradoresRef, where("role", "==", "cobrador"), where("providerId", "==", userId));
     const querySnapshot = await getDocs(q);
 
     return querySnapshot.docs.map(doc => {
@@ -337,12 +320,8 @@ const getFullCreditDetails = async (creditData: any, providersMap: Map<string, a
 
 
 export async function getProviderActivityLog() {
-    const userIdCookie = cookies().get('loggedInUser');
-    if (!userIdCookie) return [];
-    const userId = userIdCookie.value;
-
-    const userRole = await getUserRole(userId);
-    if (userRole !== 'proveedor') return [];
+    const { userId, role } = await getAuthenticatedUser();
+    if (role !== 'proveedor' || !userId) return [];
 
     let activityLog: any[] = [];
 
@@ -428,15 +407,8 @@ export async function getProviderActivityLog() {
 
 
 export async function getCreditsByCobrador() {
-    const cobradorIdCookie = cookies().get('loggedInUser');
-    if (!cobradorIdCookie) return [];
-
-    const cobradorDocRef = doc(db, "users", cobradorIdCookie.value);
-    const cobradorSnap = await getDoc(cobradorDocRef);
-    if (!cobradorSnap.exists()) return [];
-    const cobrador = cobradorSnap.data();
-    
-    if (!cobrador || cobrador.role !== 'cobrador') return [];
+    const { user: cobrador, userId } = await getAuthenticatedUser();
+    if (!cobrador || cobrador.role !== 'cobrador' || !userId) return [];
 
     if (cobrador.providerId) {
         const provider = await getUserData(cobrador.providerId);
@@ -505,15 +477,8 @@ export async function getCreditsByCobrador() {
 
 
 export async function getCreditsByCliente() {
-    const clienteIdCookie = cookies().get('loggedInUser');
-    if (!clienteIdCookie) return [];
-
-    const clienteDocRef = doc(db, "users", clienteIdCookie.value);
-    const clienteSnap = await getDoc(clienteDocRef);
-    if (!clienteSnap.exists() || clienteSnap.data().role !== 'cliente') {
-        return [];
-    }
-    const clienteData = clienteSnap.data();
+    const { user: clienteData, userId } = await getAuthenticatedUser();
+    if (!clienteData || clienteData.role !== 'cliente' || !userId) return [];
 
     const creditsRef = collection(db, "credits");
     const q = query(creditsRef, where("clienteId", "==", clienteData.idNumber), where("estado", "==", "Activo"));
@@ -581,15 +546,8 @@ export async function getCreditsByCliente() {
 }
 
 export async function getHistoricalCreditsByCliente() {
-    const clienteIdCookie = cookies().get('loggedInUser');
-    if (!clienteIdCookie) return [];
-
-    const clienteDocRef = doc(db, "users", clienteIdCookie.value);
-    const clienteSnap = await getDoc(clienteDocRef);
-    if (!clienteSnap.exists() || clienteSnap.data().role !== 'cliente') {
-        return [];
-    }
-    const clienteData = clienteSnap.data();
+    const { user: clienteData } = await getAuthenticatedUser();
+    if (!clienteData || clienteData.role !== 'cliente') return [];
 
     const creditsRef = collection(db, "credits");
     const q = query(creditsRef, where("clienteId", "==", clienteData.idNumber), where("estado", "in", ["Pagado", "Renovado"]));
@@ -654,11 +612,11 @@ export async function getPaymentsByCreditId(creditId: string) {
 }
 
 export async function getDailyCollectionSummary() {
-    const providerIdCookie = cookies().get('loggedInUser');
-    if (!providerIdCookie) {
+    const { userId } = await getAuthenticatedUser();
+    if (!userId) {
         return { summary: [], totalCollected: 0 };
     }
-    const providerId = providerIdCookie.value;
+    const providerId = userId;
 
     const timeZone = 'America/Bogota';
     const nowInTimeZone = toZonedTime(new Date(), timeZone);
@@ -706,13 +664,8 @@ export async function getDailyCollectionSummary() {
 }
 
 export async function getPaymentRoute() {
-    const cobradorIdCookie = cookies().get('loggedInUser');
-    if (!cobradorIdCookie) return { routes: [], dailyGoal: 0, collectedToday: 0 };
-
-    const cobradorDocRef = doc(db, "users", cobradorIdCookie.value);
-    const cobradorSnap = await getDoc(cobradorDocRef);
-    if (!cobradorSnap.exists()) return { routes: [], dailyGoal: 0, collectedToday: 0 };
-    const cobradorData = cobradorSnap.data();
+    const { user: cobradorData } = await getAuthenticatedUser();
+    if (!cobradorData || cobradorData.role !== 'cobrador') return { routes: [], dailyGoal: 0, collectedToday: 0 };
 
     const allCredits = await getCreditsByCobrador();
     const activeCredits = allCredits.filter(c => c.estado === 'Activo' && Array.isArray(c.paymentDates) && c.paymentDates.length > 0);
@@ -806,21 +759,17 @@ export async function getPaymentRoute() {
 }
 
 async function getCreditsByProvider() {
-    const providerIdCookie = cookies().get('loggedInUser');
-    if (!providerIdCookie) return [];
-    const providerId = providerIdCookie.value;
-
-    const userRole = await getUserRole(providerId);
-    if (userRole !== 'proveedor') return [];
+    const { userId, role } = await getAuthenticatedUser();
+    if (role !== 'proveedor' || !userId) return [];
 
     const creditsRef = collection(db, "credits");
-    const q = query(creditsRef, where("providerId", "==", providerId));
+    const q = query(creditsRef, where("providerId", "==", userId));
     const querySnapshot = await getDocs(q);
 
     const providersMap = new Map();
-    const providerData = await getUserData(providerId);
+    const providerData = await getUserData(userId);
     if(providerData) {
-        providersMap.set(providerId, providerData);
+        providersMap.set(userId, providerData);
     }
     
     const recordsPromises = querySnapshot.docs.map(doc => 
@@ -838,17 +787,9 @@ export async function downloadProviderCredits() {
 // --- Data Mutation Actions ---
 
 export async function registerCobrador(values: z.infer<typeof CobradorRegisterSchema>) {
-    const providerIdCookie = cookies().get('loggedInUser');
-    if (!providerIdCookie) {
-        return { error: "No se pudo identificar al proveedor." };
-    }
-    const providerDocRef = doc(db, "users", providerIdCookie.value);
-    const providerSnap = await getDoc(providerDocRef);
-    if (!providerSnap.exists()) return { error: "Proveedor no encontrado."};
-    const provider = providerSnap.data();
-
-    if (!provider || provider.role !== 'proveedor') {
-        return { error: "Acción no autorizada." };
+    const { user: provider, userId: providerId } = await getAuthenticatedUser();
+    if (!provider || provider.role !== 'proveedor' || !providerId) {
+        return { error: "Acción no autorizada o proveedor no identificado." };
     }
 
     if (!provider.isActive) {
@@ -866,7 +807,7 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
         name: values.name,
         password: hashedPassword,
         role: 'cobrador',
-        providerId: providerIdCookie.value,
+        providerId: providerId,
         createdAt: Timestamp.now()
     });
 
@@ -1067,14 +1008,7 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
 
 
 export async function createClientAndCredit(values: z.infer<typeof ClientCreditSchema>) {
-    const cobradorIdCookie = cookies().get('loggedInUser');
-    if (!cobradorIdCookie) return { error: "No se pudo identificar al cobrador." };
-
-    const cobradorDocRef = doc(db, "users", cobradorIdCookie.value);
-    const cobradorSnap = await getDoc(cobradorDocRef);
-    if (!cobradorSnap.exists()) return { error: "Cobrador no encontrado."};
-    const cobrador = cobradorSnap.data();
-
+    const { user: cobrador } = await getAuthenticatedUser();
     if (!cobrador || cobrador.role !== 'cobrador') return { error: "Acción no autorizada." };
     
     const providerId = cobrador.providerId;
@@ -1174,15 +1108,8 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
 }
 
 export async function createNewCreditForClient(values: z.infer<typeof NewCreditSchema>) {
-    const cobradorIdCookie = cookies().get('loggedInUser');
-    if (!cobradorIdCookie) return { error: "No se pudo identificar al cobrador." };
-
-    const cobradorDocRef = doc(db, "users", cobradorIdCookie.value);
-    const cobradorSnap = await getDoc(cobradorDocRef);
-    if (!cobradorSnap.exists() || cobradorSnap.data().role !== 'cobrador') {
-        return { error: "Acción no autorizada." };
-    }
-    const cobrador = cobradorSnap.data();
+    const { user: cobrador } = await getAuthenticatedUser();
+    if (!cobrador || cobrador.role !== 'cobrador') return { error: "Acción no autorizada." };
 
     const providerId = cobrador.providerId;
     if (!providerId) return { error: "El cobrador no tiene un proveedor asociado." };
@@ -1229,15 +1156,8 @@ export async function createNewCreditForClient(values: z.infer<typeof NewCreditS
 }
 
 export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
-    const cobradorIdCookie = cookies().get('loggedInUser');
-    if (!cobradorIdCookie) return { error: "No se pudo identificar al cobrador." };
-
-    const cobradorDocRef = doc(db, "users", cobradorIdCookie.value);
-    const cobradorSnap = await getDoc(cobradorDocRef);
-    if (!cobradorSnap.exists() || cobradorSnap.data().role !== 'cobrador') {
-        return { error: "Acción no autorizada." };
-    }
-    const cobrador = cobradorSnap.data();
+    const { user: cobrador } = await getAuthenticatedUser();
+    if (!cobrador || cobrador.role !== 'cobrador') return { error: "Acción no autorizada." };
 
     const providerId = cobrador.providerId;
     if(!providerId) return { error: "El cobrador no tiene un proveedor asociado." };
@@ -1370,15 +1290,8 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
 }
 
 export async function registerPayment(creditId: string, amount: number, type: "cuota" | "total" | "comision") {
-    const cobradorIdCookie = cookies().get('loggedInUser');
-    if (!cobradorIdCookie) return { error: "Acceso no autorizado." };
-
-    const cobradorDocRef = doc(db, "users", cobradorIdCookie.value);
-    const cobradorSnap = await getDoc(cobradorDocRef);
-    if (!cobradorSnap.exists() || cobradorSnap.data().role !== 'cobrador') {
-        return { error: "Acción no autorizada." };
-    }
-    const cobradorData = cobradorSnap.data();
+    const { user: cobradorData } = await getAuthenticatedUser();
+    if (!cobradorData || cobradorData.role !== 'cobrador') return { error: "Acción no autorizada." };
 
     const creditRef = doc(db, "credits", creditId);
     const creditSnap = await getDoc(creditRef);
@@ -1450,15 +1363,8 @@ export async function registerPayment(creditId: string, amount: number, type: "c
 }
 
 export async function registerPaymentAgreement(creditId: string, amount: number) {
-    const cobradorIdCookie = cookies().get('loggedInUser');
-    if (!cobradorIdCookie) return { error: "Acceso no autorizado." };
-
-    const cobradorDocRef = doc(db, "users", cobradorIdCookie.value);
-    const cobradorSnap = await getDoc(cobradorDocRef);
-    if (!cobradorSnap.exists() || cobradorSnap.data().role !== 'cobrador') {
-        return { error: "Acción no autorizada." };
-    }
-    const cobradorData = cobradorSnap.data();
+    const { user: cobradorData } = await getAuthenticatedUser();
+    if (!cobradorData || cobradorData.role !== 'cobrador') return { error: "Acción no autorizada." };
 
     const creditRef = doc(db, "credits", creditId);
     const creditSnap = await getDoc(creditRef);
@@ -1529,7 +1435,7 @@ export async function saveProviderSettings(providerId: string, settings: { commi
         updateData.isLateInterestActive = settings.isLateInterestActive;
       }
       if (settings.isContractGenerationActive !== undefined) {
-        updateData.isContractGenerationActive = settings.isContractGenerationActive;
+        updateData.isContractGenerationActive = settings.isLateInterestActive;
       }
        if (settings.contractTemplate !== undefined) {
         updateData.contractTemplate = settings.contractTemplate;
@@ -1550,8 +1456,8 @@ export async function saveProviderSettings(providerId: string, settings: { commi
 }
 
 export async function registerMissedPayment(creditId: string) {
-  const cobradorIdCookie = cookies().get('loggedInUser')?.value;
-  if (!cobradorIdCookie) return { error: "Acceso no autorizado." };
+  const { user } = await getAuthenticatedUser();
+  if (!user) return { error: "Acceso no autorizado." };
 
   const creditRef = doc(db, "credits", creditId);
   try {
@@ -1652,7 +1558,7 @@ export async function getClientReputationData(clienteId: string) {
 }
 
 export async function getCobradoresDailySummary() {
-    const providerId = cookies().get('loggedInUser')?.value;
+    const { userId: providerId } = await getAuthenticatedUser();
     if (!providerId) return [];
 
     const timeZone = 'America/Bogota';
@@ -1707,15 +1613,11 @@ export async function getCobradoresDailySummary() {
 }
 
 export async function getCobradorSelfDailySummary() {
-    const cobradorUserId = cookies().get('loggedInUser')?.value;
-    if (!cobradorUserId) return { successfulPayments: 0, renewedCredits: 0, missedPayments: 0 };
-    
-    const cobrador = await getUserData(cobradorUserId);
+    const { user: cobrador } = await getAuthenticatedUser();
     if (!cobrador || cobrador.role !== 'cobrador') {
         return { successfulPayments: 0, renewedCredits: 0, missedPayments: 0 };
     }
     const cobradorId = cobrador.idNumber;
-    const providerId = cobrador.providerId;
 
     const timeZone = 'America/Bogota';
     const today = toZonedTime(new Date(), timeZone);
@@ -1756,7 +1658,7 @@ export async function getCobradorSelfDailySummary() {
 }
 
 export async function getProviderFinancialSummary() {
-  const providerId = cookies().get('loggedInUser')?.value;
+  const { userId: providerId } = await getAuthenticatedUser();
   if (!providerId) return { activeCapital: 0, collectedCommission: 0, uniqueClientCount: 0 };
 
   let activeCapital = 0;
@@ -1841,10 +1743,9 @@ export async function getAllProviders() {
 }
 
 export async function toggleProviderStatus(providerId: string, newStatus: boolean) {
-    const adminId = cookies().get('loggedInUser')?.value;
-    if (adminId !== ADMIN_ID) {
-        return { error: "Acción no autorizada." };
-    }
+    const { role } = await getAuthenticatedUser();
+    if (role !== 'admin') return { error: "Acción no autorizada." };
+
     const providerRef = doc(db, "users", providerId);
     try {
         await updateDoc(providerRef, { isActive: newStatus });
@@ -1856,10 +1757,8 @@ export async function toggleProviderStatus(providerId: string, newStatus: boolea
 }
 
 export async function deleteProvider(providerId: string) {
-    const adminId = cookies().get('loggedInUser')?.value;
-    if (adminId !== ADMIN_ID) {
-        return { error: "Acción no autorizada." };
-    }
+    const { role } = await getAuthenticatedUser();
+    if (role !== 'admin') return { error: "Acción no autorizada." };
 
     const batch = writeBatch(db);
 
@@ -1899,10 +1798,8 @@ export async function deleteProvider(providerId: string) {
 }
 
 export async function updateProvider(values: z.infer<typeof EditProviderSchema>) {
-    const adminId = cookies().get('loggedInUser')?.value;
-    if (adminId !== ADMIN_ID) {
-        return { error: "Acción no autorizada." };
-    }
+    const { role } = await getAuthenticatedUser();
+    if (role !== 'admin') return { error: "Acción no autorizada." };
     
     const { originalIdNumber, idNumber, companyName, email, whatsappNumber, password } = values;
 
@@ -1947,10 +1844,9 @@ export async function getAdminSettings() {
 }
 
 export async function saveAdminSettings(settings: { pricePerClient: number }) {
-    const adminId = cookies().get('loggedInUser')?.value;
-    if (adminId !== ADMIN_ID) {
-        return { error: "Acción no autorizada." };
-    }
+    const { role } = await getAuthenticatedUser();
+    if (role !== 'admin') return { error: "Acción no autorizada." };
+
     const settingsRef = doc(db, "settings", "app_config");
     try {
         await setDoc(settingsRef, settings, { merge: true });
@@ -1960,5 +1856,3 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
         return { error: "No se pudo guardar la configuración." };
     }
 }
-
-    
