@@ -113,7 +113,7 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: 'pr
         return { error: "Campos inválidos." };
     }
 
-    const { idNumber, password, companyName, email, whatsappNumber } = validatedFields.data;
+    const { idNumber, password, companyName, email, whatsappNumber, city } = validatedFields.data;
 
     const existingUser = await findUserByIdNumber(idNumber);
     if (existingUser) {
@@ -130,6 +130,7 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: 'pr
         name: role === 'proveedor' ? companyName : "Nuevo Cliente",
         email,
         whatsappNumber,
+        city,
         isActive: true, // Proveedores start as active by default
         createdAt: new Date().toISOString()
     });
@@ -941,27 +942,34 @@ export async function updateClient(values: z.infer<typeof EditClientSchema>) {
 export async function deleteCobrador(idNumber: string) {
     const batch = writeBatch(db);
 
+    // Find and delete the cobrador user document
     const usersRef = collection(db, "users");
-    const q = query(usersRef, where("idNumber", "==", idNumber), where("role", "==", "cobrador"));
-    const querySnapshot = await getDocs(q);
+    const qUser = query(usersRef, where("idNumber", "==", idNumber), where("role", "==", "cobrador"));
+    const userSnapshot = await getDocs(qUser);
 
-    if (querySnapshot.empty) {
+    if (userSnapshot.empty) {
         return { error: "Cobrador no encontrado." };
     }
     
-    const cobradorDoc = querySnapshot.docs[0];
+    const cobradorDoc = userSnapshot.docs[0];
     batch.delete(cobradorDoc.ref);
 
+    // Find all credits associated with this cobrador
     const creditsRef = collection(db, "credits");
-    const creditsQuery = query(creditsRef, where("cobradorId", "==", idNumber));
-    const creditsSnapshot = await getDocs(creditsQuery);
+    const qCredits = query(creditsRef, where("cobradorId", "==", idNumber));
+    const creditsSnapshot = await getDocs(qCredits);
 
+    // For each credit, find and delete all associated payments
     for (const creditDoc of creditsSnapshot.docs) {
         const paymentsRef = collection(db, "payments");
-        const paymentsQuery = query(paymentsRef, where("creditId", "==", creditDoc.id));
-        const paymentsSnapshot = await getDocs(paymentsQuery);
-        paymentsSnapshot.forEach(paymentDoc => batch.delete(paymentDoc.ref));
+        const qPayments = query(paymentsRef, where("creditId", "==", creditDoc.id));
+        const paymentsSnapshot = await getDocs(qPayments);
         
+        paymentsSnapshot.forEach(paymentDoc => {
+            batch.delete(paymentDoc.ref);
+        });
+        
+        // Delete the credit itself
         batch.delete(creditDoc.ref);
     }
     
@@ -970,7 +978,7 @@ export async function deleteCobrador(idNumber: string) {
         return { success: true };
     } catch (e) {
         console.error(e);
-        return { error: "No se pudo eliminar al cobrador y sus datos asociados." };
+        return { error: "No se pudo eliminar al cobrador y todos sus datos asociados." };
     }
 }
 
@@ -1706,11 +1714,13 @@ export async function deleteProvider(providerId: string) {
     const providerRef = doc(db, "users", providerId);
     batch.delete(providerRef);
 
+    // Delete associated cobradores
     const cobradoresRef = collection(db, "users");
     const cobradoresQuery = query(cobradoresRef, where("providerId", "==", providerId));
     const cobradoresSnapshot = await getDocs(cobradoresQuery);
     cobradoresSnapshot.forEach(doc => batch.delete(doc.ref));
     
+    // Delete associated credits and their payments
     const creditsRef = collection(db, "credits");
     const creditsQuery = query(creditsRef, where("providerId", "==", providerId));
     const creditsSnapshot = await getDocs(creditsQuery);
@@ -1729,7 +1739,7 @@ export async function deleteProvider(providerId: string) {
         return { success: true };
     } catch (e) {
         console.error(e);
-        return { error: "No se pudo eliminar el proveedor y sus datos asociados." };
+        return { error: "No se pudo eliminar el proveedor y todos sus datos asociados." };
     }
 }
 

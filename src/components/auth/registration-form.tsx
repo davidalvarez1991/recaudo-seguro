@@ -24,6 +24,8 @@ import { useRouter } from "next/navigation";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TermsDialog } from "@/components/auth/terms-dialog";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { colombianCities } from "@/lib/colombian-cities";
 
 type RegistrationFormProps = {
   role: "cliente" | "proveedor";
@@ -38,6 +40,7 @@ export function RegistrationForm({ role }: RegistrationFormProps) {
     resolver: zodResolver(RegisterSchema),
     defaultValues: {
       companyName: "",
+      city: "",
       idNumber: "",
       whatsappNumber: "",
       email: "",
@@ -78,19 +81,43 @@ export function RegistrationForm({ role }: RegistrationFormProps) {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         {role === 'proveedor' && (
-            <FormField
-              control={form.control}
-              name="companyName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nombre de la Empresa</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="Mi Empresa S.A.S" disabled={isPending} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <>
+                <FormField
+                control={form.control}
+                name="companyName"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Nombre de la Empresa</FormLabel>
+                    <FormControl>
+                        <Input {...field} placeholder="Mi Empresa S.A.S" disabled={isPending} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ciudad</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isPending}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecciona tu ciudad principal" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {colombianCities.map(city => (
+                            <SelectItem key={city} value={city}>{city}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+            </>
         )}
         <FormField
           control={form.control}

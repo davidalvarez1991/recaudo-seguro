@@ -12,6 +12,7 @@ export const LoginSchema = z.object({
 
 export const RegisterSchema = z.object({
   companyName: z.string().min(3, { message: "El nombre de la empresa debe tener al menos 3 caracteres."}).optional(),
+  city: z.string({ required_error: "La ciudad es obligatoria." }).min(1, "La ciudad es obligatoria."),
   idNumber: z.string().min(6, {
     message: "El número de identificación debe tener al menos 6 caracteres.",
   }),
