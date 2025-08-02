@@ -52,23 +52,26 @@ Las partes declaran haber leído y comprendido todas las cláusulas del presente
 
 
 type CommissionTier = {
-  minAmount: number;
-  maxAmount: number;
-  percentage: number;
+  minAmount: number | undefined;
+  maxAmount: number | undefined;
+  percentage: number | undefined;
 };
 
 type SettingsFormProps = {
   providerId: string;
 };
 
-const formatCurrencyForInput = (value: number | string): string => {
-    if (value === undefined || value === null || value === 0 || value === "0") return "";
+const formatCurrencyForInput = (value: number | string | undefined): string => {
+    if (value === undefined || value === null || value === "") return "";
     if (typeof value === 'number') {
         value = value.toString();
     }
     const numberValue = parseInt(value.replace(/\D/g, ''), 10);
     if (isNaN(numberValue)) return "";
-    return new Intl.NumberFormat('es-CO').format(numberValue);
+    return new Intl.NumberFormat('es-CO', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(numberValue);
 };
 
 export function SettingsForm({ providerId }: SettingsFormProps) {
@@ -97,7 +100,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
           if (userData.commissionTiers && userData.commissionTiers.length > 0) {
               setCommissionTiers(userData.commissionTiers);
           } else {
-              setCommissionTiers([{ minAmount: 0, maxAmount: 50000000, percentage: userData.commissionPercentage || 20 }]);
+              setCommissionTiers([{ minAmount: undefined, maxAmount: undefined, percentage: undefined }]);
           }
         }
       } catch (error) {
@@ -114,13 +117,13 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
     const numericValue = parseInt(value.replace(/\D/g, ''), 10);
     
     const newTiers = [...commissionTiers];
-    newTiers[index] = { ...newTiers[index], [field]: isNaN(numericValue) ? 0 : numericValue };
+    newTiers[index] = { ...newTiers[index], [field]: isNaN(numericValue) ? undefined : numericValue };
     setCommissionTiers(newTiers);
   };
 
   const addCommissionTier = () => {
     if (commissionTiers.length < 4) {
-      setCommissionTiers([...commissionTiers, { minAmount: 0, maxAmount: 0, percentage: 0 }]);
+      setCommissionTiers([...commissionTiers, { minAmount: undefined, maxAmount: undefined, percentage: undefined }]);
     } else {
       toast({ title: "Límite alcanzado", description: "Puedes configurar un máximo de 4 tramos de comisión.", variant: "destructive" });
     }
@@ -145,11 +148,11 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
         }
 
         for (const tier of commissionTiers) {
-            if (tier.minAmount >= tier.maxAmount && tier.maxAmount !== 0) {
+            if ((tier.minAmount ?? 0) >= (tier.maxAmount ?? Infinity) && (tier.maxAmount !== 0 && tier.maxAmount !== undefined)) {
                 toast({ title: "Error de validación", description: `En un tramo, el monto mínimo (${formatCurrencyForInput(tier.minAmount)}) debe ser menor que el máximo (${formatCurrencyForInput(tier.maxAmount)}).`, variant: "destructive" });
                 return;
             }
-            if (tier.percentage <= 0 || tier.percentage > 100) {
+            if (tier.percentage === undefined || tier.percentage <= 0 || tier.percentage > 100) {
                 toast({ title: "Error de validación", description: `El porcentaje (${tier.percentage}%) debe estar entre 1 y 100.`, variant: "destructive" });
                 return;
             }
@@ -235,7 +238,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
                     <Input
                       id={`percentage-${index}`}
                       type="number"
-                      value={tier.percentage === 0 ? "" : tier.percentage}
+                      value={tier.percentage === undefined ? "" : tier.percentage}
                       onChange={(e) => handleCommissionTierChange(index, 'percentage', e.target.value)}
                       className="pr-8"
                       placeholder="20"
