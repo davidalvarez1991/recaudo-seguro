@@ -1774,7 +1774,7 @@ export async function deleteProvider(providerId: string) {
     const creditsQuery = query(creditsRef, where("providerId", "==", providerId));
     const creditsSnapshot = await getDocs(creditsQuery);
     
-    for (const creditDoc of creditSnapshot.docs) {
+    for (const creditDoc of creditsSnapshot.docs) {
         const paymentsRef = collection(db, "payments");
         const paymentsQuery = query(paymentsRef, where("creditId", "==", creditDoc.id));
         const paymentsSnapshot = await getDocs(paymentsQuery);
