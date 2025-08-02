@@ -9,14 +9,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, DollarSign, Save, CalendarIcon, RefreshCw, CheckCircle2, BadgeInfo } from "lucide-react";
+import { Loader2, DollarSign, Save, CalendarIcon, RefreshCw, CheckCircle2, BadgeInfo, ShieldCheck } from "lucide-react";
 import { RenewCreditSchema } from "@/lib/schemas";
-import { renewCredit, savePaymentSchedule } from "@/lib/actions";
+import { renewCredit, savePaymentSchedule, getContractForAcceptance, acceptContract } from "@/lib/actions";
 import { useRouter } from "next/navigation";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { startOfDay, format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { ScrollArea } from "../ui/scroll-area";
 
 type RenewCreditFormProps = {
   clienteId: string;
@@ -34,6 +35,7 @@ export function RenewCreditForm({ clienteId, oldCreditId, remainingBalance, onFo
   const [step, setStep] = useState(1);
   const [isPending, setIsPending] = useState(false);
   const [newCreditId, setNewCreditId] = useState<string | null>(null);
+  const [contractText, setContractText] = useState<string | null>(null);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [month, setMonth] = useState(new Date());
 
@@ -129,7 +131,7 @@ export function RenewCreditForm({ clienteId, oldCreditId, remainingBalance, onFo
       if (validDates.length !== installments) {
            toast({
               title: "Fechas no coinciden",
-              description: `Debes seleccionar exactamente ${installments} fechas. Has seleccionado ${validates.length}.`,
+              description: `Debes seleccionar exactamente ${installments} fechas. Has seleccionado ${validDates.length}.`,
               variant: "destructive"
           });
           return;
@@ -142,21 +144,54 @@ export function RenewCreditForm({ clienteId, oldCreditId, remainingBalance, onFo
       });
       
       if (result.success) {
-          toast({ 
-              title: "Crédito Renovado", 
-              description: "El nuevo crédito y su calendario de pagos se han creado exitosamente.",
-              className: "bg-accent text-accent-foreground border-accent",
-          });
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('creditos-updated'));
+          const contractData = await getContractForAcceptance(newCreditId);
+          if (contractData.contractText) {
+              setContractText(contractData.contractText);
+              setStep(3);
+          } else {
+              toast({ 
+                  title: "Crédito Renovado", 
+                  description: "El nuevo crédito y su calendario de pagos se han creado exitosamente.",
+                  className: "bg-accent text-accent-foreground border-accent",
+              });
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('creditos-updated'));
+              }
+              onFormSubmit();
+              router.refresh();
           }
-          onFormSubmit();
-          router.refresh();
       } else {
           toast({ title: "Error", description: result.error, variant: "destructive" });
       }
       setIsPending(false);
   };
+  
+   const handleAcceptContract = async () => {
+        if (!newCreditId) return;
+        
+        setIsPending(true);
+        const result = await acceptContract(newCreditId);
+
+        if (result.success) {
+            toast({
+                title: "Renovación Finalizada",
+                description: "El contrato fue aceptado y el crédito renovado está activo.",
+                variant: "default",
+                className: "bg-accent text-accent-foreground border-accent",
+            });
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('creditos-updated'));
+            }
+            onFormSubmit();
+        } else {
+            toast({
+                title: "Error",
+                description: result.error || "No se pudo aceptar el contrato.",
+                variant: "destructive",
+            });
+        }
+        setIsPending(false);
+    }
 
 
   const renderStepContent = () => {
@@ -284,13 +319,32 @@ export function RenewCreditForm({ clienteId, oldCreditId, remainingBalance, onFo
                 <Button type="button" variant="outline" onClick={() => setStep(1)} disabled={isPending}>
                     Volver
                 </Button>
-                <Button type="button" onClick={handleSaveSchedule} className="w-full bg-accent hover:bg-accent/90" disabled={isPending || selectedDates.length === 0}>
+                <Button type="button" onClick={handleSaveSchedule} className="w-full" disabled={isPending || selectedDates.length === 0}>
                     {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                    {isPending ? 'Guardando...' : 'Finalizar Renovación'}
+                    {isPending ? 'Guardando...' : 'Siguiente'}
                 </Button>
             </div>
         </>
       );
+    }
+     if (step === 3) {
+        return (
+            <div className="space-y-4">
+                 <div className="space-y-1">
+                    <Label>Revisión y Aceptación del Contrato</Label>
+                    <p className="text-sm text-muted-foreground">
+                        El cliente debe leer y aceptar los términos para finalizar.
+                    </p>
+                </div>
+                 <ScrollArea className="h-80 w-full rounded-md border p-4 whitespace-pre-wrap font-mono text-xs">
+                    {isPending && !contractText ? <Loader2 className="animate-spin mx-auto" /> : contractText}
+                </ScrollArea>
+                <Button type="button" onClick={handleAcceptContract} className="w-full bg-accent hover:bg-accent/90" disabled={isPending}>
+                    {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                    {isPending ? "Procesando..." : "Aceptar y Finalizar Contrato"}
+                </Button>
+            </div>
+        )
     }
   }
 

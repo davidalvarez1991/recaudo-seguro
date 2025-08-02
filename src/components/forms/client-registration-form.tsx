@@ -16,10 +16,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useRef, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, DollarSign, Eraser, FileText, X, Save, StepForward, CheckCircle2, AlertCircle, Upload, CalendarIcon, RefreshCw } from "lucide-react";
+import { Loader2, DollarSign, Eraser, FileText, X, Save, StepForward, CheckCircle2, AlertCircle, Upload, CalendarIcon, RefreshCw, BadgeInfo, ShieldCheck } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ClientCreditSchema } from "@/lib/schemas";
-import { createClientAndCredit, savePaymentSchedule } from "@/lib/actions";
+import { createClientAndCredit, savePaymentSchedule, getContractForAcceptance, acceptContract } from "@/lib/actions";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -40,6 +40,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   const [requiresGuarantor, setRequiresGuarantor] = useState(false);
   const [requiresReferences, setRequiresReferences] = useState(false);
   const [createdCreditId, setCreatedCreditId] = useState<string | null>(null);
+  const [contractText, setContractText] = useState<string | null>(null);
   
   // State for payment schedule
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
@@ -165,7 +166,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         setSelectedDates(validDates.sort((a,b) => a.getTime() - b.getTime()));
     };
     
-    const handleSaveScheduleAndFinish = async () => {
+    const handleSaveSchedule = async () => {
         const validDates = selectedDates.filter(d => d instanceof Date && !isNaN(d.getTime()));
 
         if (!createdCreditId || validDates.length === 0) {
@@ -194,16 +195,23 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         });
         
         if (result.success) {
-            toast({ 
-                title: "Registro Completado",
-                description: "El cliente y su crédito han sido creados exitosamente.",
-                variant: "default",
-                className: "bg-accent text-accent-foreground border-accent",
-            });
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('creditos-updated'));
+            const contractData = await getContractForAcceptance(createdCreditId);
+            if (contractData.contractText) {
+                setContractText(contractData.contractText);
+                setStep(3);
+            } else {
+                // If no contract is to be generated, finish the process
+                toast({ 
+                    title: "Registro Completado",
+                    description: "El cliente y su crédito han sido creados exitosamente.",
+                    variant: "default",
+                    className: "bg-accent text-accent-foreground border-accent",
+                });
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('creditos-updated'));
+                }
+                onFormSubmit?.();
             }
-            onFormSubmit?.();
         } else {
             toast({ title: "Error al guardar calendario", description: result.error, variant: "destructive" });
         }
@@ -216,6 +224,33 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         title: "Selección reiniciada",
         description: "Puedes volver a elegir las fechas de pago.",
       });
+    }
+
+    const handleAcceptContract = async () => {
+        if (!createdCreditId) return;
+        
+        setIsPending(true);
+        const result = await acceptContract(createdCreditId);
+
+        if (result.success) {
+            toast({
+                title: "Registro Finalizado",
+                description: "El contrato fue aceptado y el crédito está activo.",
+                variant: "default",
+                className: "bg-accent text-accent-foreground border-accent",
+            });
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('creditos-updated'));
+            }
+            onFormSubmit?.();
+        } else {
+            toast({
+                title: "Error",
+                description: result.error || "No se pudo aceptar el contrato.",
+                variant: "destructive",
+            });
+        }
+        setIsPending(false);
     }
 
   const renderStep = () => {
@@ -621,13 +656,31 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     <Button type="button" variant="outline" onClick={() => setStep(1)} className="w-full" disabled={isPending}>
                         Volver
                     </Button>
-                    <Button type="button" onClick={handleSaveScheduleAndFinish} className="w-full" disabled={isPending || selectedDates.length === 0}>
+                    <Button type="button" onClick={handleSaveSchedule} className="w-full" disabled={isPending || selectedDates.length === 0}>
                         {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                        {isPending ? 'Guardando...' : 'Finalizar Registro'}
+                        {isPending ? 'Guardando...' : 'Siguiente'}
                     </Button>
                 </div>
             </>
         );
+      case 3:
+        return (
+            <div className="space-y-4">
+                 <div className="space-y-1">
+                    <Label>Revisión y Aceptación del Contrato</Label>
+                    <p className="text-sm text-muted-foreground">
+                        El cliente debe leer y aceptar los términos para finalizar.
+                    </p>
+                </div>
+                 <ScrollArea className="h-80 w-full rounded-md border p-4 whitespace-pre-wrap font-mono text-xs">
+                    {isPending && !contractText ? <Loader2 className="animate-spin mx-auto" /> : contractText}
+                </ScrollArea>
+                <Button type="button" onClick={handleAcceptContract} className="w-full bg-accent hover:bg-accent/90" disabled={isPending}>
+                    {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                    {isPending ? "Procesando..." : "Aceptar y Finalizar Contrato"}
+                </Button>
+            </div>
+        )
       default:
         return null;
     }

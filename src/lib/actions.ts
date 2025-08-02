@@ -1023,9 +1023,10 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
 
     const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
     const installmentAmount = creditData.cuotas > 0 ? totalLoanAmount / creditData.cuotas : 0;
-    const firstPaymentDate = creditData.paymentDates && creditData.paymentDates.length > 0
-        ? format(creditData.paymentDates[0].toDate(), "d 'de' MMMM 'de' yyyy", { locale: es })
-        : "Fecha no definida";
+    
+    // The payment dates are not available at this stage, so the placeholder will remain.
+    // It will be updated when the payment schedule is set.
+    const firstPaymentDate = "FECHA_PENDIENTE";
         
     const replacements = {
         "“NOMBRE DE LA EMPRESA”": providerData.companyName.toUpperCase() || 'EMPRESA NO DEFINIDA',
@@ -1050,6 +1051,7 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
         clienteId: clienteData.idNumber,
         contractText: contractText,
         createdAt: Timestamp.now(),
+        acceptedAt: null, // Mark as not accepted initially
     });
 };
 
@@ -1124,7 +1126,6 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
         valor,
         cuotas: parseInt(installments, 10),
         commission,
-        paymentDates: [],
     };
     
     const creditRef = await addDoc(collection(db, "credits"), {
@@ -1197,7 +1198,6 @@ export async function createNewCreditForClient(values: z.infer<typeof NewCreditS
         valor,
         cuotas: parseInt(installments, 10),
         commission,
-        paymentDates: [],
     };
     
     const newCreditRef = await addDoc(collection(db, "credits"), {
@@ -1269,7 +1269,6 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
         valor: newTotalValue,
         cuotas: parseInt(installments, 10),
         commission,
-        paymentDates: [],
     };
 
     // 1. Create the new credit
@@ -1343,7 +1342,7 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
                     ? format(new Date(paymentDates[0]), "d 'de' MMMM 'de' yyyy", { locale: es }) 
                     : "Fecha no definida";
                 
-                contractText = contractText.replace(/“DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”/g, firstPaymentDate);
+                contractText = contractText.replace(/FECHA_PENDIENTE/g, firstPaymentDate);
 
                 await updateDoc(contractRef, { contractText });
             }
@@ -1535,7 +1534,7 @@ export async function saveProviderSettings(providerId: string, settings: { commi
 }
 
 export async function registerMissedPayment(creditId: string) {
-  const cobradorIdCookie = cookies().get('loggedInUser');
+  const cobradorIdCookie = cookies().get('loggedInUser')?.value;
   if (!cobradorIdCookie) return { error: "Acceso no autorizado." };
 
   const creditRef = doc(db, "credits", creditId);
@@ -1549,6 +1548,43 @@ export async function registerMissedPayment(creditId: string) {
     console.error("Error registering missed payment:", error);
     return { error: "No se pudo registrar el día de mora." };
   }
+}
+
+export async function getContractForAcceptance(creditId: string) {
+    if (!creditId) return { error: "ID de crédito no válido." };
+    const q = query(collection(db, "contracts"), where("creditId", "==", creditId), limit(1));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+        // This can happen if the provider has contract generation disabled.
+        // It's not an error, just means there's no contract to show.
+        return { contractText: null };
+    }
+
+    const contract = snapshot.docs[0].data();
+    return { contractText: contract.contractText };
+}
+
+export async function acceptContract(creditId: string) {
+    if (!creditId) return { error: "ID de crédito no válido." };
+    
+    const q = query(collection(db, "contracts"), where("creditId", "==", creditId), limit(1));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+        return { error: "No se encontró el contrato para este crédito." };
+    }
+
+    const contractRef = snapshot.docs[0].ref;
+    try {
+        await updateDoc(contractRef, {
+            acceptedAt: Timestamp.now()
+        });
+        return { success: true };
+    } catch (e) {
+        console.error("Error accepting contract:", e);
+        return { error: "No se pudo actualizar el estado de aceptación del contrato." };
+    }
 }
 
 // --- AI Actions ---
@@ -1908,5 +1944,3 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
         return { error: "No se pudo guardar la configuración." };
     }
 }
-
-    
