@@ -8,9 +8,11 @@ import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
 import { db } from "./firebase";
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc, increment, orderBy, limit } from "firebase/firestore";
-import { startOfDay, differenceInDays, endOfDay, isWithinInterval, addDays, parseISO, isFuture, isToday, isSameDay } from 'date-fns';
+import { startOfDay, differenceInDays, endOfDay, isWithinInterval, addDays, parseISO, isFuture, isToday, isSameDay, format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { analyzeClientReputation, ClientReputationInput } from '@/ai/flows/analyze-client-reputation';
+import { es } from 'date-fns/locale';
+
 
 const ADMIN_ID = "admin_0703091991";
 
@@ -942,7 +944,6 @@ export async function updateClient(values: z.infer<typeof EditClientSchema>) {
 export async function deleteCobrador(idNumber: string) {
     const batch = writeBatch(db);
 
-    // Find and delete the cobrador user document
     const usersRef = collection(db, "users");
     const qUser = query(usersRef, where("idNumber", "==", idNumber), where("role", "==", "cobrador"));
     const userSnapshot = await getDocs(qUser);
@@ -954,22 +955,21 @@ export async function deleteCobrador(idNumber: string) {
     const cobradorDoc = userSnapshot.docs[0];
     batch.delete(cobradorDoc.ref);
 
-    // Find all credits associated with this cobrador
     const creditsRef = collection(db, "credits");
     const qCredits = query(creditsRef, where("cobradorId", "==", idNumber));
     const creditsSnapshot = await getDocs(qCredits);
 
-    // For each credit, find and delete all associated payments
     for (const creditDoc of creditsSnapshot.docs) {
         const paymentsRef = collection(db, "payments");
         const qPayments = query(paymentsRef, where("creditId", "==", creditDoc.id));
         const paymentsSnapshot = await getDocs(qPayments);
+        paymentsSnapshot.forEach(paymentDoc => batch.delete(paymentDoc.ref));
         
-        paymentsSnapshot.forEach(paymentDoc => {
-            batch.delete(paymentDoc.ref);
-        });
+        const contractsRef = collection(db, "contracts");
+        const qContracts = query(contractsRef, where("creditId", "==", creditDoc.id));
+        const contractsSnapshot = await getDocs(qContracts);
+        contractsSnapshot.forEach(contractDoc => batch.delete(contractDoc.ref));
         
-        // Delete the credit itself
         batch.delete(creditDoc.ref);
     }
     
@@ -999,12 +999,60 @@ export async function deleteClientAndCredits(clienteId: string) {
         const paymentsQuery = query(paymentsRef, where("creditId", "==", creditDoc.id));
         const paymentsSnapshot = await getDocs(paymentsQuery);
         paymentsSnapshot.forEach(paymentDoc => batch.delete(paymentDoc.ref));
+        
+        const contractsRef = collection(db, "contracts");
+        const qContracts = query(contractsRef, where("creditId", "==", creditDoc.id));
+        const contractsSnapshot = await getDocs(qContracts);
+        contractsSnapshot.forEach(contractDoc => batch.delete(contractDoc.ref));
+        
         batch.delete(creditDoc.ref);
     }
     
     await batch.commit();
     return { success: true };
 }
+
+const generateAndSaveContract = async (creditId: string, providerId: string, creditData: any, clienteData: any) => {
+    const providerSnap = await getDoc(doc(db, "users", providerId));
+    if (!providerSnap.exists()) return;
+    
+    const providerData = providerSnap.data();
+    if (!providerData.isContractGenerationActive || !providerData.contractTemplate) return;
+
+    let contractText = providerData.contractTemplate;
+
+    const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
+    const installmentAmount = creditData.cuotas > 0 ? totalLoanAmount / creditData.cuotas : 0;
+    const firstPaymentDate = creditData.paymentDates && creditData.paymentDates.length > 0
+        ? format(creditData.paymentDates[0].toDate(), "d 'de' MMMM 'de' yyyy", { locale: es })
+        : "Fecha no definida";
+        
+    const replacements = {
+        "“NOMBRE DE LA EMPRESA”": providerData.companyName.toUpperCase() || 'EMPRESA NO DEFINIDA',
+        "“NOMBRE DEL CLIENTE”": clienteData.name.toUpperCase() || 'CLIENTE NO DEFINIDO',
+        "“CEDULA DEL CLIENTE”": clienteData.idNumber || 'CÉDULA NO DEFINIDA',
+        "“CIUDAD”": clienteData.city || 'CIUDAD NO DEFINIDA',
+        "“VALOR PRESTAMO”": (creditData.valor || 0).toLocaleString('es-CO'),
+        "“CUOTAS DEL CREDITO”": creditData.cuotas.toString() || '0',
+        "“DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”": firstPaymentDate,
+        "“DIAS DEL RECAUDO”": "diarios/semanales/quincenales/mensuales", // This needs to be determined or generalized
+        "“VALOR DE LA CUOTA”": installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
+        "“INTERES”": (providerData.lateInterestRate || 0).toString(),
+    };
+
+    for (const [key, value] of Object.entries(replacements)) {
+        contractText = contractText.replace(new RegExp(key, 'g'), value);
+    }
+    
+    await addDoc(collection(db, "contracts"), {
+        creditId: creditId,
+        providerId: providerId,
+        clienteId: clienteData.idNumber,
+        contractText: contractText,
+        createdAt: Timestamp.now(),
+    });
+};
+
 
 export async function createClientAndCredit(values: z.infer<typeof ClientCreditSchema>) {
     const cobradorIdCookie = cookies().get('loggedInUser');
@@ -1045,12 +1093,12 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
         personalReferenceName, personalReferencePhone, personalReferenceAddress
     } = validatedFields.data;
     
-    let existingClient = await findUserByIdNumber(idNumber);
+    let clienteData = await findUserByIdNumber(idNumber);
+    const fullName = [firstName, secondName, firstLastName, secondLastName].filter(Boolean).join(" ");
 
-    if (!existingClient) {
-        const fullName = [firstName, secondName, firstLastName, secondLastName].filter(Boolean).join(" ");
+    if (!clienteData) {
         const hashedPassword = await bcrypt.hash(idNumber, 10);
-        await addDoc(collection(db, "users"),{
+        const newUserDocRef = await addDoc(collection(db, "users"),{
             idNumber,
             name: fullName,
             firstName,
@@ -1064,18 +1112,26 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
             contactPhone,
             createdAt: new Date().toISOString()
         });
+        clienteData = { id: newUserDocRef.id, idNumber, name: fullName, city: provider.city };
+    } else {
+        clienteData.name = fullName; // Use the provided name for the contract
     }
 
     const valor = parseFloat(creditAmount.replace(/\./g, '').replace(',', '.'));
     const commission = calculateCommission(valor, provider.commissionTiers);
 
+    const creditDataForContract = {
+        valor,
+        cuotas: parseInt(installments, 10),
+        commission,
+        paymentDates: [],
+    };
+    
     const creditRef = await addDoc(collection(db, "credits"), {
+        ...creditDataForContract,
         clienteId: idNumber,
         cobradorId: cobrador.idNumber,
         providerId,
-        valor,
-        commission,
-        cuotas: parseInt(installments, 10),
         fecha: Timestamp.now(),
         estado: 'Activo',
         guarantor: requiresGuarantor ? {
@@ -1098,6 +1154,8 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
         } : null,
         missedPaymentDays: 0,
     });
+    
+    await generateAndSaveContract(creditRef.id, providerId, creditDataForContract, clienteData);
 
     return { success: true, creditId: creditRef.id };
 }
@@ -1135,18 +1193,25 @@ export async function createNewCreditForClient(values: z.infer<typeof NewCreditS
     const valor = parseFloat(creditAmount.replace(/\./g, '').replace(',', '.'));
     const commission = calculateCommission(valor, provider.commissionTiers);
 
+    const creditDataForContract = {
+        valor,
+        cuotas: parseInt(installments, 10),
+        commission,
+        paymentDates: [],
+    };
+    
     const newCreditRef = await addDoc(collection(db, "credits"), {
+        ...creditDataForContract,
         clienteId,
         cobradorId: cobrador.idNumber,
         providerId,
-        valor,
-        commission,
-        cuotas: parseInt(installments, 10),
         fecha: Timestamp.now(),
         estado: 'Activo',
         paymentScheduleSet: false,
         missedPaymentDays: 0,
     });
+    
+    await generateAndSaveContract(newCreditRef.id, providerId, creditDataForContract, cliente);
 
     return { success: true, newCreditId: newCreditRef.id };
 }
@@ -1187,7 +1252,6 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
     const paymentsQuery = query(paymentsRef, where("creditId", "==", oldCreditId));
     const paymentsSnapshot = await getDocs(paymentsQuery);
     
-    // Only 'cuota' and 'total' payments reduce the capital balance
     const capitalAndCommissionPayments = paymentsSnapshot.docs.map(p => p.data()).filter(p => p.type === 'cuota' || p.type === 'total');
     const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
     const totalOldLoanAmount = (oldCreditData.valor || 0) + (oldCreditData.commission || 0);
@@ -1198,19 +1262,27 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
 
     const commission = calculateCommission(newTotalValue, provider.commissionTiers);
 
+    const cliente = await findUserByIdNumber(clienteId);
+    if(!cliente) return { error: "Cliente no encontrado" };
+    
+    const creditDataForContract = {
+        valor: newTotalValue,
+        cuotas: parseInt(installments, 10),
+        commission,
+        paymentDates: [],
+    };
+
     // 1. Create the new credit
     const newCreditRef = await addDoc(collection(db, "credits"), {
+        ...creditDataForContract,
         clienteId,
         cobradorId: cobrador.idNumber,
         providerId,
-        valor: newTotalValue,
-        commission,
-        cuotas: parseInt(installments, 10),
         fecha: Timestamp.now(),
         estado: 'Activo',
         paymentScheduleSet: false,
         missedPaymentDays: 0,
-        renewedFrom: oldCreditId, // Link to the old credit
+        renewedFrom: oldCreditId,
     });
 
     // 2. Mark the old credit as 'Renovado'
@@ -1219,6 +1291,15 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
         updatedAt: Timestamp.now(),
         renewedWithCreditId: newCreditRef.id,
     });
+    
+    // 3. Delete old contract
+    const contractsRef = collection(db, "contracts");
+    const qContracts = query(contractsRef, where("creditId", "==", oldCreditId));
+    const contractsSnapshot = await getDocs(qContracts);
+    contractsSnapshot.forEach(contractDoc => deleteDoc(contractDoc.ref));
+    
+    // 4. Generate and save the new contract
+    await generateAndSaveContract(newCreditRef.id, providerId, creditDataForContract, cliente);
 
     return { success: true, newCreditId: newCreditRef.id };
 }
@@ -1234,11 +1315,40 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
     const creditRef = doc(db, "credits", creditId);
 
     try {
+        const timestampDates = paymentDates.map(dateStr => Timestamp.fromDate(new Date(dateStr)));
+        
         await updateDoc(creditRef, {
-            paymentDates: paymentDates.map(dateStr => Timestamp.fromDate(new Date(dateStr))),
+            paymentDates: timestampDates,
             paymentScheduleSet: true,
             updatedAt: Timestamp.now(),
         });
+        
+        const creditSnap = await getDoc(creditRef);
+        const creditData = creditSnap.data();
+        if (creditData) {
+            const clienteData = await findUserByIdNumber(creditData.clienteId);
+            const providerId = creditData.providerId;
+
+            // Find existing contract and update it, or create a new one
+            const contractsRef = collection(db, "contracts");
+            const qContracts = query(contractsRef, where("creditId", "==", creditId));
+            const contractSnapshot = await getDocs(qContracts);
+
+            if (!contractSnapshot.empty) {
+                const contractDoc = contractSnapshot.docs[0];
+                const contractRef = contractDoc.ref;
+                let contractText = contractDoc.data().contractText;
+                
+                const firstPaymentDate = paymentDates.length > 0 
+                    ? format(new Date(paymentDates[0]), "d 'de' MMMM 'de' yyyy", { locale: es }) 
+                    : "Fecha no definida";
+                
+                contractText = contractText.replace(/“DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”/g, firstPaymentDate);
+
+                await updateDoc(contractRef, { contractText });
+            }
+        }
+        
         return { success: true };
     } catch (error) {
         console.error("Error saving payment schedule:", error);
@@ -1264,7 +1374,6 @@ export async function registerPayment(creditId: string, amount: number, type: "c
     }
     const creditData = creditSnap.data();
 
-    // Add payment to payments collection
     await addDoc(collection(db, "payments"), {
         creditId,
         amount,
@@ -1275,7 +1384,6 @@ export async function registerPayment(creditId: string, amount: number, type: "c
         clienteId: creditData.clienteId,
     });
     
-    // Update credit status if it's not a commission-only payment
     if (type === 'cuota' || type === 'total') {
         const paymentsRef = collection(db, "payments");
         const q = query(paymentsRef, where("creditId", "==", creditId));
@@ -1285,7 +1393,7 @@ export async function registerPayment(creditId: string, amount: number, type: "c
         let isPaidOff = false;
         if (type === 'total') {
             isPaidOff = true;
-        } else { // type === 'cuota'
+        } else {
             const capitalAndCommissionPayments = allPayments.filter(p => p.type === 'cuota' || p.type === 'total');
             const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum,p) => sum + p.amount, 0);
             
@@ -1304,18 +1412,22 @@ export async function registerPayment(creditId: string, amount: number, type: "c
             const lateFee = calculateLateFee({ ...freshCreditData, lateInterestRate });
             const totalDebt = remainingBalance + lateFee;
 
-            if (totalDebt <= 1) { // Using a small threshold for floating point comparisons
+            if (totalDebt <= 1) {
                  isPaidOff = true;
             }
         }
 
         if (isPaidOff) {
             await updateDoc(creditRef, { estado: 'Pagado', updatedAt: Timestamp.now(), missedPaymentDays: 0 });
+            // Delete contract on payoff
+            const contractsRef = collection(db, "contracts");
+            const qContracts = query(contractsRef, where("creditId", "==", creditId));
+            const contractsSnapshot = await getDocs(qContracts);
+            contractsSnapshot.forEach(contractDoc => deleteDoc(contractDoc.ref));
         } else {
-             await updateDoc(creditRef, { updatedAt: Timestamp.now(), missedPaymentDays: 0 }); // Reset missed days if a quota payment is made
+             await updateDoc(creditRef, { updatedAt: Timestamp.now(), missedPaymentDays: 0 });
         }
-    } else { // type === 'comision'
-        // Just update the timestamp for commission payments, don't change state
+    } else {
         await updateDoc(creditRef, { updatedAt: Timestamp.now() });
     }
 
@@ -1342,11 +1454,9 @@ export async function registerPaymentAgreement(creditId: string, amount: number)
         return { error: "El calendario de pagos no es válido para reprogramar." };
     }
 
-    // Infer payment frequency
     const dates = creditData.paymentDates.map((ts: Timestamp) => ts.toDate()).sort((a: Date, b: Date) => a.getTime() - b.getTime());
     const frequencyDays = differenceInDays(dates[1], dates[0]);
 
-    // Find the next upcoming payment date
     const paymentsSnapshot = await getDocs(query(collection(db, "payments"), where("creditId", "==", creditId)));
     const paidInstallments = paymentsSnapshot.docs.filter(p => p.data().type === 'cuota').length;
     
@@ -1357,20 +1467,17 @@ export async function registerPaymentAgreement(creditId: string, amount: number)
     const remainingDates = dates.slice(paidInstallments);
     const newPaymentDates = remainingDates.map(date => addDays(date, frequencyDays));
 
-    // Combine paid dates with new dates
     const finalSchedule = [
         ...dates.slice(0, paidInstallments),
         ...newPaymentDates
     ];
 
-    // Update the credit with the new schedule and reset missed days
     await updateDoc(creditRef, {
         paymentDates: finalSchedule.map(d => Timestamp.fromDate(d)),
         missedPaymentDays: 0,
         updatedAt: Timestamp.now(),
     });
 
-    // Log the agreement as a payment
     if (amount > 0) {
       await addDoc(collection(db, "payments"), {
           creditId,
@@ -1386,7 +1493,7 @@ export async function registerPaymentAgreement(creditId: string, amount: number)
     return { success: "Acuerdo registrado. El calendario de pagos ha sido actualizado." };
 }
 
-export async function saveProviderSettings(providerId: string, settings: { commissionTiers?: CommissionTier[], lateInterestRate?: number, isLateInterestActive?: boolean }) {
+export async function saveProviderSettings(providerId: string, settings: { commissionTiers?: CommissionTier[], lateInterestRate?: number, isLateInterestActive?: boolean, isContractGenerationActive?: boolean, contractTemplate?: string }) {
   if (!providerId) return { error: "ID de proveedor no válido." };
   
   const providerRef = doc(db, "users", providerId);
@@ -1406,6 +1513,12 @@ export async function saveProviderSettings(providerId: string, settings: { commi
       if (settings.isLateInterestActive !== undefined) {
         updateData.isLateInterestActive = settings.isLateInterestActive;
       }
+      if (settings.isContractGenerationActive !== undefined) {
+        updateData.isContractGenerationActive = settings.isContractGenerationActive;
+      }
+       if (settings.contractTemplate !== undefined) {
+        updateData.contractTemplate = settings.contractTemplate;
+      }
       
       if (Object.keys(updateData).length > 0) {
         updateData.updatedAt = Timestamp.now();
@@ -1413,7 +1526,7 @@ export async function saveProviderSettings(providerId: string, settings: { commi
         return { success: true };
       }
 
-      return { success: true }; // No changes, but operation is successful.
+      return { success: true };
 
   } catch (error) {
       console.error("Error saving provider settings:", error);
@@ -1442,13 +1555,11 @@ export async function registerMissedPayment(creditId: string) {
 
 export async function getClientReputationData(clienteId: string) {
     try {
-        // 1. Find the client by their ID number
         const client = await findUserByIdNumber(clienteId);
         if (!client || client.role !== 'cliente') {
             return { error: "No se encontró un cliente con esa cédula." };
         }
 
-        // 2. Fetch all credits for that client ID across all providers
         const allCreditsSnapshot = await getDocs(collection(db, "credits"));
         const clientCreditsDocs = allCreditsSnapshot.docs.filter(doc => doc.data().clienteId === clienteId);
 
@@ -1476,7 +1587,6 @@ export async function getClientReputationData(clienteId: string) {
         
         const creditHistory = await Promise.all(creditsPromises);
 
-        // 3. Call the Genkit flow with the prepared data
         const analysis = await analyzeClientReputation({
             clienteId: clienteId,
             creditHistory: creditHistory,
@@ -1498,10 +1608,8 @@ export async function getCobradoresDailySummary() {
     const todayStart = startOfDay(today);
     const todayEnd = endOfDay(today);
 
-    // 1. Get all cobradores for the provider
     const cobradoresList = await getCobradoresByProvider();
 
-    // 2. Get all payments for the provider for today
     const paymentsRef = collection(db, "payments");
     const paymentsQuery = query(paymentsRef, where("providerId", "==", providerId));
     const paymentsSnapshot = await getDocs(paymentsQuery);
@@ -1510,7 +1618,6 @@ export async function getCobradoresDailySummary() {
         .map(doc => ({ id: doc.id, ...doc.data() }))
         .filter(p => p.date && isWithinInterval(toZonedTime(p.date.toDate(), timeZone), { start: todayStart, end: todayEnd }));
 
-    // 3. Get all credits for the provider
     const creditsRef = collection(db, "credits");
     const creditsQuery = query(creditsRef, where("providerId", "==", providerId));
     const creditsSnapshot = await getDocs(creditsQuery);
@@ -1523,7 +1630,6 @@ export async function getCobradoresDailySummary() {
         .map(doc => doc.data())
         .filter(c => c.missedPaymentDays > 0 && c.updatedAt && isWithinInterval(toZonedTime(c.updatedAt.toDate(), timeZone), { start: todayStart, end: todayEnd }));
 
-    // 4. Process data for each cobrador
     const summaryPromises = cobradoresList.map(async (cobrador) => {
         const cobradorId = cobrador.idNumber;
 
@@ -1564,7 +1670,6 @@ export async function getCobradorSelfDailySummary() {
     const todayStart = startOfDay(today);
     const todayEnd = endOfDay(today);
 
-    // Payments
     const paymentsRef = collection(db, "payments");
     const paymentsQuery = query(paymentsRef, where("cobradorId", "==", cobradorId));
     const paymentsSnapshot = await getDocs(paymentsQuery);
@@ -1573,7 +1678,6 @@ export async function getCobradorSelfDailySummary() {
         .filter(p => p.date && isWithinInterval(toZonedTime(p.date.toDate(), timeZone), { start: todayStart, end: todayEnd }));
     const successfulPayments = new Set(todayPayments.filter(p => p.type === 'cuota' || p.type === 'total').map(p => p.clienteId)).size;
 
-    // Credits (for renewals and missed payments)
     const creditsRef = collection(db, "credits");
     const creditsQuery = query(creditsRef, where("cobradorId", "==", cobradorId));
     const creditsSnapshot = await getDocs(creditsQuery);
@@ -1607,14 +1711,12 @@ export async function getProviderFinancialSummary() {
   let collectedCommission = 0;
   const uniqueClientIds = new Set<string>();
 
-  // Get all credits for the provider
   const creditsRef = collection(db, "credits");
   const creditsQuery = query(creditsRef, where("providerId", "==", providerId));
   const creditsSnapshot = await getDocs(creditsQuery);
 
   const allProviderCredits = creditsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-  // Get all payments for the provider to avoid N+1 queries
   const paymentsRef = collection(db, "payments");
   const paymentsQuery = query(paymentsRef, where("providerId", "==", providerId));
   const paymentsSnapshot = await getDocs(paymentsQuery);
@@ -1626,14 +1728,12 @@ export async function getProviderFinancialSummary() {
     const creditPayments = allProviderPayments.filter(p => p.creditId === credit.id && (p.type === 'cuota' || p.type === 'total'));
     const paidAmount = creditPayments.reduce((sum, p) => sum + p.amount, 0);
 
-    // Calculate commission proportion for paid amount
     const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
     if (totalLoanAmount > 0) {
       const paidProportion = paidAmount / totalLoanAmount;
       collectedCommission += (credit.commission || 0) * paidProportion;
     }
 
-    // Calculate remaining capital for active credits
     if (credit.estado === 'Activo') {
         const totalCapitalPaid = creditPayments.reduce((sum, p) => {
              if (totalLoanAmount > 0) {
@@ -1647,7 +1747,7 @@ export async function getProviderFinancialSummary() {
   }
 
   return { 
-    activeCapital: Math.max(0, activeCapital), // Ensure it doesn't go negative
+    activeCapital: Math.max(0, activeCapital),
     collectedCommission,
     uniqueClientCount: uniqueClientIds.size
   };
@@ -1680,7 +1780,7 @@ export async function getAllProviders() {
             email: providerData.email || 'Sin Correo',
             whatsappNumber: providerData.whatsappNumber || 'Sin Teléfono',
             idNumber: providerData.idNumber,
-            isActive: providerData.isActive !== false, // Default to true if undefined
+            isActive: providerData.isActive !== false,
             uniqueClientCount: uniqueClientIds.size,
         };
     });
@@ -1714,13 +1814,11 @@ export async function deleteProvider(providerId: string) {
     const providerRef = doc(db, "users", providerId);
     batch.delete(providerRef);
 
-    // Delete associated cobradores
     const cobradoresRef = collection(db, "users");
     const cobradoresQuery = query(cobradoresRef, where("providerId", "==", providerId));
     const cobradoresSnapshot = await getDocs(cobradoresQuery);
     cobradoresSnapshot.forEach(doc => batch.delete(doc.ref));
     
-    // Delete associated credits and their payments
     const creditsRef = collection(db, "credits");
     const creditsQuery = query(creditsRef, where("providerId", "==", providerId));
     const creditsSnapshot = await getDocs(creditsQuery);
@@ -1730,6 +1828,11 @@ export async function deleteProvider(providerId: string) {
         const paymentsQuery = query(paymentsRef, where("creditId", "==", creditDoc.id));
         const paymentsSnapshot = await getDocs(paymentsQuery);
         paymentsSnapshot.forEach(paymentDoc => batch.delete(paymentDoc.ref));
+
+        const contractsRef = collection(db, "contracts");
+        const qContracts = query(contractsRef, where("creditId", "==", creditDoc.id));
+        const contractsSnapshot = await getDocs(qContracts);
+        contractsSnapshot.forEach(contractDoc => batch.delete(contractDoc.ref));
         
         batch.delete(creditDoc.ref);
     }
