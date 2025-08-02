@@ -3,7 +3,7 @@
 
 import { z } from "zod";
 import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, SavePaymentScheduleSchema, RenewCreditSchema, EditClientSchema, NewCreditSchema, EditProviderSchema } from "./schemas";
-import { cookies } from "next/headers";
+import { cookies } from "next/cookies";
 import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
 import { db } from "./firebase";
@@ -32,14 +32,19 @@ const findUserByIdNumber = async (idNumber: string) => {
     }
     const userDoc = querySnapshot.docs[0];
     const data = userDoc.data();
-     const serializableData: { [key: string]: any } = { id: userDoc.id, ...data };
-    // Convert Timestamps to strings
-    if (data.createdAt && data.createdAt instanceof Timestamp) {
-        serializableData.createdAt = data.createdAt.toDate().toISOString();
+    
+    // Create a new object for serialization
+    const serializableData: { [key: string]: any } = { id: userDoc.id };
+
+    // Copy all fields, converting Timestamps as they are found
+    for (const key in data) {
+        if (data[key] instanceof Timestamp) {
+            serializableData[key] = data[key].toDate().toISOString();
+        } else {
+            serializableData[key] = data[key];
+        }
     }
-     if (data.updatedAt && data.updatedAt instanceof Timestamp) {
-        serializableData.updatedAt = data.updatedAt.toDate().toISOString();
-    }
+    
     return serializableData;
 };
 
@@ -134,7 +139,7 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: 'pr
         whatsappNumber,
         city,
         isActive: true, // Proveedores start as active by default
-        createdAt: new Date().toISOString()
+        createdAt: Timestamp.now()
     });
     
     if (newUserRef) {
@@ -857,7 +862,7 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
         password: hashedPassword,
         role: 'cobrador',
         providerId: providerIdCookie.value,
-        createdAt: new Date().toISOString()
+        createdAt: Timestamp.now()
     });
 
     return { success: `Cobrador ${values.name} registrado exitosamente.` };
@@ -1112,9 +1117,10 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
             providerId,
             address,
             contactPhone,
-            createdAt: new Date().toISOString()
+            createdAt: Timestamp.now(),
+            city: provider.city || 'N/A'
         });
-        clienteData = { id: newUserDocRef.id, idNumber, name: fullName, city: provider.city };
+        clienteData = { id: newUserDocRef.id, idNumber, name: fullName, city: provider.city || 'N/A' };
     } else {
         clienteData.name = fullName; // Use the provided name for the contract
     }
@@ -1271,8 +1277,11 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
         commission,
     };
 
+    const batch = writeBatch(db);
+
     // 1. Create the new credit
-    const newCreditRef = await addDoc(collection(db, "credits"), {
+    const newCreditRef = doc(collection(db, "credits")); // Generate a ref with a new ID
+    batch.set(newCreditRef, {
         ...creditDataForContract,
         clienteId,
         cobradorId: cobrador.idNumber,
@@ -1285,7 +1294,7 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
     });
 
     // 2. Mark the old credit as 'Renovado'
-    await updateDoc(oldCreditRef, {
+    batch.update(oldCreditRef, {
         estado: 'Renovado',
         updatedAt: Timestamp.now(),
         renewedWithCreditId: newCreditRef.id,
@@ -1295,9 +1304,11 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
     const contractsRef = collection(db, "contracts");
     const qContracts = query(contractsRef, where("creditId", "==", oldCreditId));
     const contractsSnapshot = await getDocs(qContracts);
-    contractsSnapshot.forEach(contractDoc => deleteDoc(contractDoc.ref));
+    contractsSnapshot.forEach(contractDoc => batch.delete(contractDoc.ref));
     
-    // 4. Generate and save the new contract
+    await batch.commit();
+    
+    // 4. Generate and save the new contract (after batch commit)
     await generateAndSaveContract(newCreditRef.id, providerId, creditDataForContract, cliente);
 
     return { success: true, newCreditId: newCreditRef.id };
@@ -1325,10 +1336,7 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
         const creditSnap = await getDoc(creditRef);
         const creditData = creditSnap.data();
         if (creditData) {
-            const clienteData = await findUserByIdNumber(creditData.clienteId);
-            const providerId = creditData.providerId;
-
-            // Find existing contract and update it, or create a new one
+            // Find existing contract and update it
             const contractsRef = collection(db, "contracts");
             const qContracts = query(contractsRef, where("creditId", "==", creditId));
             const contractSnapshot = await getDocs(qContracts);
@@ -1422,7 +1430,9 @@ export async function registerPayment(creditId: string, amount: number, type: "c
             const contractsRef = collection(db, "contracts");
             const qContracts = query(contractsRef, where("creditId", "==", creditId));
             const contractsSnapshot = await getDocs(qContracts);
-            contractsSnapshot.forEach(contractDoc => deleteDoc(contractDoc.ref));
+            const batch = writeBatch(db);
+            contractsSnapshot.forEach(contractDoc => batch.delete(contractDoc.ref));
+            await batch.commit();
         } else {
              await updateDoc(creditRef, { updatedAt: Timestamp.now(), missedPaymentDays: 0 });
         }
