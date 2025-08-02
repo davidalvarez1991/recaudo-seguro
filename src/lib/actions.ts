@@ -12,7 +12,6 @@ import { toZonedTime } from 'date-fns-tz';
 import { analyzeClientReputation, ClientReputationInput } from '@/ai/flows/analyze-client-reputation';
 import { es } from 'date-fns/locale';
 import { getAuthenticatedUser } from "./auth";
-import { cookies } from "next/headers";
 
 
 const ADMIN_ID = "admin_0703091991";
@@ -71,6 +70,7 @@ const calculateCommission = (amount: number, tiers: CommissionTier[] | undefined
 
 // --- Auth Actions ---
 export async function login(values: z.infer<typeof LoginSchema>) {
+  const { cookies } = await import('next/headers')
   try {
     const validatedFields = LoginSchema.safeParse(values);
 
@@ -115,6 +115,7 @@ export async function login(values: z.infer<typeof LoginSchema>) {
 }
 
 export async function register(values: z.infer<typeof RegisterSchema>, role: 'proveedor') {
+    const { cookies } = await import('next/headers')
     const validatedFields = RegisterSchema.safeParse(values);
 
     if (!validatedFields.success) {
@@ -153,6 +154,7 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: 'pr
 }
 
 export async function logout() {
+  const { cookies } = await import('next/headers')
   cookies().set('loggedInUser', '', { expires: new Date(0), path: '/' });
   cookies().set('userRole', '', { expires: new Date(0), path: '/' });
   return { successUrl: '/login' };
@@ -1514,17 +1516,16 @@ export async function getClientContracts() {
     if (!clienteData || clienteData.role !== 'cliente') return [];
     
     const contractsRef = collection(db, "contracts");
-    const q = query(contractsRef, 
-        where("clienteId", "==", clienteData.idNumber), 
-        where("acceptedAt", "!=", null)
-    );
+    const q = query(contractsRef, where("clienteId", "==", clienteData.idNumber));
     const contractSnapshot = await getDocs(q);
 
     if (contractSnapshot.empty) {
         return [];
     }
+
+    const acceptedContracts = contractSnapshot.docs.filter(doc => doc.data().acceptedAt !== null);
     
-    const contractsPromises = contractSnapshot.docs.map(async (contractDoc) => {
+    const contractsPromises = acceptedContracts.map(async (contractDoc) => {
         const contractData = contractDoc.data();
         const creditDoc = await getDoc(doc(db, "credits", contractData.creditId));
         if (!creditDoc.exists()) return null;
@@ -1895,3 +1896,5 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
         return { error: "No se pudo guardar la configuración." };
     }
 }
+
+    
