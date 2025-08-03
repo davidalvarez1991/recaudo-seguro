@@ -39,63 +39,54 @@ export function TermsDialog() {
             <div>
                 <h3 className="font-bold text-foreground mb-2">1. FINALIDAD DE LA APLICACIÓN</h3>
                 <p>
-                Recaudo Seguro es una plataforma de registro de información. Su objetivo es permitir a los usuarios organizar datos relacionados con préstamos, cobros y pagos. La app no realiza operaciones financieras, no presta dinero, no recauda fondos ni participa en actividades de cobranza directa.
+                Recaudo Seguro es una herramienta de gestión de información. Su único propósito es ayudar a los usuarios a organizar datos de cobros, pagos y estados de cuenta. La aplicación <span className="italic">no participa en operaciones financieras</span>, no presta dinero ni se involucra en actividades de cobranza o transacciones.
                 </p>
             </div>
 
             <div>
                 <h3 className="font-bold text-foreground mb-2">2. INFORMACIÓN REGISTRADA</h3>
                 <p>
-                Los datos almacenados (clientes, pagos, montos, fechas, estados) son ingresados exclusivamente por los usuarios. Recaudo Seguro:
-                </p>
-                <ul className="list-disc pl-6 mt-2 space-y-1">
-                    <li>No verifica la veracidad de la información.</li>
-                    <li>No conoce ni controla la procedencia de los fondos.</li>
-                    <li>No interviene en la relación entre cobradores y clientes.</li>
-                </ul>
-                <p className="mt-2">
-                Cada usuario es responsable total del contenido que almacena.
+                El usuario es el único responsable de toda la información que registra. Recaudo Seguro no verifica la veracidad de los datos ni conoce la procedencia de los fondos. El usuario garantiza que toda la información es legal y que ha obtenido el consentimiento necesario de terceros para su registro.
                 </p>
             </div>
 
             <div>
-                <h3 className="font-bold text-foreground mb-2">3. USO INFORMAL E INFORMACIÓN SENSIBLE</h3>
+                <h3 className="font-bold text-foreground mb-2">3. PROHIBICIONES Y CUMPLIMIENTO LEGAL</h3>
                 <p>
-                La app puede ser usada por usuarios que trabajan en el sector informal, sin que eso implique relación o respaldo de nuestra parte. La plataforma se exonera de toda responsabilidad penal, civil o fiscal relacionada con:
+                Está estrictamente prohibido usar la aplicación para:
                 </p>
                 <ul className="list-disc pl-6 mt-2 space-y-1">
-                    <li>El origen de los recursos.</li>
-                    <li>La legalidad de los préstamos.</li>
-                    <li>Cualquier actividad que derive de su uso.</li>
+                    <li>Cobrar tasas de interés que superen la <span className="italic">tasa de usura</span> máxima permitida en Colombia, certificada por la Superintendencia Financiera.</li>
+                    <li>Realizar actividades ilícitas, extorsión, acoso o amenazas.</li>
+                    <li>Recaudar dinero de origen ilícito (lavado de activos).</li>
+                    <li>Publicar datos personales de terceros sin su consentimiento, violando la Ley 1581 de 2012.</li>
                 </ul>
             </div>
 
             <div>
                 <h3 className="font-bold text-foreground mb-2">4. PROTECCIÓN DE DATOS Y PRIVACIDAD</h3>
-                 <ul className="list-disc pl-6 mt-2 space-y-1">
-                    <li>Toda la información es privada y cifrada.</li>
-                    <li>Solo el usuario que registra los datos tiene acceso.</li>
-                    <li>No compartimos información con terceros sin orden judicial o requerimiento legal.</li>
-                </ul>
+                <p>
+                 El usuario acepta que Recaudo Seguro recopile los datos de registro para el uso de la app. Nuestra política de privacidad cumple con la Ley 1581 de 2012. La información registrada es privada y se almacena con medidas de seguridad para garantizar su confidencialidad. No compartimos datos con terceros sin una orden judicial.
+                </p>
             </div>
 
             <div>
                 <h3 className="font-bold text-foreground mb-2">5. LIMITACIÓN DE RESPONSABILIDAD</h3>
                 <p>
-                Recaudo Seguro no se hace responsable por:
+                El desarrollador y/o propietario de Recaudo Seguro no será responsable por:
                 </p>
                  <ul className="list-disc pl-6 mt-2 space-y-1">
-                    <li>Pérdida o daño de datos causados por mal uso.</li>
-                    <li>Consecuencias legales derivadas de la actividad del usuario.</li>
-                    <li>Errores cometidos en los registros manuales por parte del usuario.</li>
+                    <li>La legalidad de las transacciones o préstamos gestionados por el usuario.</li>
+                    <li>Cualquier sanción, multa o proceso judicial que se derive de las acciones del usuario.</li>
+                    <li>Errores, omisiones o pérdida de datos causados por un mal uso de la aplicación.</li>
+                    <li>Cualquier acto ilegal, incluyendo el delito de usura o extorsión.</li>
                 </ul>
             </div>
 
             <div>
                 <h3 className="font-bold text-foreground mb-2">6. SEGURIDAD Y ACCESO</h3>
                  <ul className="list-disc pl-6 mt-2 space-y-1">
-                    <li>Garantizamos conexión segura mediante encriptación y Firestore de Google.</li>
-                    <li>Cada usuario debe resguardar su contraseña y evitar el uso indebido.</li>
+                    <li>La aplicación utiliza tecnologías seguras de Google (Firebase/Firestore) para proteger los datos. El usuario debe mantener la confidencialidad de su contraseña.</li>
                 </ul>
             </div>
 
