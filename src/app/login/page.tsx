@@ -23,6 +23,9 @@ export default function LoginPage() {
                 Regístrate como Proveedor
               </Link>
             </Button>
+            <p className="text-xs text-muted-foreground mt-4 px-2">
+                Recaudo Seguro es una herramienta de gestión de información. Su único propósito es ayudar a los usuarios a organizar datos de cobros, pagos y estados de cuenta en tiempo real. La aplicación <i>no participa en operaciones financieras</i>, no presta dinero ni se involucra en actividades de cobranza o transacciones.
+            </p>
           </div>
         </AuthCard>
       </main>
