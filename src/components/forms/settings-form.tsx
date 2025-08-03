@@ -310,7 +310,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
         <CardHeader>
           <CardTitle>Generación de Contratos</CardTitle>
           <CardDescription>
-            Activa esta función para generar un contrato automáticamente por cada crédito nuevo o renovado.
+            Activa esta función para generar un contrato automáticamente por cada crédito nuevo o renovado. Esta es una plantilla de ejemplo, el uso del contrato es opcional para cada proveedor.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
