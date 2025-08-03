@@ -199,7 +199,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
           <CardTitle>Fórmula de Comisión por Tramos</CardTitle>
           <CardDescription>
             Define hasta 4 rangos de comisión diferentes según el monto del préstamo.
-            El sistema aplicará automáticamente el porcentaje correspondiente.
+            El sistema aplicará automáticamente el porcentaje correspondiente. <b className="text-destructive">Recuerda no sobrepasar la tasa de usura definido por nuestro país.</b>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
