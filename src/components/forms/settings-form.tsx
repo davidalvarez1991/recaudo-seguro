@@ -28,7 +28,7 @@ EL ACREEDOR entrega en calidad de préstamo la suma de “VALOR PRESTAMO” peso
 
 SEGUNDA - Plazo y forma de pago
 
-EL DEUDOR se compromete a pagar el préstamo en un plazo de “CUOTAS DEL CREDITO” cuota(s), a partir del día “DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”, mediante pagos “DIAS DEL RECAUDO” de $ “VALOR DE LA CUOTA MAS COMISION”, hasta completar el capital más los intereses pactados.
+EL DEUDOR se compromete a pagar el préstamo en un plazo de “CUOTAS DEL CREDITO” cuota(s), a partir del día “DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”, cada cuota por un valor de $ “VALOR DE LA CUOTA MAS COMISION”, hasta completar el capital más los intereses pactados.
 
 TERCERA - Intereses
 

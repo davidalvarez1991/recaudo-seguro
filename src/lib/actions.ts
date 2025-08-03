@@ -986,8 +986,6 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
         "“VALOR DE LA CUOTA MAS COMISION”": installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
         "“INTERES”": (creditData.commissionPercentage || 0).toString(),
         "“INTERES DE MORA”": (providerData.lateInterestRate || 0).toString(),
-        // Fallback for older template versions
-        "“VALOR DE LA CUOTA”": installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
     };
 
     for (const [key, value] of Object.entries(replacements)) {
