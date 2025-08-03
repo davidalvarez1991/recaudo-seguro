@@ -988,10 +988,9 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
         "“CIUDAD”": clienteData.city || 'CIUDAD NO DEFINIDA',
         "“VALOR PRESTAMO”": (creditData.valor || 0).toLocaleString('es-CO'),
         "“CUOTAS DEL CREDITO”": creditData.cuotas.toString() || '0',
-        "“DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”": firstPaymentDate,
-        "“DIAS DEL RECAUDO”": "diarios/semanales/quincenales/mensuales", // This needs to be determined or generalized
+        "“FECHA PRIMER PAGO”": firstPaymentDate,
         "“VALOR DE LA CUOTA”": installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
-        "“INTERES”": (providerData.lateInterestRate || 0).toString(),
+        "“INTERES DE MORA”": (providerData.lateInterestRate || 0).toString(),
     };
 
     for (const [key, value] of Object.entries(replacements)) {
@@ -1279,6 +1278,7 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
                     : "Fecha no definida";
                 
                 contractText = contractText.replace(/FECHA_PENDIENTE/g, firstPaymentDate);
+                contractText = contractText.replace(/“FECHA PRIMER PAGO”/g, firstPaymentDate);
 
                 await updateDoc(contractRef, { contractText });
             }
@@ -1523,10 +1523,15 @@ export async function getClientContracts() {
         return [];
     }
 
-    const acceptedContracts = contractSnapshot.docs.filter(doc => doc.data().acceptedAt !== null);
+    const acceptedContracts = contractSnapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .filter(c => c.acceptedAt !== null);
+
+    if (acceptedContracts.length === 0) {
+        return [];
+    }
     
-    const contractsPromises = acceptedContracts.map(async (contractDoc) => {
-        const contractData = contractDoc.data();
+    const contractsPromises = acceptedContracts.map(async (contractData) => {
         const creditDoc = await getDoc(doc(db, "credits", contractData.creditId));
         if (!creditDoc.exists()) return null;
 
@@ -1535,7 +1540,7 @@ export async function getClientContracts() {
         const providerName = providerDoc.exists() ? providerDoc.data().companyName : "Proveedor Desconocido";
 
         return {
-            id: contractDoc.id,
+            id: contractData.id,
             creditId: contractData.creditId,
             providerName: providerName,
             creditAmount: creditData.valor,
@@ -1545,7 +1550,7 @@ export async function getClientContracts() {
     });
 
     const contracts = (await Promise.all(contractsPromises)).filter(Boolean);
-    return contracts.sort((a,b) => new Date(b.acceptedAt).getTime() - new Date(a.acceptedAt).getTime()) as any[];
+    return contracts.sort((a,b) => new Date(b!.acceptedAt).getTime() - new Date(a!.acceptedAt).getTime()) as any[];
 }
 
 
