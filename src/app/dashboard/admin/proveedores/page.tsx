@@ -1,10 +1,10 @@
 
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useTransition, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, User, MoreHorizontal, Pencil, Trash2, Loader2, RefreshCw, CheckCircle, Ban, Users as UsersIcon, DollarSign } from "lucide-react";
+import { ArrowLeft, User, MoreHorizontal, Pencil, Trash2, Loader2, RefreshCw, CheckCircle, Ban, Users as UsersIcon, DollarSign, Search } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getAllProviders, toggleProviderStatus, deleteProvider, getAdminSettings } from "@/lib/actions";
@@ -14,6 +14,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { EditProviderForm } from "@/components/forms/edit-provider-form";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 type Provider = {
   id: string;
@@ -30,6 +33,16 @@ const formatCurrency = (value: number) => {
     return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 };
 
+const getAvatarFallback = (name: string) => {
+    if (!name) return 'P';
+    const words = name.split(' ');
+    if (words.length > 1) {
+        return `${words[0][0]}${words[1][0]}`.toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
+}
+
+
 export default function AdminProvidersPage() {
   const [providers, setProviders] = useState<Provider[]>([]);
   const [pricePerClient, setPricePerClient] = useState(3500);
@@ -38,6 +51,7 @@ export default function AdminProvidersPage() {
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
   const router = useRouter();
@@ -112,7 +126,7 @@ export default function AdminProvidersPage() {
                     title: "Estado Actualizado",
                     description: `El estado de ${provider.companyName} ahora es ${!provider.isActive ? 'Activo' : 'Inactivo'}.`,
                 });
-                fetchProviders(); // Refresh the list
+                fetchProviders();
             } else {
                 toast({
                     title: "Error",
@@ -122,6 +136,13 @@ export default function AdminProvidersPage() {
             }
       });
   }
+  
+  const filteredProviders = useMemo(() => {
+    return providers.filter(provider => 
+        provider.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        provider.idNumber.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [providers, searchTerm]);
 
   return (
     <>
@@ -136,7 +157,7 @@ export default function AdminProvidersPage() {
             </div>
             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <Button onClick={fetchProviders} variant="outline" className="w-full" disabled={loading}>
-                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                    {loading && !isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
                     Actualizar
                 </Button>
                 <Button asChild variant="outline" className="w-full">
@@ -147,85 +168,99 @@ export default function AdminProvidersPage() {
                 </Button>
             </div>
           </div>
+          <div className="pt-4">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                    placeholder="Buscar por nombre o cédula..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-8 sm:max-w-sm"
+                />
+              </div>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
              <div className="flex justify-center items-center h-40">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
              </div>
-          ) : providers.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {providers.map((provider) => (
-                <Card key={provider.id} className="flex flex-col">
-                  <CardHeader className="flex flex-row items-start justify-between pb-4">
-                      <div className="flex items-center gap-4">
-                          <User className="w-12 h-12 text-muted-foreground" />
-                          <div className="grid gap-1">
-                              <CardTitle>{provider.companyName}</CardTitle>
-                              <CardDescription>{provider.email}</CardDescription>
-                          </div>
-                      </div>
-                       <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEdit(provider)}>
-                                  <Pencil className="mr-2 h-4 w-4" />
-                                  Editar
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleDelete(provider)} className="text-destructive focus:text-destructive">
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Eliminar Proveedor
-                              </DropdownMenuItem>
-                          </DropdownMenuContent>
-                      </DropdownMenu>
-                  </CardHeader>
-                  <CardContent className="flex-grow space-y-4">
-                     <div className="grid grid-cols-2 gap-4 text-center">
-                        <div className="p-3 bg-muted/50 rounded-md">
-                            <p className="text-sm text-muted-foreground flex items-center justify-center gap-1.5"><UsersIcon className="h-4 w-4"/> Clientes Únicos</p>
-                            <p className="text-2xl font-bold">{provider.uniqueClientCount}</p>
-                        </div>
-                        <div className="p-3 bg-muted/50 rounded-md">
-                             <p className="text-sm text-muted-foreground flex items-center justify-center gap-1.5"><DollarSign className="h-4 w-4"/>Suscripción</p>
-                             <p className="text-2xl font-bold text-primary">{formatCurrency(provider.uniqueClientCount * pricePerClient)}</p>
-                        </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Estado</p>
-                      <Badge variant={provider.isActive ? "secondary" : "destructive"}>
-                        {provider.isActive ? "Activo" : "Inactivo"}
-                      </Badge>
-                    </div>
-                    <Button 
-                        size="sm" 
-                        variant={provider.isActive ? "destructive" : "default"}
-                        onClick={() => handleToggleStatus(provider)}
-                        disabled={isPending}
-                    >
-                        {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : (provider.isActive ? <Ban className="mr-2 h-4 w-4"/> : <CheckCircle className="mr-2 h-4 w-4"/>)}
-                        {provider.isActive ? 'Desactivar' : 'Activar'}
-                    </Button>
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
           ) : (
-            <Card>
-                <CardContent className="pt-6">
-                    <div className="text-center text-muted-foreground py-8 px-4">
-                        <User className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                        <h3 className="text-lg font-semibold">No hay proveedores registrados</h3>
-                        <p className="text-sm">Cuando un nuevo proveedor se registre, aparecerá aquí.</p>
-                    </div>
-                </CardContent>
-            </Card>
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Proveedor</TableHead>
+                        <TableHead className="text-center">Clientes</TableHead>
+                        <TableHead className="text-center">Suscripción</TableHead>
+                        <TableHead className="text-center">Estado</TableHead>
+                        <TableHead className="text-right">Acciones</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                 {filteredProviders.length > 0 ? (
+                    filteredProviders.map((provider) => (
+                        <TableRow key={provider.id}>
+                            <TableCell>
+                                <div className="flex items-center gap-3">
+                                    <Avatar>
+                                        <AvatarFallback>{getAvatarFallback(provider.companyName)}</AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                        <p className="font-medium">{provider.companyName}</p>
+                                        <p className="text-sm text-muted-foreground">{provider.email}</p>
+                                    </div>
+                                </div>
+                            </TableCell>
+                            <TableCell className="text-center font-medium">{provider.uniqueClientCount}</TableCell>
+                            <TableCell className="text-center font-semibold text-primary">{formatCurrency(provider.uniqueClientCount * pricePerClient)}</TableCell>
+                            <TableCell className="text-center">
+                                <Badge variant={provider.isActive ? "secondary" : "destructive"}>
+                                    {provider.isActive ? "Activo" : "Inactivo"}
+                                </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                                <div className="flex justify-end items-center gap-2">
+                                     <Button 
+                                        size="sm" 
+                                        variant={provider.isActive ? "destructive" : "default"}
+                                        onClick={() => handleToggleStatus(provider)}
+                                        disabled={isPending}
+                                        className="w-28"
+                                    >
+                                        {isPending && selectedProvider?.id === provider.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : (provider.isActive ? <Ban className="mr-2 h-4 w-4"/> : <CheckCircle className="mr-2 h-4 w-4"/>)}
+                                        {provider.isActive ? 'Desactivar' : 'Activar'}
+                                    </Button>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                <MoreHorizontal className="h-4 w-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={() => handleEdit(provider)}>
+                                                <Pencil className="mr-2 h-4 w-4" />
+                                                Editar
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={() => handleDelete(provider)} className="text-destructive focus:text-destructive">
+                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                Eliminar Proveedor
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            </TableCell>
+                        </TableRow>
+                    ))
+                 ) : (
+                    <TableRow>
+                        <TableCell colSpan={5} className="h-24 text-center">
+                            No se encontraron proveedores {searchTerm ? `con el término "${searchTerm}"` : "registrados."}
+                        </TableCell>
+                    </TableRow>
+                 )}
+                </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
