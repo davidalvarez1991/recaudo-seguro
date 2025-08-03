@@ -48,10 +48,10 @@ export const findUserByIdNumber = async (idNumber: string) => {
     return serializableData;
 };
 
-const calculateCommission = (amount: number, tiers: CommissionTier[] | undefined): number => {
+const calculateCommission = (amount: number, tiers: CommissionTier[] | undefined): { commission: number, percentage: number } => {
     if (!tiers || tiers.length === 0) {
         // Fallback to a default 20% if no tiers are set
-        return amount * 0.20;
+        return { commission: amount * 0.20, percentage: 20 };
     }
     
     // Sort tiers by minAmount to ensure correct matching
@@ -60,12 +60,12 @@ const calculateCommission = (amount: number, tiers: CommissionTier[] | undefined
     const applicableTier = sortedTiers.find(tier => amount >= tier.minAmount && amount <= tier.maxAmount);
 
     if (applicableTier) {
-        return amount * (applicableTier.percentage / 100);
+        return { commission: amount * (applicableTier.percentage / 100), percentage: applicableTier.percentage };
     }
 
     // If no tier matches (e.g., gaps in ranges), fallback to the first tier's percentage or a default
     const fallbackPercentage = sortedTiers[0]?.percentage || 20;
-    return amount * (fallbackPercentage / 100);
+    return { commission: amount * (fallbackPercentage / 100), percentage: fallbackPercentage };
 };
 
 // --- Auth Actions ---
@@ -977,20 +977,17 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
     const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
     const installmentAmount = creditData.cuotas > 0 ? totalLoanAmount / creditData.cuotas : 0;
     
-    // The payment dates are not available at this stage, so the placeholder will remain.
-    // It will be updated when the payment schedule is set.
-    const firstPaymentDate = "FECHA_PENDIENTE";
-        
-    const replacements = {
-        "“NOMBRE DE LA EMPRESA”": providerData.companyName.toUpperCase() || 'EMPRESA NO DEFINIDA',
-        "“NOMBRE DEL CLIENTE”": clienteData.name.toUpperCase() || 'CLIENTE NO DEFINIDO',
+    const replacements: { [key: string]: string } = {
+        "“NOMBRE DE LA EMPRESA”": providerData.companyName?.toUpperCase() || 'EMPRESA NO DEFINIDA',
+        "“NOMBRE DEL CLIENTE”": clienteData.name?.toUpperCase() || 'CLIENTE NO DEFINIDO',
         "“CEDULA DEL CLIENTE”": clienteData.idNumber || 'CÉDULA NO DEFINIDA',
         "“CIUDAD”": clienteData.city || 'CIUDAD NO DEFINIDA',
         "“VALOR PRESTAMO”": (creditData.valor || 0).toLocaleString('es-CO'),
-        "“CUOTAS DEL CREDITO”": creditData.cuotas.toString() || '0',
-        "“FECHA PRIMER PAGO”": firstPaymentDate,
-        "“VALOR DE LA CUOTA”": installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
+        "“VALOR DE LA CUOTA MAS COMISION”": installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
+        "“INTERES”": (creditData.commissionPercentage || 0).toString(),
         "“INTERES DE MORA”": (providerData.lateInterestRate || 0).toString(),
+        // Fallback for older template versions
+        "“VALOR DE LA CUOTA”": installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
     };
 
     for (const [key, value] of Object.entries(replacements)) {
@@ -1067,12 +1064,13 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     }
 
     const valor = parseFloat(creditAmount.replace(/\./g, '').replace(',', '.'));
-    const commission = calculateCommission(valor, provider.commissionTiers);
+    const { commission, percentage } = calculateCommission(valor, provider.commissionTiers);
 
     const creditDataForContract = {
         valor,
         cuotas: parseInt(installments, 10),
-        commission,
+        commission: commission,
+        commissionPercentage: percentage,
     };
     
     const creditRef = await addDoc(collection(db, "credits"), {
@@ -1132,12 +1130,13 @@ export async function createNewCreditForClient(values: z.infer<typeof NewCreditS
     }
 
     const valor = parseFloat(creditAmount.replace(/\./g, '').replace(',', '.'));
-    const commission = calculateCommission(valor, provider.commissionTiers);
+    const { commission, percentage } = calculateCommission(valor, provider.commissionTiers);
 
     const creditDataForContract = {
         valor,
         cuotas: parseInt(installments, 10),
         commission,
+        commissionPercentage: percentage,
     };
     
     const newCreditRef = await addDoc(collection(db, "credits"), {
@@ -1193,7 +1192,7 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
     const additionalValue = parseFloat(additionalAmount.replace(/\./g, '').replace(',', '.'));
     const newTotalValue = additionalValue + remainingBalance;
 
-    const commission = calculateCommission(newTotalValue, provider.commissionTiers);
+    const { commission, percentage } = calculateCommission(newTotalValue, provider.commissionTiers);
 
     const cliente = await findUserByIdNumber(clienteId);
     if(!cliente) return { error: "Cliente no encontrado" };
@@ -1202,6 +1201,7 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
         valor: newTotalValue,
         cuotas: parseInt(installments, 10),
         commission,
+        commissionPercentage: percentage,
     };
 
     const batch = writeBatch(db);
@@ -1241,6 +1241,24 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
     return { success: true, newCreditId: newCreditRef.id };
 }
 
+function getPaymentFrequency(dates: Date[]): string {
+    if (dates.length < 2) {
+        return "único";
+    }
+    const sortedDates = [...dates].sort((a, b) => a.getTime() - b.getTime());
+    const diffs = [];
+    for (let i = 1; i < sortedDates.length; i++) {
+        diffs.push(differenceInDays(sortedDates[i], sortedDates[i - 1]));
+    }
+    const avgDiff = diffs.reduce((a, b) => a + b, 0) / diffs.length;
+
+    if (avgDiff <= 1.5) return "Diarios";
+    if (avgDiff >= 6 && avgDiff <= 8) return "Semanales";
+    if (avgDiff >= 14 && avgDiff <= 16) return "Quincenales";
+    if (avgDiff >= 28 && avgDiff <= 32) return "Mensuales";
+    
+    return `${avgDiff.toFixed(0)} días`;
+}
 
 export async function savePaymentSchedule(values: z.infer<typeof SavePaymentScheduleSchema>) {
     const validatedFields = SavePaymentScheduleSchema.safeParse(values);
@@ -1252,7 +1270,8 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
     const creditRef = doc(db, "credits", creditId);
 
     try {
-        const timestampDates = paymentDates.map(dateStr => Timestamp.fromDate(new Date(dateStr)));
+        const dateObjects = paymentDates.map(dateStr => new Date(dateStr));
+        const timestampDates = dateObjects.map(d => Timestamp.fromDate(d));
         
         await updateDoc(creditRef, {
             paymentDates: timestampDates,
@@ -1276,9 +1295,12 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
                 const firstPaymentDate = paymentDates.length > 0 
                     ? format(new Date(paymentDates[0]), "d 'de' MMMM 'de' yyyy", { locale: es }) 
                     : "Fecha no definida";
+
+                const paymentFrequency = getPaymentFrequency(dateObjects);
                 
-                contractText = contractText.replace(/FECHA_PENDIENTE/g, firstPaymentDate);
-                contractText = contractText.replace(/“FECHA PRIMER PAGO”/g, firstPaymentDate);
+                contractText = contractText.replace(/“DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”/g, firstPaymentDate);
+                contractText = contractText.replace(/“DIAS DEL RECAUDO”/g, paymentFrequency);
+                contractText = contractText.replace(/“CUOTAS DEL CREDITO”/g, creditData.cuotas.toString() || '0');
 
                 await updateDoc(contractRef, { contractText });
             }
