@@ -8,7 +8,7 @@ import {
   SidebarMenuButton,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Home, Settings, Users } from "lucide-react";
+import { Home, Settings, Users, DollarSign } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -52,6 +52,20 @@ export function SidebarContentAdmin() {
             <Link href="/dashboard/admin/proveedores">
               <Users />
               <span>Proveedores</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+
+        <SidebarMenuItem>
+           <SidebarMenuButton 
+            asChild
+            isActive={isActive(`/dashboard/admin/soportes`)}
+            tooltip="Soportes de Ingresos"
+            onClick={handleLinkClick}
+           >
+            <Link href="/dashboard/admin/soportes">
+              <DollarSign />
+              <span>Soportes</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
