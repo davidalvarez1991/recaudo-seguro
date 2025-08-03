@@ -983,9 +983,9 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
         "“CEDULA DEL CLIENTE”": clienteData.idNumber || 'CÉDULA NO DEFINIDA',
         "“CIUDAD”": clienteData.city || 'CIUDAD NO DEFINIDA',
         "“VALOR PRESTAMO”": (creditData.valor || 0).toLocaleString('es-CO'),
+        "“CUOTAS DEL CREDITO”": creditData.cuotas?.toString() || '0',
         "“VALOR DE LA CUOTA MAS COMISION”": installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
-        "“INTERES”": (creditData.commissionPercentage || 0).toString(),
-        "“INTERES DE MORA”": (providerData.lateInterestRate || 0).toString(),
+        "“PORCENTAJE DE COMISION”": (creditData.commissionPercentage || 0).toString(),
     };
 
     for (const [key, value] of Object.entries(replacements)) {
@@ -1036,30 +1036,30 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     } = validatedFields.data;
     
     let clienteData = await findUserByIdNumber(idNumber);
+    if (clienteData) {
+        return { error: "Ya existe un cliente con este número de cédula. Utilice la opción de renovar o crear un nuevo crédito desde el historial del cliente." };
+    }
+    
     const fullName = [firstName, secondName, firstLastName, secondLastName].filter(Boolean).join(" ");
 
-    if (!clienteData) {
-        const hashedPassword = await bcrypt.hash(idNumber, 10);
-        const newUserDocRef = await addDoc(collection(db, "users"),{
-            idNumber,
-            name: fullName,
-            firstName,
-            secondName,
-            firstLastName,
-            secondLastName,
-            password: hashedPassword,
-            role: 'cliente',
-            providerId,
-            address,
-            contactPhone,
-            createdAt: Timestamp.now(),
-            city: provider.city || 'N/A'
-        });
-        clienteData = { id: newUserDocRef.id, idNumber, name: fullName, city: provider.city || 'N/A' };
-    } else {
-        // Client already exists, just use their data. We'll build the full name for the contract.
-        clienteData.name = fullName;
-    }
+    const hashedPassword = await bcrypt.hash(idNumber, 10);
+    const newUserDocRef = await addDoc(collection(db, "users"),{
+        idNumber,
+        name: fullName,
+        firstName,
+        secondName,
+        firstLastName,
+        secondLastName,
+        password: hashedPassword,
+        role: 'cliente',
+        providerId,
+        address,
+        contactPhone,
+        createdAt: Timestamp.now(),
+        city: provider.city || 'N/A'
+    });
+    clienteData = { id: newUserDocRef.id, idNumber, name: fullName, city: provider.city || 'N/A' };
+
 
     const valor = parseFloat(creditAmount.replace(/\./g, '').replace(',', '.'));
     const { commission, percentage } = calculateCommission(valor, provider.commissionTiers);
@@ -1293,12 +1293,8 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
                 const firstPaymentDate = paymentDates.length > 0 
                     ? format(new Date(paymentDates[0]), "d 'de' MMMM 'de' yyyy", { locale: es }) 
                     : "Fecha no definida";
-
-                const paymentFrequency = getPaymentFrequency(dateObjects);
                 
                 contractText = contractText.replace(/“DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”/g, firstPaymentDate);
-                contractText = contractText.replace(/“DIAS DEL RECAUDO”/g, paymentFrequency);
-                contractText = contractText.replace(/“CUOTAS DEL CREDITO”/g, creditData.cuotas.toString() || '0');
 
                 await updateDoc(contractRef, { contractText });
             }
@@ -1921,5 +1917,7 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
         return { error: "No se pudo guardar la configuración." };
     }
 }
+
+    
 
     
