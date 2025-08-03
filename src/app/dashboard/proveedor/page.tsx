@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { DailySummaryContainer } from "@/components/proveedor/daily-summary-container";
 import { ClientReputationSearch } from "@/components/dashboard/client-reputation-search";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { RenewalCountdown } from "@/components/proveedor/renewal-countdown";
 
 type UserData = {
     companyName?: string;
@@ -84,26 +85,6 @@ export default async function ProveedorDashboard() {
       <Card>
         <CardHeader>
            <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card className="bg-purple-50 dark:bg-purple-900/30 border-purple-200">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium text-purple-800 dark:text-purple-200">Clientes Únicos</CardTitle>
-                      <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-3xl font-bold text-purple-900 dark:text-purple-300">{financialSummary.uniqueClientCount}</div>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-teal-50 dark:bg-teal-900/30 border-teal-200">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium text-teal-800 dark:text-teal-200">Suscripción Mensual</CardTitle>
-                      <DollarSign className="h-5 w-5 text-teal-600 dark:text-teal-400" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-3xl font-bold text-teal-900 dark:text-teal-300">{formatCurrency(subscriptionCost)}</div>
-                    </CardContent>
-                  </Card>
-                </div>
               <div className="space-y-1">
                   <CardTitle className="text-3xl">{companyName.toUpperCase()}</CardTitle>
                   <CardDescription>Bienvenido a tu panel de gestión.</CardDescription>
@@ -111,7 +92,32 @@ export default async function ProveedorDashboard() {
             </div>
         </CardHeader>
         <CardContent className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <RenewalCountdown />
+
+          <Separator />
+            
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="bg-purple-50 dark:bg-purple-900/30 border-purple-200">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-purple-800 dark:text-purple-200">Clientes Únicos</CardTitle>
+                <Users className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-purple-900 dark:text-purple-300">{financialSummary.uniqueClientCount}</div>
+              </CardContent>
+            </Card>
+            <Card className="bg-teal-50 dark:bg-teal-900/30 border-teal-200">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-teal-800 dark:text-teal-200">Suscripción Mensual</CardTitle>
+                <DollarSign className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-teal-900 dark:text-teal-300">{formatCurrency(subscriptionCost)}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card className="bg-blue-50 dark:bg-blue-900/30 border-blue-200">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-blue-800 dark:text-blue-200">Capital Activo en la Calle</CardTitle>
