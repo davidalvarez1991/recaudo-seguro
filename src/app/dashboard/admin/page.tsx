@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Users } from "lucide-react";
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
+import { CollectionCountdown } from "@/components/admin/collection-countdown";
 
 export default function AdminDashboard() {
   return (
@@ -28,6 +29,10 @@ export default function AdminDashboard() {
                     Gestionar Proveedores
                 </Link>
             </Button>
+            
+            <Separator />
+            
+            <CollectionCountdown />
             
             <Separator />
 
