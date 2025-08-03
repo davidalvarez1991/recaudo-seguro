@@ -604,7 +604,7 @@ export async function getPaymentsByCreditId(creditId: string) {
         return {
             id: doc.id,
             amount: data.amount,
-            date: data.date instanceof Timestamp ? data.date.toISOString() : data.date,
+            date: data.date instanceof Timestamp ? data.date.toDate().toISOString() : data.date,
             type: data.type,
         };
     });
