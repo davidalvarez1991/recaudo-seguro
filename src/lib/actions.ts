@@ -82,8 +82,8 @@ export async function login(values: z.infer<typeof LoginSchema>) {
     
     // Check for a hardcoded admin user first
     if (idNumber === "0703091991" && password === "19913030") {
-         cookies().set('loggedInUser', ADMIN_ID, { httpOnly: true, path: '/' });
-         cookies().set('userRole', 'admin', { httpOnly: true, path: '/' });
+         await cookies().set('loggedInUser', ADMIN_ID, { httpOnly: true, path: '/' });
+         await cookies().set('userRole', 'admin', { httpOnly: true, path: '/' });
          return { successUrl: `/dashboard/admin` };
     }
     
@@ -103,8 +103,8 @@ export async function login(values: z.infer<typeof LoginSchema>) {
       return { error: "Cédula o contraseña incorrecta." };
     }
     
-    cookies().set('loggedInUser', user.id, { httpOnly: true, path: '/' });
-    cookies().set('userRole', user.role, { httpOnly: true, path: '/' });
+    await cookies().set('loggedInUser', user.id, { httpOnly: true, path: '/' });
+    await cookies().set('userRole', user.role, { httpOnly: true, path: '/' });
 
     return { successUrl: `/dashboard/${user.role}` };
 
@@ -145,8 +145,8 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: 'pr
     });
     
     if (newUserRef) {
-        cookies().set('loggedInUser', newUserRef.id, { httpOnly: true, path: '/' });
-        cookies().set('userRole', role, { httpOnly: true, path: '/' });
+        await cookies().set('loggedInUser', newUserRef.id, { httpOnly: true, path: '/' });
+        await cookies().set('userRole', role, { httpOnly: true, path: '/' });
         return { successUrl: `/dashboard/${role}` };
     }
     
@@ -155,8 +155,8 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: 'pr
 
 export async function logout() {
   const { cookies } = await import('next/headers')
-  cookies().set('loggedInUser', '', { expires: new Date(0), path: '/' });
-  cookies().set('userRole', '', { expires: new Date(0), path: '/' });
+  await cookies().set('loggedInUser', '', { expires: new Date(0), path: '/' });
+  await cookies().set('userRole', '', { expires: new Date(0), path: '/' });
   return { successUrl: '/login' };
 }
 
@@ -601,10 +601,23 @@ export async function getPaymentsByCreditId(creditId: string) {
     
     const payments = querySnapshot.docs.map(doc => {
         const data = doc.data();
+        // Ensure date is handled correctly, converting from Timestamp if needed
+        const dateValue = data.date;
+        let isoDate;
+        if (dateValue instanceof Timestamp) {
+            isoDate = dateValue.toDate().toISOString();
+        } else if (typeof dateValue === 'string') {
+            isoDate = dateValue;
+        } else if (dateValue && typeof dateValue.toDate === 'function') { // Fallback for other potential date-like objects
+            isoDate = dateValue.toDate().toISOString();
+        } else {
+            isoDate = new Date().toISOString(); // Fallback date
+        }
+
         return {
             id: doc.id,
             amount: data.amount,
-            date: data.date instanceof Timestamp ? data.date.toDate().toISOString() : data.date,
+            date: isoDate,
             type: data.type,
         };
     });
@@ -1921,3 +1934,4 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
     
 
     
+
