@@ -195,23 +195,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         });
         
         if (result.success) {
-            const contractData = await getContractForAcceptance(createdCreditId);
-            if (contractData.contractText) {
-                setContractText(contractData.contractText);
-                setStep(3);
-            } else {
-                // If no contract is to be generated, finish the process
-                toast({ 
-                    title: "Registro Completado",
-                    description: "El cliente y su crédito han sido creados exitosamente.",
-                    variant: "default",
-                    className: "bg-accent text-accent-foreground border-accent",
-                });
-                if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new CustomEvent('creditos-updated'));
-                }
-                onFormSubmit?.();
-            }
+            setStep(3); // Move to step 3 to fetch and display the contract
         } else {
             toast({ title: "Error al guardar calendario", description: result.error, variant: "destructive" });
         }
@@ -253,26 +237,40 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         setIsPending(false);
     }
     
-  useEffect(() => {
-    if (step === 3 && createdCreditId && !contractText) {
-      const fetchContract = async () => {
-        setIsPending(true);
-        const data = await getContractForAcceptance(createdCreditId);
-        if (data.contractText) {
-          setContractText(data.contractText);
-        } else {
-          // Handle case where contract might not be generated
-          toast({
-            title: "Aviso",
-            description: "No se generó un contrato para este crédito (puede estar desactivado por el proveedor).",
-          });
-          onFormSubmit?.(); // Close modal or finish flow
+    // Effect to fetch the processed contract when moving to step 3
+    useEffect(() => {
+        if (step === 3 && createdCreditId) {
+            const fetchContract = async () => {
+                setIsPending(true);
+                setContractText(null); // Clear previous contract text
+                const data = await getContractForAcceptance(createdCreditId);
+                if (data.contractText) {
+                    setContractText(data.contractText);
+                } else if (data.error) {
+                    toast({
+                        title: "Error al generar contrato",
+                        description: data.error,
+                        variant: "destructive",
+                    });
+                } else {
+                    // This case handles when contract generation is disabled by the provider.
+                    // The process should just finish.
+                    toast({ 
+                        title: "Registro Completado",
+                        description: "El cliente y su crédito han sido creados exitosamente (sin contrato).",
+                        variant: "default",
+                        className: "bg-accent text-accent-foreground border-accent",
+                    });
+                    if (typeof window !== 'undefined') {
+                        window.dispatchEvent(new CustomEvent('creditos-updated'));
+                    }
+                    onFormSubmit?.();
+                }
+                setIsPending(false);
+            };
+            fetchContract();
         }
-        setIsPending(false);
-      };
-      fetchContract();
-    }
-  }, [step, createdCreditId, contractText, onFormSubmit, toast]);
+    }, [step, createdCreditId, onFormSubmit, toast]);
 
 
   const renderStep = () => {
@@ -695,7 +693,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     </p>
                 </div>
                  <ScrollArea className="h-80 w-full rounded-md border p-4 whitespace-pre-wrap font-mono text-xs">
-                    {isPending && !contractText ? <div className="flex justify-center items-center h-full"><Loader2 className="animate-spin" /></div> : contractText}
+                    {isPending ? <div className="flex justify-center items-center h-full"><Loader2 className="animate-spin" /></div> : contractText}
                 </ScrollArea>
                 <Button type="button" onClick={handleAcceptContract} className="w-full bg-accent hover:bg-accent/90" disabled={isPending || !contractText}>
                     {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}

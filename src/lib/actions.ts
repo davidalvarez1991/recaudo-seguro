@@ -603,12 +603,13 @@ export async function getPaymentsByCreditId(creditId: string) {
         const data = doc.data();
         const dateValue = data.date;
         let isoDate;
+
         if (dateValue instanceof Timestamp) {
+            isoDate = dateValue.toDate().toISOString();
+        } else if (dateValue && typeof dateValue.toDate === 'function') { // Handle Firestore's object representation
             isoDate = dateValue.toDate().toISOString();
         } else if (typeof dateValue === 'string') {
             isoDate = dateValue;
-        } else if (dateValue && typeof dateValue.toDate === 'function') {
-            isoDate = dateValue.toDate().toISOString();
         } else {
             isoDate = new Date().toISOString(); 
         }
@@ -997,6 +998,8 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
         "“CUOTAS DEL CREDITO”": creditData.cuotas?.toString() || '0',
         "“VALOR DE LA CUOTA A PAGAR MAS COMISION”": installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
         "“EL PORCENTAJE ESTABLECIDO DE FORMULA DE COMISION POR TAMO”": (creditData.commissionPercentage || 0).toString(),
+        // Defaulting the "15" days placeholder to 15, can be made dynamic if needed
+        "“15”": "15"
     };
 
     for (const [key, value] of Object.entries(replacements)) {
@@ -1932,5 +1935,6 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
     
 
     
+
 
 
