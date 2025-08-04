@@ -195,7 +195,22 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         });
         
         if (result.success) {
-            setStep(3); // Move to step 3 to fetch and display the contract
+            const contractData = await getContractForAcceptance(createdCreditId);
+            if (contractData.contractText) {
+                setContractText(contractData.contractText);
+                setStep(3);
+            } else {
+                 toast({ 
+                    title: "Registro Completado",
+                    description: "El cliente y su crédito han sido creados exitosamente (sin contrato).",
+                    variant: "default",
+                    className: "bg-accent text-accent-foreground border-accent",
+                });
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('creditos-updated'));
+                }
+                onFormSubmit?.();
+            }
         } else {
             toast({ title: "Error al guardar calendario", description: result.error, variant: "destructive" });
         }
@@ -237,42 +252,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         setIsPending(false);
     }
     
-    // Effect to fetch the processed contract when moving to step 3
-    useEffect(() => {
-        if (step === 3 && createdCreditId) {
-            const fetchContract = async () => {
-                setIsPending(true);
-                setContractText(null); // Clear previous contract text
-                const data = await getContractForAcceptance(createdCreditId);
-                if (data.contractText) {
-                    setContractText(data.contractText);
-                } else if (data.error) {
-                    toast({
-                        title: "Error al generar contrato",
-                        description: data.error,
-                        variant: "destructive",
-                    });
-                } else {
-                    // This case handles when contract generation is disabled by the provider.
-                    // The process should just finish.
-                    toast({ 
-                        title: "Registro Completado",
-                        description: "El cliente y su crédito han sido creados exitosamente (sin contrato).",
-                        variant: "default",
-                        className: "bg-accent text-accent-foreground border-accent",
-                    });
-                    if (typeof window !== 'undefined') {
-                        window.dispatchEvent(new CustomEvent('creditos-updated'));
-                    }
-                    onFormSubmit?.();
-                }
-                setIsPending(false);
-            };
-            fetchContract();
-        }
-    }, [step, createdCreditId, onFormSubmit, toast]);
-
-
   const renderStep = () => {
     switch (step) {
       case 1:
@@ -723,7 +702,3 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
-
-    
-
-    
