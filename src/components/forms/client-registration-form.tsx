@@ -252,6 +252,28 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         }
         setIsPending(false);
     }
+    
+  useEffect(() => {
+    if (step === 3 && createdCreditId && !contractText) {
+      const fetchContract = async () => {
+        setIsPending(true);
+        const data = await getContractForAcceptance(createdCreditId);
+        if (data.contractText) {
+          setContractText(data.contractText);
+        } else {
+          // Handle case where contract might not be generated
+          toast({
+            title: "Aviso",
+            description: "No se generó un contrato para este crédito (puede estar desactivado por el proveedor).",
+          });
+          onFormSubmit?.(); // Close modal or finish flow
+        }
+        setIsPending(false);
+      };
+      fetchContract();
+    }
+  }, [step, createdCreditId, contractText, onFormSubmit, toast]);
+
 
   const renderStep = () => {
     switch (step) {
@@ -673,9 +695,9 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     </p>
                 </div>
                  <ScrollArea className="h-80 w-full rounded-md border p-4 whitespace-pre-wrap font-mono text-xs">
-                    {isPending && !contractText ? <Loader2 className="animate-spin mx-auto" /> : contractText}
+                    {isPending && !contractText ? <div className="flex justify-center items-center h-full"><Loader2 className="animate-spin" /></div> : contractText}
                 </ScrollArea>
-                <Button type="button" onClick={handleAcceptContract} className="w-full bg-accent hover:bg-accent/90" disabled={isPending}>
+                <Button type="button" onClick={handleAcceptContract} className="w-full bg-accent hover:bg-accent/90" disabled={isPending || !contractText}>
                     {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
                     {isPending ? "Procesando..." : "Aceptar y Finalizar Contrato"}
                 </Button>
