@@ -16,23 +16,23 @@ import { Textarea } from "@/components/ui/textarea";
 const defaultContractTemplate = `CONTRATO DE PRÉSTAMO CON GARANTÍA DE EMBARGO DE BIENES MUEBLES
 Entre los suscritos a saber:
 
-1. PRESTAMISTA: “NOMBRE DE LA EMPRESA”, quien en adelante se denominará EL ACREEDOR.
+1. PRESTAMISTA: "NOMBRE DE LA EMPRESA", quien en adelante se denominará EL ACREEDOR.
 
-2. DEUDOR: “NOMBRE DEL CLIENTE” mayor de edad, identificado con cédula de ciudadanía No. “CEDULA DEL CLIENTE” de “CIUDAD”, quien en adelante se denominará EL DEUDOR.
+2. DEUDOR: "NOMBRE DEL CLIENTE" mayor de edad, identificado con cédula de ciudadanía No. "CEDULA DEL CLIENTE" de "CIUDAD", quien en adelante se denominará EL DEUDOR.
 
 Se celebra el presente contrato de préstamo, el cual se regirá por las siguientes cláusulas:
 
 PRIMERA - Objeto del contrato
 
-EL ACREEDOR entrega en calidad de préstamo la suma de “VALOR PRESTAMO” pesos colombianos a EL DEUDOR, quien se obliga a pagar dicha suma en los términos y condiciones establecidos en este contrato.
+EL ACREEDOR entrega en calidad de préstamo la suma de "VALOR PRESTAMO" pesos colombianos a EL DEUDOR, quien se obliga a pagar dicha suma en los términos y condiciones establecidos en este contrato.
 
 SEGUNDA - Plazo y forma de pago
 
-EL DEUDOR se compromete a pagar el préstamo en un plazo de “CUOTAS DEL CREDITO” cuota(s), a partir del día “DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”, cada cuota por un valor de $ “VALOR DE LA CUOTA MAS COMISION”, hasta completar el capital más los intereses pactados.
+EL DEUDOR se compromete a pagar el préstamo en un plazo de "CUOTAS DEL CREDITO" cuota(s), a partir del día "DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA", mediante pagos por valor de cuota $ "VALOR DE LA CUOTA MAS COMISION", hasta completar el capital más los intereses pactados.
 
 TERCERA - Intereses
 
-El préstamo generará un interés mensual del “INTERES”%, que será sumado al capital al momento del cálculo de la deuda total. El interés se calcula de forma [simple/compuesta] y debe ser cancelado dentro del mismo calendario pactado.
+El préstamo generará un interés mensual del "PORCENTAJE DE COMISION"%, que será sumado al capital al momento del cálculo de la deuda total. El interés se calcula de forma [simple/compuesta] y debe ser cancelado dentro del mismo calendario pactado.
 
 CUARTA - Mora
 
@@ -44,7 +44,7 @@ EL DEUDOR autoriza expresamente a EL ACREEDOR a realizar el embargo de uno o var
 
 Los bienes susceptibles de embargo podrán ser muebles como electrodomésticos, motocicletas, celulares, herramientas u otros que, según avaluación razonable, suplan el valor de la deuda.
 
-EL DEUDOR se compromete a permitir el ingreso del ACREEDOR o su representante a su domicilio para el retiro de dichos bienes si se presenta incumplimiento mayor a “15” días.
+EL DEUDOR se compromete a permitir el ingreso del ACREEDOR o su representante a su domicilio para el retiro de dichos bienes si se presenta incumplimiento mayor a "15" días.
 
 SEXTA - Aceptación y firma
 
@@ -339,7 +339,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
                     disabled={!isContractGenerationActive}
                 />
                 <p className="text-xs text-muted-foreground">
-                    Usa los marcadores como “NOMBRE DEL CLIENTE” o “VALOR PRESTAMO” para que se reemplacen automáticamente.
+                    Usa los marcadores como "NOMBRE DEL CLIENTE" o "VALOR PRESTAMO" para que se reemplacen automáticamente.
                 </p>
             </div>
         </CardContent>
