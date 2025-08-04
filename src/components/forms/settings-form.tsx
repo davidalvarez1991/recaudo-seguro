@@ -28,11 +28,11 @@ EL ACREEDOR entrega en calidad de préstamo la suma de “VALOR PRESTAMO” peso
 
 SEGUNDA - Plazo y forma de pago
 
-EL DEUDOR se compromete a pagar el préstamo en un plazo de “CUOTAS DEL CREDITO” cuotas, a partir del día “DIA DONDE EL COBRADOR SELECIONA EL PRIMER DIA DE PAGO DE LA CUOTA”, mediante pagos por cuotas establecidas por un valor de $ “VALOR DE LA CUOTA A PAGAR MAS COMISION”, hasta completar el capital más los intereses pactados.
+EL DEUDOR se compromete a pagar el préstamo en un plazo de “CUOTAS DEL CREDITO” cuotas, a partir del día “AQUÍ TIENES QUE REGISTRAR EL PRIMER DIA DE PAGO”, mediante pagos por cuotas establecidas por un valor de $ “ AQUÍ DEBE QUE MOSTRAR EL VALOR DE LA CUOTA MAS LA COMISION”, hasta completar el capital más los intereses pactados.
 
 TERCERA - Intereses
 
-El préstamo generará un interés mensual del “EL PORCENTAJE ESTABLECIDO DE FORMULA DE COMISION POR TAMO”%, que será sumado al capital al momento del cálculo de la deuda total. El interés se calcula de forma [simple/compuesta] y debe ser cancelado dentro del mismo calendario pactado.
+El préstamo generará un interés mensual del “AQUÍ DEBE QUE IR EL PORCENTAJE DE COMISION”%, que será sumado al capital al momento del cálculo de la deuda total. El interés se calcula de forma [simple/compuesta] y debe ser cancelado dentro del mismo calendario pactado.
 
 CUARTA - Mora
 
