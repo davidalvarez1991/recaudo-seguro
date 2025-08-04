@@ -985,9 +985,6 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
     if (!providerData.isContractGenerationActive || !providerData.contractTemplate) return;
 
     let contractText = providerData.contractTemplate;
-
-    const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
-    const installmentAmount = creditData.cuotas > 0 ? totalLoanAmount / creditData.cuotas : 0;
     
     const replacements: { [key: string]: string } = {
         "“NOMBRE DE LA EMPRESA”": providerData.companyName?.toUpperCase() || 'EMPRESA NO DEFINIDA',
@@ -996,7 +993,6 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
         "“CIUDAD”": clienteData.city || 'CIUDAD NO DEFINIDA',
         "“VALOR PRESTAMO”": (creditData.valor || 0).toLocaleString('es-CO'),
         "“CUOTAS DEL CREDITO”": creditData.cuotas?.toString() || '0',
-        "“VALOR DE LA CUOTA A PAGAR MAS COMISION”": installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
         "“EL PORCENTAJE ESTABLECIDO DE FORMULA DE COMISION POR TAMO”": (creditData.commissionPercentage || 0).toString(),
         "“15”": "15"
     };
@@ -1252,25 +1248,6 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
     return { success: true, newCreditId: newCreditRef.id };
 }
 
-function getPaymentFrequency(dates: Date[]): string {
-    if (dates.length < 2) {
-        return "único";
-    }
-    const sortedDates = [...dates].sort((a, b) => a.getTime() - b.getTime());
-    const diffs = [];
-    for (let i = 1; i < sortedDates.length; i++) {
-        diffs.push(differenceInDays(sortedDates[i], sortedDates[i - 1]));
-    }
-    const avgDiff = diffs.reduce((a, b) => a + b, 0) / diffs.length;
-
-    if (avgDiff <= 1.5) return "Diarios";
-    if (avgDiff >= 6 && avgDiff <= 8) return "Semanales";
-    if (avgDiff >= 14 && avgDiff <= 16) return "Quincenales";
-    if (avgDiff >= 28 && avgDiff <= 32) return "Mensuales";
-    
-    return `${avgDiff.toFixed(0)} días`;
-}
-
 export async function savePaymentSchedule(values: z.infer<typeof SavePaymentScheduleSchema>) {
     const validatedFields = SavePaymentScheduleSchema.safeParse(values);
     if (!validatedFields.success) {
@@ -1293,7 +1270,6 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
         const creditSnap = await getDoc(creditRef);
         const creditData = creditSnap.data();
         if (creditData) {
-            // Find existing contract and update it
             const contractsRef = collection(db, "contracts");
             const qContracts = query(contractsRef, where("creditId", "==", creditId));
             const contractSnapshot = await getDocs(qContracts);
@@ -1307,7 +1283,17 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
                     ? format(new Date(paymentDates[0]), "d 'de' MMMM 'de' yyyy", { locale: es }) 
                     : "Fecha no definida";
                 
-                contractText = contractText.replace(/“DIA DONDE EL COBRADOR SELECIONA EL PRIMER DIA DE PAGO DE LA CUOTA”/g, firstPaymentDate);
+                const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
+                const installmentAmount = creditData.cuotas > 0 ? totalLoanAmount / creditData.cuotas : 0;
+                
+                const replacements: { [key: string]: string } = {
+                    "“DIA DONDE EL COBRADOR SELECIONA EL PRIMER DIA DE PAGO DE LA CUOTA”": firstPaymentDate,
+                    "“VALOR DE LA CUOTA A PAGAR MAS COMISION”": installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
+                };
+                
+                for (const [key, value] of Object.entries(replacements)) {
+                    contractText = contractText.replace(new RegExp(key, 'g'), value);
+                }
 
                 await updateDoc(contractRef, { contractText });
             }
@@ -1928,5 +1914,7 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
         return { error: "No se pudo guardar la configuración." };
     }
 }
+
+    
 
     
