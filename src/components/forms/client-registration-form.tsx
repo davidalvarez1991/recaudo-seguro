@@ -693,7 +693,13 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     </p>
                 </div>
                  <ScrollArea className="h-80 w-full rounded-md border p-4 whitespace-pre-wrap font-mono text-xs">
-                    {isPending ? <div className="flex justify-center items-center h-full"><Loader2 className="animate-spin" /></div> : contractText}
+                    {isPending && !contractText ? (
+                        <div className="flex justify-center items-center h-full">
+                            <Loader2 className="animate-spin" />
+                        </div>
+                    ) : (
+                        contractText
+                    )}
                 </ScrollArea>
                 <Button type="button" onClick={handleAcceptContract} className="w-full bg-accent hover:bg-accent/90" disabled={isPending || !contractText}>
                     {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
@@ -717,3 +723,5 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
+
+    

@@ -998,8 +998,7 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
         "“CUOTAS DEL CREDITO”": creditData.cuotas?.toString() || '0',
         "“VALOR DE LA CUOTA A PAGAR MAS COMISION”": installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
         "“EL PORCENTAJE ESTABLECIDO DE FORMULA DE COMISION POR TAMO”": (creditData.commissionPercentage || 0).toString(),
-        // Defaulting the "15" days placeholder to 15, can be made dynamic if needed
-        "“15”": "15"
+        "“15”": "15" // Defaulting the "15" days placeholder to 15
     };
 
     for (const [key, value] of Object.entries(replacements)) {
@@ -1012,7 +1011,7 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
         clienteId: clienteData.idNumber,
         contractText: contractText,
         createdAt: Timestamp.now(),
-        acceptedAt: null, // Mark as not accepted initially
+        acceptedAt: null,
     });
 };
 
@@ -1510,8 +1509,6 @@ export async function getContractForAcceptance(creditId: string) {
     const snapshot = await getDocs(q);
 
     if (snapshot.empty) {
-        // This can happen if the provider has contract generation disabled.
-        // It's not an error, just means there's no contract to show.
         return { contractText: null };
     }
 
@@ -1933,8 +1930,3 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
 }
 
     
-
-    
-
-
-
