@@ -85,12 +85,16 @@ export default function HistorialClientePage() {
         doc.setFontSize(12);
         doc.setTextColor(0);
         
+        const totalPaid = paymentRecords.reduce((sum, p) => sum + p.amount, 0);
+        
         const mainDetailsBody = [
             ['Empresa Prestadora', providerName],
             ['Fecha de Liquidación', formattedToday],
             ['Fecha de Inicio Crédito', format(new Date(credit.fecha), "d 'de' MMMM, yyyy", { locale: es })],
             ['Valor Solicitado', formatCurrency(credit.valor)],
+            ['Comisión', formatCurrency(credit.commission)],
             ['Número de Cuotas', credit.cuotas.toString()],
+            ['Valor Total Pagado', formatCurrency(totalPaid)],
         ];
 
         doc.autoTable({
@@ -107,12 +111,13 @@ export default function HistorialClientePage() {
             const paymentHistoryBody = paymentRecords.map((payment, index) => [
                 (index + 1).toString(),
                 format(new Date(payment.date), "d 'de' MMMM, yyyy", { locale: es }),
-                payment.type === 'interes' ? 'Abono a Interés' : 'Pago a Cuota'
+                payment.type === 'interes' ? 'Abono a Interés' : 'Pago a Cuota',
+                formatCurrency(payment.amount)
             ]);
             
             doc.autoTable({
                 startY: (doc as any).lastAutoTable.finalY + 10,
-                head: [['#', 'Fecha de Pago', 'Tipo']],
+                head: [['#', 'Fecha de Pago', 'Tipo', 'Valor Pagado']],
                 body: paymentHistoryBody,
                 theme: 'grid',
                 headStyles: { fillColor: [41, 98, 255] },
