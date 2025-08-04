@@ -1258,6 +1258,12 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
     const creditRef = doc(db, "credits", creditId);
 
     try {
+        const creditSnap = await getDoc(creditRef);
+        if (!creditSnap.exists()) {
+            return { error: "Crédito no encontrado." };
+        }
+        const creditData = creditSnap.data();
+
         const dateObjects = paymentDates.map(dateStr => new Date(dateStr));
         const timestampDates = dateObjects.map(d => Timestamp.fromDate(d));
         
@@ -1267,36 +1273,32 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
             updatedAt: Timestamp.now(),
         });
         
-        const creditSnap = await getDoc(creditRef);
-        const creditData = creditSnap.data();
-        if (creditData) {
-            const contractsRef = collection(db, "contracts");
-            const qContracts = query(contractsRef, where("creditId", "==", creditId), limit(1));
-            const contractSnapshot = await getDocs(qContracts);
+        const contractsRef = collection(db, "contracts");
+        const qContracts = query(contractsRef, where("creditId", "==", creditId), limit(1));
+        const contractSnapshot = await getDocs(qContracts);
 
-            if (!contractSnapshot.empty) {
-                const contractDoc = contractSnapshot.docs[0];
-                const contractRef = contractDoc.ref;
-                let contractText = contractDoc.data().contractText;
-                
-                const firstPaymentDate = paymentDates.length > 0 
-                    ? format(new Date(paymentDates[0]), "d 'de' MMMM 'de' yyyy", { locale: es }) 
-                    : "Fecha no definida";
-                
-                const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
-                const installmentAmount = creditData.cuotas > 0 ? totalLoanAmount / creditData.cuotas : 0;
-                
-                const replacements: { [key: string]: string } = {
-                    "“DIA DONDE EL COBRADOR SELECIONA EL PRIMER DIA DE PAGO DE LA CUOTA”": firstPaymentDate,
-                    "“VALOR DE LA CUOTA MAS COMISION”": installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
-                };
-                
-                for (const [key, value] of Object.entries(replacements)) {
-                    contractText = contractText.replace(new RegExp(key, 'g'), value);
-                }
-
-                await updateDoc(contractRef, { contractText });
+        if (!contractSnapshot.empty) {
+            const contractDoc = contractSnapshot.docs[0];
+            const contractRef = contractDoc.ref;
+            let contractText = contractDoc.data().contractText;
+            
+            const firstPaymentDate = dateObjects.length > 0 
+                ? format(dateObjects[0], "d 'de' MMMM 'de' yyyy", { locale: es }) 
+                : "Fecha no definida";
+            
+            const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
+            const installmentAmount = creditData.cuotas > 0 ? totalLoanAmount / creditData.cuotas : 0;
+            
+            const replacements: { [key: string]: string } = {
+                "“DIA DONDE EL COBRADOR SELECIONA EL PRIMER DIA DE PAGO DE LA CUOTA”": firstPaymentDate,
+                "“VALOR DE LA CUOTA A PAGAR MAS COMISION”": installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
+            };
+            
+            for (const [key, value] of Object.entries(replacements)) {
+                contractText = contractText.replace(new RegExp(key, 'g'), value);
             }
+
+            await updateDoc(contractRef, { contractText });
         }
         
         return { success: true };
