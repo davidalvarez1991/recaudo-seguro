@@ -601,17 +601,16 @@ export async function getPaymentsByCreditId(creditId: string) {
     
     const payments = querySnapshot.docs.map(doc => {
         const data = doc.data();
-        // Ensure date is handled correctly, converting from Timestamp if needed
         const dateValue = data.date;
         let isoDate;
         if (dateValue instanceof Timestamp) {
             isoDate = dateValue.toDate().toISOString();
         } else if (typeof dateValue === 'string') {
             isoDate = dateValue;
-        } else if (dateValue && typeof dateValue.toDate === 'function') { // Fallback for other potential date-like objects
+        } else if (dateValue && typeof dateValue.toDate === 'function') {
             isoDate = dateValue.toDate().toISOString();
         } else {
-            isoDate = new Date().toISOString(); // Fallback date
+            isoDate = new Date().toISOString(); 
         }
 
         return {
@@ -622,7 +621,6 @@ export async function getPaymentsByCreditId(creditId: string) {
         };
     });
 
-    // Sort the results in application code
     return payments.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
@@ -997,8 +995,8 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
         "“CIUDAD”": clienteData.city || 'CIUDAD NO DEFINIDA',
         "“VALOR PRESTAMO”": (creditData.valor || 0).toLocaleString('es-CO'),
         "“CUOTAS DEL CREDITO”": creditData.cuotas?.toString() || '0',
-        "“VALOR DE LA CUOTA MAS COMISION”": installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
-        "“PORCENTAJE DE COMISION”": (creditData.commissionPercentage || 0).toString(),
+        "“VALOR DE LA CUOTA A PAGAR MAS COMISION”": installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
+        "“EL PORCENTAJE ESTABLECIDO DE FORMULA DE COMISION POR TAMO”": (creditData.commissionPercentage || 0).toString(),
     };
 
     for (const [key, value] of Object.entries(replacements)) {
@@ -1307,7 +1305,7 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
                     ? format(new Date(paymentDates[0]), "d 'de' MMMM 'de' yyyy", { locale: es }) 
                     : "Fecha no definida";
                 
-                contractText = contractText.replace(/“DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”/g, firstPaymentDate);
+                contractText = contractText.replace(/“DIA DONDE EL COBRADOR SELECIONA EL PRIMER DIA DE PAGO DE LA CUOTA”/g, firstPaymentDate);
 
                 await updateDoc(contractRef, { contractText });
             }
@@ -1934,4 +1932,5 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
     
 
     
+
 
