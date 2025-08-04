@@ -977,7 +977,7 @@ export async function deleteClientAndCredits(clienteId: string) {
     return { success: true };
 }
 
-const generateAndSaveContract = async (creditId: string, providerId: string, creditData: any, clienteData: any) => {
+const generateAndSaveContract = async (creditId: string, providerId: string, creditData: any, clienteData: any, paymentDates: Date[]) => {
     const providerSnap = await getDoc(doc(db, "users", providerId));
     if (!providerSnap.exists()) return;
     
@@ -985,14 +985,23 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
     if (!providerData.isContractGenerationActive || !providerData.contractTemplate) return;
 
     let contractText = providerData.contractTemplate;
+
+    const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
+    const installmentAmount = creditData.cuotas > 0 ? totalLoanAmount / creditData.cuotas : 0;
+    const firstPaymentDate = paymentDates.length > 0
+        ? format(paymentDates[0], "d 'de' MMMM 'de' yyyy", { locale: es })
+        : "Fecha no definida";
     
     const replacements: { [key: string]: string } = {
-        "“NOMBRE DE LA EMPRESA”": providerData.companyName?.toUpperCase() || 'EMPRESA NO DEFINIDA',
-        "“NOMBRE DEL CLIENTE”": clienteData.name?.toUpperCase() || 'CLIENTE NO DEFINIDO',
-        "“CEDULA DEL CLIENTE”": clienteData.idNumber || 'CÉDULA NO DEFINIDA',
-        "“CIUDAD”": clienteData.city || 'CIUDAD NO DEFINIDA',
-        "“VALOR PRESTAMO”": (creditData.valor || 0).toLocaleString('es-CO'),
-        "“CUOTAS DEL CREDITO”": creditData.cuotas?.toString() || '0',
+        '“NOMBRE DE LA EMPRESA”': providerData.companyName?.toUpperCase() || 'EMPRESA NO DEFINIDA',
+        '“NOMBRE DEL CLIENTE”': clienteData.name?.toUpperCase() || 'CLIENTE NO DEFINIDO',
+        '“CEDULA DEL CLIENTE”': clienteData.idNumber || 'CÉDULA NO DEFINIDA',
+        '“CIUDAD”': clienteData.city || 'CIUDAD NO DEFINIDA',
+        '“VALOR PRESTAMO”': (creditData.valor || 0).toLocaleString('es-CO'),
+        '“CUOTAS DEL CREDITO”': creditData.cuotas?.toString() || '0',
+        '“AQUÍ TIENES QUE REGISTRAR EL PRIMER DIA DE PAGO”': firstPaymentDate,
+        '“AQUÍ DEBE QUE MOSTRAR EL VALOR DE LA CUOTA MAS LA COMISION”': installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
+        '“AQUÍ DEBE QUE IR EL PORCENTAJE DE COMISION”': (creditData.commissionPercentage || 0).toString(),
     };
 
     for (const [key, value] of Object.entries(replacements)) {
@@ -1065,7 +1074,6 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
         createdAt: Timestamp.now(),
         city: provider.city || 'N/A'
     });
-    clienteData = { id: newUserDocRef.id, idNumber, name: fullName, city: provider.city || 'N/A' };
 
 
     const valor = parseFloat(creditAmount.replace(/\./g, '').replace(',', '.'));
@@ -1106,8 +1114,6 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
         missedPaymentDays: 0,
     });
     
-    await generateAndSaveContract(creditRef.id, providerId, creditDataForContract, clienteData);
-
     return { success: true, creditId: creditRef.id };
 }
 
@@ -1155,8 +1161,6 @@ export async function createNewCreditForClient(values: z.infer<typeof NewCreditS
         missedPaymentDays: 0,
     });
     
-    await generateAndSaveContract(newCreditRef.id, providerId, creditDataForContract, cliente);
-
     return { success: true, newCreditId: newCreditRef.id };
 }
 
@@ -1198,9 +1202,6 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
     const newTotalValue = additionalValue + remainingBalance;
 
     const { commission, percentage } = calculateCommission(newTotalValue, provider.commissionTiers);
-
-    const cliente = await findUserByIdNumber(clienteId);
-    if(!cliente) return { error: "Cliente no encontrado" };
     
     const creditDataForContract = {
         valor: newTotalValue,
@@ -1232,16 +1233,7 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
         renewedWithCreditId: newCreditRef.id,
     });
     
-    // 3. Delete old contract
-    const contractsRef = collection(db, "contracts");
-    const qContracts = query(contractsRef, where("creditId", "==", oldCreditId));
-    const contractsSnapshot = await getDocs(qContracts);
-    contractsSnapshot.forEach(contractDoc => batch.delete(contractDoc.ref));
-    
     await batch.commit();
-    
-    // 4. Generate and save the new contract (after batch commit)
-    await generateAndSaveContract(newCreditRef.id, providerId, creditDataForContract, cliente);
 
     return { success: true, newCreditId: newCreditRef.id };
 }
@@ -1271,33 +1263,9 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
             updatedAt: Timestamp.now(),
         });
         
-        const contractsRef = collection(db, "contracts");
-        const qContracts = query(contractsRef, where("creditId", "==", creditId), limit(1));
-        const contractSnapshot = await getDocs(qContracts);
-
-        if (!contractSnapshot.empty) {
-            const contractDoc = contractSnapshot.docs[0];
-            const contractRef = contractDoc.ref;
-            let contractText = contractDoc.data().contractText;
-            
-            const firstPaymentDate = dateObjects.length > 0 
-                ? format(dateObjects[0], "d 'de' MMMM 'de' yyyy", { locale: es }) 
-                : "Fecha no definida";
-            
-            const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
-            const installmentAmount = creditData.cuotas > 0 ? totalLoanAmount / creditData.cuotas : 0;
-            
-            const replacements: { [key: string]: string } = {
-                '“AQUÍ TIENES QUE REGISTRAR EL PRIMER DIA DE PAGO”': firstPaymentDate,
-                '“ AQUÍ DEBE QUE MOSTRAR EL VALOR DE LA CUOTA MAS LA COMISION”': installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
-                '“AQUÍ DEBE QUE IR EL PORCENTAJE DE COMISION”': (creditData.commissionPercentage || 0).toString(),
-            };
-            
-            for (const [key, value] of Object.entries(replacements)) {
-                contractText = contractText.replace(new RegExp(key, 'g'), value);
-            }
-
-            await updateDoc(contractRef, { contractText });
+        const clienteData = await findUserByIdNumber(creditData.clienteId);
+        if (clienteData) {
+            await generateAndSaveContract(creditId, creditData.providerId, creditData, clienteData, dateObjects);
         }
         
         return { success: true };
