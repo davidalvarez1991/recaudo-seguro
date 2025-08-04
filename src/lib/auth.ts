@@ -43,3 +43,4 @@ export async function getAuthenticatedUser(): Promise<AuthResult> {
 
     return { userId, user, role: user.role }
 }
+
