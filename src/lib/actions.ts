@@ -68,6 +68,26 @@ const calculateCommission = (amount: number, tiers: CommissionTier[] | undefined
     return { commission: amount * (fallbackPercentage / 100), percentage: fallbackPercentage };
 };
 
+const getPaymentFrequencyString = (dates: Date[]): string => {
+    if (dates.length < 2) return "únicos";
+    
+    const sortedDates = [...dates].sort((a, b) => a.getTime() - b.getTime());
+    const differences: number[] = [];
+    for (let i = 1; i < sortedDates.length; i++) {
+        differences.push(differenceInDays(sortedDates[i], sortedDates[i - 1]));
+    }
+    
+    const avgDifference = differences.reduce((a, b) => a + b, 0) / differences.length;
+
+    if (avgDifference <= 1.5) return "diarios";
+    if (avgDifference > 1.5 && avgDifference <= 7.5) return "semanales";
+    if (avgDifference > 7.5 && avgDifference <= 16) return "quincenales";
+    if (avgDifference > 16 && avgDifference <= 31) return "mensuales";
+    
+    return "personalizados";
+};
+
+
 // --- Auth Actions ---
 export async function login(values: z.infer<typeof LoginSchema>) {
   const { cookies } = await import('next/headers')
@@ -988,34 +1008,46 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
 
     const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
     const installmentAmount = creditData.cuotas > 0 ? totalLoanAmount / creditData.cuotas : 0;
+    
     const firstPaymentDate = paymentDates.length > 0
         ? format(paymentDates[0], "d 'de' MMMM 'de' yyyy", { locale: es })
         : "Fecha no definida";
     
-    const replacements: { [key: string]: string } = {
+    const paymentFrequency = getPaymentFrequencyString(paymentDates);
+    
+    const replacements: Record<string, string> = {
         '“NOMBRE DE LA EMPRESA”': providerData.companyName?.toUpperCase() || 'EMPRESA NO DEFINIDA',
-        '“NOMBRE DEL CLIENTE”': clienteData.name?.toUpperCase() || 'CLIENTE NO DEFINIDO',
-        '“CEDULA DEL CLIENTE”': clienteData.idNumber || 'CÉDULA NO DEFINIDA',
+        '“NOMBRE DEL CLIENTE”': (clienteData.name || 'CLIENTE NO DEFINIDO').toUpperCase(),
+        '“CEDULA DEL CLIENTE”': clienteData.idNumber || 'DOCUMENTO NO DEFINIDO',
         '“CIUDAD”': clienteData.city || 'CIUDAD NO DEFINIDA',
         '“VALOR PRESTAMO”': (creditData.valor || 0).toLocaleString('es-CO'),
         '“CUOTAS DEL CREDITO”': creditData.cuotas?.toString() || '0',
-        '“AQUÍ TIENES QUE REGISTRAR EL PRIMER DIA DE PAGO”': firstPaymentDate,
-        '“AQUÍ DEBE QUE MOSTRAR EL VALOR DE LA CUOTA MAS LA COMISION”': installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
-        '“AQUÍ DEBE QUE IR EL PORCENTAJE DE COMISION”': (creditData.commissionPercentage || 0).toString(),
+        '“DIA DONDE EL COBRADOR SELECIONA EL PRIMER DIA DE PAGO DE LA CUOTA”': firstPaymentDate,
+        '“DIAS DEL RECAUDO”': paymentFrequency,
+        '“VALOR DE LA CUOTA”': installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
+        '“PORCENTAJE DE COMISION”': `${creditData.commissionPercentage || 0}`,
     };
-
+    
     for (const [key, value] of Object.entries(replacements)) {
         contractText = contractText.replace(new RegExp(key, 'g'), value);
     }
     
-    await addDoc(collection(db, "contracts"), {
-        creditId: creditId,
-        providerId: providerId,
-        clienteId: clienteData.idNumber,
-        contractText: contractText,
-        createdAt: Timestamp.now(),
-        acceptedAt: null,
-    });
+    const contractQuery = query(collection(db, "contracts"), where("creditId", "==", creditId), limit(1));
+    const contractSnapshot = await getDocs(contractQuery);
+
+    if (contractSnapshot.empty) {
+        await addDoc(collection(db, "contracts"), {
+            creditId: creditId,
+            providerId: providerId,
+            clienteId: clienteData.idNumber,
+            contractText: contractText,
+            createdAt: Timestamp.now(),
+            acceptedAt: null,
+        });
+    } else {
+        const contractRef = contractSnapshot.docs[0].ref;
+        await updateDoc(contractRef, { contractText });
+    }
 };
 
 
