@@ -211,6 +211,12 @@ export default function RutaDePagoPage() {
 
     const hasInterestOption = (selectedCredit?.lateInterestRate ?? 0) > 0;
     const sortedGroupKeys = Object.keys(groupedRoutes).sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
+
+    const defaultOpenValue = useMemo(() => {
+        const timeZone = 'America/Bogota';
+        const todayKey = sortedGroupKeys.find(key => isToday(toZonedTime(parseISO(key), timeZone)));
+        return todayKey ? [`group-${todayKey}`] : [];
+    }, [sortedGroupKeys]);
     
     return (
         <Card>
@@ -249,7 +255,7 @@ export default function RutaDePagoPage() {
                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     </div>
                 ) : sortedGroupKeys.length > 0 ? (
-                    <Accordion type="multiple" defaultValue={sortedGroupKeys.map(key => `group-${key}`)} className="w-full space-y-4">
+                    <Accordion type="multiple" defaultValue={defaultOpenValue} className="w-full space-y-4">
                         {sortedGroupKeys.map(dateKey => (
                             <AccordionItem key={dateKey} value={`group-${dateKey}`} className="border rounded-lg bg-card">
                                 <AccordionTrigger className="px-4 py-3 hover:no-underline">
