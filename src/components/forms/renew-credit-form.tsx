@@ -339,7 +339,7 @@ export function RenewCreditForm({ clienteId, oldCreditId, remainingBalance, onFo
                  <ScrollArea className="h-80 w-full rounded-md border p-4 whitespace-pre-wrap font-mono text-xs">
                     {isPending && !contractText ? <Loader2 className="animate-spin mx-auto" /> : contractText}
                 </ScrollArea>
-                <Button type="button" onClick={handleAcceptContract} className="w-full bg-accent hover:bg-accent/90" disabled={isPending}>
+                <Button type="button" onClick={handleAcceptContract} className="w-full bg-accent hover:bg-accent/90" disabled={isPending || !contractText}>
                     {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
                     {isPending ? "Procesando..." : "Aceptar y Finalizar Contrato"}
                 </Button>

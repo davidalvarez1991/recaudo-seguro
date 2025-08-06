@@ -1009,9 +1009,12 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
     const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
     const installmentAmount = creditData.cuotas > 0 ? totalLoanAmount / creditData.cuotas : 0;
     
-    const firstPaymentDate = paymentDates.length > 0
-        ? format(paymentDates[0], "d 'de' MMMM 'de' yyyy", { locale: es })
+    const sortedDates = [...paymentDates].sort((a, b) => a.getTime() - b.getTime());
+    const firstPaymentDate = sortedDates.length > 0
+        ? format(sortedDates[0], "d 'de' MMMM 'de' yyyy", { locale: es })
         : "Fecha no definida";
+    
+    const paymentFrequency = getPaymentFrequencyString(sortedDates);
         
     const replacements: Record<string, string> = {
         '“NOMBRE DE LA EMPRESA”': providerData.companyName?.toUpperCase() || 'EMPRESA NO DEFINIDA',
@@ -1020,9 +1023,12 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
         '“CIUDAD”': clienteData.city || 'CIUDAD NO DEFINIDA',
         '“VALOR PRESTAMO”': (creditData.valor || 0).toLocaleString('es-CO'),
         '“CUOTAS DEL CREDITO”': creditData.cuotas?.toString() || '0',
-        '“DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”': firstPaymentDate,
+        '“DIA DONDE EL COBRADOR SELECIONA EL PRIMER DIA DE PAGO DE LA CUOTA”': firstPaymentDate,
+        '“DIAS DEL RECAUDO”': paymentFrequency,
         '“VALOR DE LA CUOTA”': installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
-        '“INTERES”': `${creditData.commissionPercentage || 0}`,
+        '“PORCENTAJE DE COMISION”': `${creditData.commissionPercentage || 0}`,
+        '“DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”': firstPaymentDate,
+        '“INTERES”': `${creditData.commissionPercentage || 0}`
     };
     
     for (const [key, value] of Object.entries(replacements)) {
