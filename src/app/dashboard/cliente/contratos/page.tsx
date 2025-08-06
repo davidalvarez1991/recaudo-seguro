@@ -1,9 +1,9 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { FileText, ArrowLeft, Loader2, Download, ShieldCheck } from "lucide-react";
+import { FileText, ArrowLeft, Loader2, Download, ShieldCheck, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { getClientContracts } from "@/lib/actions";
@@ -33,24 +33,26 @@ export default function ContratosPage() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchContracts = async () => {
-      try {
-        const data = await getClientContracts();
-        setContracts(data);
-      } catch (err) {
-        console.error("Error fetching contracts:", err);
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar tus contratos.",
-          variant: "destructive"
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchContracts();
+  const fetchContracts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await getClientContracts();
+      setContracts(data);
+    } catch (err) {
+      console.error("Error fetching contracts:", err);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar tus contratos.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   }, [toast]);
+
+  useEffect(() => {
+    fetchContracts();
+  }, [fetchContracts]);
 
   const handleDownloadPDF = (contract: Contract) => {
     try {
@@ -116,12 +118,18 @@ export default function ContratosPage() {
                     Aquí podrás ver y descargar todos los documentos de tus créditos vigentes.
                 </CardDescription>
             </div>
-            <Button asChild variant="outline" className="w-full sm:w-auto">
-                <Link href="/dashboard/cliente">
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Volver a Mis Créditos
-                </Link>
-            </Button>
+             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <Button onClick={fetchContracts} variant="outline" disabled={loading}>
+                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                    Actualizar
+                </Button>
+                <Button asChild variant="outline" className="w-full sm:w-auto">
+                    <Link href="/dashboard/cliente">
+                        <ArrowLeft className="mr-2 h-4 w-4" />
+                        Volver a Mis Créditos
+                    </Link>
+                </Button>
+            </div>
         </div>
       </CardHeader>
       <CardContent>
