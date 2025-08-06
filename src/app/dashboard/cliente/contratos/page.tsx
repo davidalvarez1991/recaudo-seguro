@@ -57,6 +57,7 @@ export default function ContratosPage() {
       const doc = new jsPDF();
       
       const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 15;
       const usableWidth = pageWidth - 2 * margin;
 
@@ -67,9 +68,22 @@ export default function ContratosPage() {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       
+      let finalY = 35;
       const lines = doc.splitTextToSize(contract.contractText, usableWidth);
-      doc.text(lines, margin, 35);
+      doc.text(lines, margin, finalY);
+      finalY += (lines.length * doc.getLineHeight()) / doc.internal.scaleFactor;
       
+      // Disclaimer watermark at the bottom
+      const disclaimer = "Los contratos y facturas generadas a través de Recaudo Seguro son herramientas exclusivas que ofrece la app para facilitar la trazabilidad y respaldo documental entre el comercio y el cliente. Estas funciones son utilizadas directamente por los usuarios y no implican que la app gestione, administre o participe en los acuerdos de cobro.\nRecaudo Seguro actúa únicamente como una plataforma tecnológica de apoyo y no interviene en la relación contractual ni en las transacciones financieras entre las partes.";
+      
+      doc.setFontSize(7);
+      doc.setTextColor("#cccccc"); // Light gray color
+      const disclaimerLines = doc.splitTextToSize(disclaimer, usableWidth);
+      const disclaimerHeight = (disclaimerLines.length * doc.getLineHeight()) / doc.internal.scaleFactor;
+      const disclaimerY = pageHeight - disclaimerHeight - 10; // 10 units from bottom
+      doc.text(disclaimerLines, margin, disclaimerY);
+
+
       const fileName = `Contrato_${contract.providerName.replace(/ /g, '_')}_${format(new Date(contract.acceptedAt), 'yyyy-MM-dd')}.pdf`;
       doc.save(fileName);
       
