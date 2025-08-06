@@ -4,7 +4,7 @@
 import { useState, useEffect, useTransition, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, User, MoreHorizontal, Pencil, Trash2, Loader2, RefreshCw, CheckCircle, Ban, Users as UsersIcon, DollarSign, Search } from "lucide-react";
+import { ArrowLeft, User, MoreHorizontal, Pencil, Trash2, Loader2, RefreshCw, CheckCircle, Ban, Users as UsersIcon, DollarSign, Search, CalendarCheck } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getAllProviders, toggleProviderStatus, deleteProvider, getAdminSettings } from "@/lib/actions";
@@ -17,6 +17,8 @@ import { useRouter } from "next/navigation";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 
 type Provider = {
   id: string;
@@ -26,6 +28,7 @@ type Provider = {
   whatsappNumber: string;
   isActive: boolean;
   uniqueClientCount: number;
+  activatedAt?: string;
 };
 
 const formatCurrency = (value: number) => {
@@ -193,6 +196,7 @@ export default function AdminProvidersPage() {
                         <TableHead className="text-center">Clientes</TableHead>
                         <TableHead className="text-center">Suscripción</TableHead>
                         <TableHead className="text-center">Estado</TableHead>
+                        <TableHead className="text-center">Fecha de Activación</TableHead>
                         <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -217,6 +221,9 @@ export default function AdminProvidersPage() {
                                 <Badge variant={provider.isActive ? "secondary" : "destructive"}>
                                     {provider.isActive ? "Activo" : "Inactivo"}
                                 </Badge>
+                            </TableCell>
+                            <TableCell className="text-center text-sm text-muted-foreground">
+                                {provider.activatedAt ? format(new Date(provider.activatedAt), 'd MMM, yyyy', { locale: es }) : '-'}
                             </TableCell>
                             <TableCell className="text-right">
                                 <div className="flex justify-end items-center gap-2">
@@ -254,7 +261,7 @@ export default function AdminProvidersPage() {
                     ))
                  ) : (
                     <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center">
+                        <TableCell colSpan={6} className="h-24 text-center">
                             No se encontraron proveedores {searchTerm ? `con el término "${searchTerm}"` : "registrados."}
                         </TableCell>
                     </TableRow>

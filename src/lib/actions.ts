@@ -1026,7 +1026,7 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
         '“DIA DONDE EL COBRADOR SELECIONA EL PRIMER DIA DE PAGO DE LA CUOTA”': firstPaymentDate,
         '“DIAS DEL RECAUDO”': paymentFrequency,
         '“VALOR DE LA CUOTA”': installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
-        '“INTERES”': `${creditData.commissionPercentage || 0}`
+        '“PORCENTAJE DE COMISION”': `${creditData.commissionPercentage || 0}`
     };
     
     for (const [key, value] of Object.entries(replacements)) {
@@ -1796,6 +1796,7 @@ export async function getAllProviders() {
             idNumber: providerData.idNumber,
             isActive: providerData.isActive !== false,
             uniqueClientCount: uniqueClientIds.size,
+            activatedAt: providerData.activatedAt instanceof Timestamp ? providerData.activatedAt.toDate().toISOString() : undefined,
         };
     });
 
@@ -1808,7 +1809,11 @@ export async function toggleProviderStatus(providerId: string, newStatus: boolea
 
     const providerRef = doc(db, "users", providerId);
     try {
-        await updateDoc(providerRef, { isActive: newStatus });
+        const updateData: { isActive: boolean; activatedAt?: Timestamp } = { isActive: newStatus };
+        if (newStatus) {
+            updateData.activatedAt = Timestamp.now();
+        }
+        await updateDoc(providerRef, updateData);
         return { success: true };
     } catch (e) {
         console.error(e);
