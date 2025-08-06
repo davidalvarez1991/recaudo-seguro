@@ -28,7 +28,7 @@ EL ACREEDOR entrega en calidad de préstamo la suma de “VALOR PRESTAMO” peso
 
 SEGUNDA - Plazo y forma de pago
 
-EL DEUDOR se compromete a pagar el préstamo en un plazo de “CUOTAS DEL CREDITO” cuotas, a partir del día “DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”, mediante pagos únicos de $ “VALOR DE LA CUOTA”, hasta completar el capital más los intereses pactados.
+EL DEUDOR se compromete a pagar el préstamo en un plazo de “CUOTAS DEL CREDITO” cuotas a partir del día “DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”, mediante pagos “DIAS DEL RECAUDO” de $ “VALOR DE LA CUOTA”, hasta completar el capital más los intereses pactados.
 
 TERCERA - Intereses
 
@@ -310,7 +310,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
         <CardHeader>
           <CardTitle>Generación de Contratos</CardTitle>
           <CardDescription>
-            Activa esta función para generar un contrato automáticamente por cada crédito nuevo o renovado. Esta es una plantilla de ejemplo, el uso del contrato es opcional para cada proveedor.
+            Activa esta función para generar un contrato automáticamente por cada crédito nuevo o renovado.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -333,13 +333,13 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
                  <Textarea
                     id="contract-template"
                     placeholder="Pega aquí tu plantilla de contrato..."
-                    className="min-h-96"
+                    className="min-h-96 font-mono text-xs"
                     value={contractTemplate}
                     onChange={(e) => setContractTemplate(e.target.value)}
                     disabled={!isContractGenerationActive}
                 />
                 <p className="text-xs text-muted-foreground">
-                    Usa los marcadores como “NOMBRE DEL CLIENTE” o “VALOR PRESTAMO” para que se reemplacen automáticamente.
+                    Puedes editar este contrato, agregar o quitar cláusulas. Los marcadores como “NOMBRE DEL CLIENTE” o “VALOR PRESTAMO” se reemplazarán automáticamente y no deben ser modificados.
                 </p>
             </div>
         </CardContent>
