@@ -113,9 +113,8 @@ export async function login(values: z.infer<typeof LoginSchema>) {
         return { error: "Cédula o contraseña incorrecta." };
     }
 
-    if (user.role === 'proveedor' && !user.isActive) {
-        return { error: "Tu cuenta de proveedor está inactiva. Contacta al administrador." };
-    }
+    // We don't check for isActive here anymore, we do it on the dashboard page
+    // to show a specific message.
     
     const passwordsMatch = await bcrypt.compare(password, user.password);
 
@@ -160,7 +159,7 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: 'pr
         email,
         whatsappNumber,
         city,
-        isActive: true, // Proveedores start as active by default
+        isActive: false, // New providers start as inactive
         createdAt: Timestamp.now()
     });
     
@@ -188,7 +187,8 @@ export async function getUserData(userId: string) {
         return {
             id: ADMIN_ID,
             name: 'Administrador',
-            role: 'admin'
+            role: 'admin',
+            isActive: true,
         };
     }
     const userDocRef = doc(db, "users", userId);
@@ -1026,8 +1026,6 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
         '“DIA DONDE EL COBRADOR SELECIONA EL PRIMER DIA DE PAGO DE LA CUOTA”': firstPaymentDate,
         '“DIAS DEL RECAUDO”': paymentFrequency,
         '“VALOR DE LA CUOTA”': installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
-        '“PORCENTAJE DE COMISION”': `${creditData.commissionPercentage || 0}`,
-        '“DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”': firstPaymentDate,
         '“INTERES”': `${creditData.commissionPercentage || 0}`
     };
     

@@ -1,7 +1,7 @@
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Eye, TrendingUp, Landmark, Users, DollarSign } from "lucide-react";
+import { UserPlus, Eye, TrendingUp, Landmark, Users, DollarSign, ShieldAlert } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import { getCobradoresByProvider, getUserData, getProviderFinancialSummary, getAdminSettings } from "@/lib/actions";
@@ -14,6 +14,8 @@ import { RenewalCountdown } from "@/components/proveedor/renewal-countdown";
 
 type UserData = {
     companyName?: string;
+    idNumber?: string;
+    isActive?: boolean;
     [key: string]: any;
 } | null;
 
@@ -22,26 +24,67 @@ const formatCurrency = (value: number) => {
     return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 };
 
+const WhatsAppIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle"><path d="M12.02 2.01c-5.53 0-10.01 4.48-10.01 10.01 0 5.53 4.48 10.01 10.01 10.01 1.76 0 3.42-.46 4.88-1.28l4.11 1.28-1.28-4.11c.82-1.46 1.28-3.12 1.28-4.88.01-5.53-4.47-10.01-10-10.01Zm0 0"/></svg>
+);
+
+const InactiveProviderView = ({ companyName, idNumber }: { companyName?: string, idNumber?: string }) => {
+    const activationMessage = encodeURIComponent(`Hola, por favor activa mi cuenta de proveedor. Nombre: ${companyName}, Cédula/NIT: ${idNumber}`);
+    const whatsappLink = `https://wa.me/573052353554?text=${activationMessage}`;
+
+    return (
+        <Card className="border-destructive border-2 bg-destructive/5">
+            <CardHeader className="text-center">
+                <ShieldAlert className="w-16 h-16 mx-auto text-destructive mb-4" />
+                <CardTitle className="text-2xl text-destructive">Cuenta Inactiva</CardTitle>
+                <CardDescription className="text-destructive/90">
+                    Comunícate con el administrador para que habilite tu cuenta y puedas acceder a todas las funciones.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="flex justify-center">
+                <Button asChild className="bg-accent hover:bg-accent/90">
+                    <a href={whatsappLink} target="_blank" rel="noopener noreferrer">
+                        <WhatsAppIcon />
+                        Contactar al Administrador
+                    </a>
+                </Button>
+            </CardContent>
+        </Card>
+    );
+};
+
+
 export default async function ProveedorDashboard() {
   const { userId } = await getAuthenticatedUser();
   
   let companyName = "Perfil de Proveedor";
+  let idNumber = "";
+  let isActive = false;
   let financialSummary = { activeCapital: 0, collectedCommission: 0, uniqueClientCount: 0 };
   let adminSettings = { pricePerClient: 3500 };
   let subscriptionCost = 0;
 
   if (userId) {
     const userData: UserData = await getUserData(userId);
-    if (userData && userData.companyName) {
-      companyName = userData.companyName;
+    if (userData) {
+      if (userData.companyName) companyName = userData.companyName;
+      if (userData.idNumber) idNumber = userData.idNumber;
+      isActive = userData.isActive !== false;
     }
-    const [summary, settings] = await Promise.all([
-      getProviderFinancialSummary(),
-      getAdminSettings()
-    ]);
-    financialSummary = summary;
-    adminSettings = settings;
-    subscriptionCost = financialSummary.uniqueClientCount * adminSettings.pricePerClient;
+    
+    if (isActive) {
+      const [summary, settings] = await Promise.all([
+        getProviderFinancialSummary(),
+        getAdminSettings()
+      ]);
+      financialSummary = summary;
+      adminSettings = settings;
+      subscriptionCost = financialSummary.uniqueClientCount * adminSettings.pricePerClient;
+    }
+  }
+
+  if (!isActive) {
+      return <InactiveProviderView companyName={companyName} idNumber={idNumber} />;
   }
 
   const cobradores = await getCobradoresByProvider();
