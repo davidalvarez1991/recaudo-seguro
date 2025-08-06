@@ -68,6 +68,11 @@ export default function HistorialClientePage() {
         const providerName = (providerData?.companyName || credit.providerName || 'N/A').toUpperCase();
         const paymentRecords = await getPaymentsByCreditId(credit.id);
 
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const margin = 15;
+        const usableWidth = pageWidth - 2 * margin;
+
         // Header
         doc.setFontSize(22);
         doc.setTextColor(41, 98, 255);
@@ -129,6 +134,16 @@ export default function HistorialClientePage() {
         doc.setFontSize(10);
         doc.text("Este documento certifica que el crédito referenciado ha sido cancelado en su totalidad.", 14, (doc as any).lastAutoTable.finalY + 20);
         doc.text("Generado por Recaudo Seguro.", 14, (doc as any).lastAutoTable.finalY + 25);
+        
+        // Disclaimer watermark at the bottom
+        const disclaimer = "Los contratos y facturas generadas a través de Recaudo Seguro son herramientas exclusivas que ofrece la app para facilitar la trazabilidad y respaldo documental entre el comercio y el cliente. Estas funciones son utilizadas directamente por los usuarios y no implican que la app gestione, administre o participe en los acuerdos de cobro.\nRecaudo Seguro actúa únicamente como una plataforma tecnológica de apoyo y no interviene en la relación contractual ni en las transacciones financieras entre las partes.";
+        
+        doc.setFontSize(7);
+        doc.setTextColor("#cccccc"); // Light gray color
+        const disclaimerLines = doc.splitTextToSize(disclaimer, usableWidth);
+        const disclaimerHeight = (disclaimerLines.length * doc.getLineHeight()) / doc.internal.scaleFactor;
+        const disclaimerY = pageHeight - disclaimerHeight - 10; // 10 units from bottom
+        doc.text(disclaimerLines, margin, disclaimerY);
 
         const fileName = `Paz_y_Salvo_${credit.clienteName.replace(/ /g, '_')}_${format(today, 'yyyy-MM-dd')}.pdf`;
         doc.save(fileName);
