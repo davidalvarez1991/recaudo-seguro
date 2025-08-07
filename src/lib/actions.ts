@@ -1369,6 +1369,7 @@ export async function registerPayment(creditId: string, amount: number, type: "c
         cobradorId: cobradorData.idNumber,
         providerId: creditData.providerId,
         clienteId: creditData.clienteId,
+        reinvested: false, // Add this flag
     });
     
     if (type === 'cuota' || type === 'total') {
@@ -1469,6 +1470,7 @@ export async function registerPaymentAgreement(creditId: string, amount: number)
           cobradorId: cobradorData.idNumber,
           providerId: creditData.providerId,
           clienteId: creditData.clienteId,
+          reinvested: false, // Also flag this
       });
     }
     
@@ -1772,6 +1774,7 @@ export async function getProviderFinancialSummary() {
       return { activeCapital: 0, collectedCommission: 0, uniqueClientCount: 0, myCapital: 0 };
   }
 
+  // Load all credits and payments first
   const creditsRef = collection(db, "credits");
   const creditsQuery = query(creditsRef, where("providerId", "==", providerId));
   const creditsSnapshot = await getDocs(creditsQuery);
@@ -1781,9 +1784,9 @@ export async function getProviderFinancialSummary() {
   const paymentsQuery = query(paymentsRef, where("providerId", "==", providerId));
   const paymentsSnapshot = await getDocs(paymentsQuery);
   const allProviderPayments = paymentsSnapshot.docs.map(doc => doc.data());
-  
+
   let activeCapital = 0;
-  let collectedCommission = 0;
+  let collectedCommission = 0; // This will be the available-to-reinvest amount
   const uniqueClientIds = new Set<string>();
   let paidOffCommission = 0;
 
@@ -1797,9 +1800,14 @@ export async function getProviderFinancialSummary() {
 
     if (totalLoanAmount > 0) {
       const paidProportion = Math.min(1, totalPaidAmount / totalLoanAmount);
-      collectedCommission += (credit.commission || 0) * paidProportion;
+      
+      // Calculate only commission from payments that have NOT been reinvested
+      const unreinvestedPayments = capitalAndCommissionPayments.filter(p => !p.reinvested);
+      const unreinvestedPaidAmount = unreinvestedPayments.reduce((sum, p) => sum + p.amount, 0);
+      const unreinvestedPaidProportion = Math.min(1, unreinvestedPaidAmount / totalLoanAmount);
+      collectedCommission += (credit.commission || 0) * unreinvestedPaidProportion;
     }
-    
+
     if (credit.estado === 'Activo') {
       const capitalProportionInLoan = totalLoanAmount > 0 ? (credit.valor || 0) / totalLoanAmount : 0;
       const totalCapitalPaid = totalPaidAmount * capitalProportionInLoan;
@@ -1813,8 +1821,7 @@ export async function getProviderFinancialSummary() {
 
   const finalActiveCapital = Math.max(0, activeCapital);
   
-  // My Capital is the base capital defined by the user plus any commission from fully paid-off credits.
-  const myCapital = (providerData.baseCapital || 0) + paidOffCommission;
+  const myCapital = (providerData.baseCapital || 0);
 
   return { 
     activeCapital: finalActiveCapital,
@@ -1836,25 +1843,29 @@ export async function reinvestCommission() {
         }
         const providerData = providerSnap.data();
 
-        // 1. Get all payments for the provider
+        // 1. Get all unreinvested payments for the provider
         const paymentsRef = collection(db, "payments");
-        const allPaymentsQuery = query(paymentsRef, where("providerId", "==", providerId));
-        const allPaymentsSnapshot = await getDocs(allPaymentsQuery);
+        
+        // This is a more compatible way to query for "not true"
+        const q1 = query(paymentsRef, where("providerId", "==", providerId), where("reinvested", "==", false));
+        const q2 = query(paymentsRef, where("providerId", "==", providerId), where("reinvested", "==", null));
+        
+        const [snapshot1, snapshot2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+        
+        const unreinvestedPaymentsDocs = [...snapshot1.docs, ...snapshot2.docs];
+        // Deduplicate in case a document matches both (though it shouldn't)
+        const uniqueDocs = Array.from(new Map(unreinvestedPaymentsDocs.map(d => [d.id, d])).values());
 
-        // 2. Filter for unreinvested payments in server code
-        const unreinvestedPayments = allPaymentsSnapshot.docs
-            .map(doc => ({ doc, data: doc.data() }))
-            .filter(({ data }) => !data.reinvested);
-
-        if (unreinvestedPayments.length === 0) {
+        if (uniqueDocs.length === 0) {
             return { success: true, newCapital: providerData.baseCapital || 0 }; // Nothing to do
         }
-
+        
         let commissionToReinvest = 0;
         const batch = writeBatch(db);
         const creditsMap = new Map();
 
-        for(const { doc: paymentDoc, data: payment } of unreinvestedPayments) {
+        for(const paymentDoc of uniqueDocs) {
+            const payment = paymentDoc.data();
             let creditData = creditsMap.get(payment.creditId);
             if (!creditData) {
                 const creditSnap = await getDoc(doc(db, "credits", payment.creditId));
@@ -1864,7 +1875,7 @@ export async function reinvestCommission() {
                 }
             }
             
-            if (creditData && (payment.type === 'cuota' || payment.type === 'total')) {
+            if (creditData && (payment.type === 'cuota' || payment.type === 'total' || payment.type === 'acuerdo')) {
                  const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
                  if (totalLoanAmount > 0) {
                      const commissionProportion = (creditData.commission || 0) / totalLoanAmount;
@@ -2078,6 +2089,7 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
     
 
     
+
 
 
 
