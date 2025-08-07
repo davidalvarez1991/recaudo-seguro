@@ -87,6 +87,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isReinvesting, setIsReinvesting] = useState(false);
+  const [reinvestAmount, setReinvestAmount] = useState("");
   const router = useRouter();
 
   const { toast } = useToast();
@@ -204,21 +205,29 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
   };
   
   const handleReinvest = async () => {
-      if (collectedCommission <= 0) {
-          toast({ title: "Sin ganancias", description: "No hay ganancias de comisión disponibles para reinvertir.", variant: "default" });
+      const amountToReinvest = parseFloat(reinvestAmount.replace(/\D/g, '')) || 0;
+
+      if (amountToReinvest <= 0) {
+          toast({ title: "Monto inválido", description: "Ingresa un monto válido para reinvertir.", variant: "destructive" });
           return;
       }
       
+      if (amountToReinvest > collectedCommission) {
+           toast({ title: "Monto excede lo disponible", description: `No puedes reinvertir más de ${formatCurrencyForInput(collectedCommission)}.`, variant: "destructive" });
+           return;
+      }
+
       setIsReinvesting(true);
       try {
-        const result = await reinvestCommission();
+        const result = await reinvestCommission(amountToReinvest);
         if (result.success) {
              toast({
                 title: "Reinversión Exitosa",
-                description: `${formatCurrencyForInput(collectedCommission)} han sido añadidos a tu capital base.`,
+                description: `${formatCurrencyForInput(result.reinvestedAmount)} han sido añadidos a tu capital base.`,
                 className: "bg-accent text-accent-foreground border-accent",
             });
             await fetchProviderData(); // Refresh all data on the page
+            setReinvestAmount(""); // Clear input
             router.refresh();
         } else {
             toast({ title: "Error", description: result.error, variant: "destructive" });
@@ -282,6 +291,20 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
                     <TrendingUp className="h-6 w-6 text-green-600"/>
                     <p className="text-2xl font-bold text-green-700">{formatCurrencyForInput(collectedCommission)}</p>
                  </div>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="reinvest-amount">Monto a Reinvertir</Label>
+                <div className="relative">
+                    <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        id="reinvest-amount"
+                        value={reinvestAmount}
+                        onChange={(e) => setReinvestAmount(formatCurrencyForInput(e.target.value))}
+                        className="pl-8"
+                        placeholder="Ej: 50.000"
+                        disabled={isReinvesting || collectedCommission <= 0}
+                    />
+                </div>
             </div>
              <Button onClick={handleReinvest} disabled={isReinvesting || collectedCommission <= 0}>
                 {isReinvesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
