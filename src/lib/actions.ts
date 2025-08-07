@@ -1799,11 +1799,12 @@ export async function getProviderFinancialSummary() {
             activeCapital += (credit.valor || 0);
         }
     }
-    
-    myCapital += (credit.valor || 0) + (credit.commission || 0);
   }
 
   const finalActiveCapital = Math.max(0, activeCapital);
+  
+  // "My Capital" is the sum of the capital still out on the street plus the commission that has already been collected.
+  myCapital = finalActiveCapital + collectedCommission;
 
   return { 
     activeCapital: finalActiveCapital,
@@ -1876,13 +1877,14 @@ export async function deleteProvider(providerId: string) {
 
     const providerRef = doc(db, "users", providerId);
     const providerSnap = await getDoc(providerRef);
-    const providerData = providerSnap.data();
-
-    if (providerData) {
-        usersCache.delete(providerData.idNumber);
+    
+    if (providerSnap.exists()) {
+        const providerData = providerSnap.data();
+        if (providerData) {
+            usersCache.delete(providerData.idNumber);
+        }
+        batch.delete(providerRef);
     }
-    batch.delete(providerRef);
-
 
     const cobradoresRef = collection(db, "users");
     const cobradoresQuery = query(cobradoresRef, where("providerId", "==", providerId));
@@ -1987,6 +1989,7 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
     
 
     
+
 
 
 
