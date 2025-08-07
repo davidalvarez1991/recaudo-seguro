@@ -3,8 +3,9 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { CalendarCheck, Hourglass, PartyPopper } from 'lucide-react';
-import { differenceInDays, startOfMonth, addMonths, startOfDay } from 'date-fns';
+import { CalendarCheck, Hourglass, PartyPopper, CalendarClock } from 'lucide-react';
+import { differenceInDays, startOfMonth, addMonths, startOfDay, format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Button } from '../ui/button';
 
 const WhatsAppIcon = () => (
@@ -14,10 +15,14 @@ const WhatsAppIcon = () => (
 export function RenewalCountdown() {
     const [daysLeft, setDaysLeft] = useState<number | null>(null);
     const [isCollectionPeriod, setIsCollectionPeriod] = useState(false);
+    const [nextCollectionDate, setNextCollectionDate] = useState<string>('');
+    const [todayDate, setTodayDate] = useState<string>('');
 
     useEffect(() => {
         const today = startOfDay(new Date());
         const dayOfMonth = today.getDate();
+
+        setTodayDate(format(today, "d 'de' MMMM", { locale: es }));
 
         if (dayOfMonth >= 1 && dayOfMonth <= 3) {
             setIsCollectionPeriod(true);
@@ -34,6 +39,7 @@ export function RenewalCountdown() {
             }
             
             setDaysLeft(differenceInDays(nextCollectionStart, today));
+            setNextCollectionDate(format(nextCollectionStart, "d 'de' MMMM", { locale: es }));
             setIsCollectionPeriod(false);
         }
     }, []);
@@ -56,14 +62,23 @@ export function RenewalCountdown() {
                         <p className="text-3xl font-bold text-green-700 dark:text-green-100">¡Es hora de renovar!</p>
                     </div>
                 ) : (
-                    <div className="p-6 rounded-lg bg-blue-100 dark:bg-blue-900/50 text-center">
-                         <p className="text-sm font-semibold text-blue-800 dark:text-blue-200 uppercase">Próxima Renovación en:</p>
-                        <div className="flex items-center justify-center gap-3">
-                            <Hourglass className="h-10 w-10 text-blue-600 dark:text-blue-400" />
-                            <p className="text-5xl font-bold text-blue-700 dark:text-blue-200">
+                    <div className="p-6 rounded-lg bg-blue-100 dark:bg-blue-900/50 text-center space-y-4">
+                        <div className="flex justify-around items-center text-blue-800 dark:text-blue-200">
+                           <div className="text-center">
+                                <p className="text-sm font-medium uppercase">Hoy es</p>
+                                <p className="text-lg font-bold">{todayDate}</p>
+                           </div>
+                           <div className="text-center">
+                                <p className="text-sm font-medium uppercase">Próximo Ciclo</p>
+                                <p className="text-lg font-bold">{nextCollectionDate}</p>
+                           </div>
+                        </div>
+                        <div className="flex items-center justify-center gap-3 pt-2 border-t border-blue-200/50 dark:border-blue-700/50">
+                            <CalendarClock className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                            <p className="text-4xl font-bold text-blue-700 dark:text-blue-200">
                                 {daysLeft !== null ? daysLeft : '...'}
                             </p>
-                            <p className="text-2xl text-blue-700/80 dark:text-blue-300 self-end pb-1">días</p>
+                            <p className="text-xl text-blue-700/80 dark:text-blue-300 self-end pb-1">días restantes</p>
                         </div>
                     </div>
                 )}
