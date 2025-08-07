@@ -46,7 +46,6 @@ type Credito = {
   remainingBalance: number;
   lateFee: number;
   totalDebt: number;
-  missedPaymentDays: number;
 };
 
 type PaymentType = "cuota" | "total" | "acuerdo" | "comision";
@@ -354,3 +353,5 @@ export default function CreditosPage() {
     </TooltipProvider>
   );
 }
+
+    

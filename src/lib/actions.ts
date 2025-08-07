@@ -15,6 +15,7 @@ import { getAuthenticatedUser } from "./auth";
 
 
 const ADMIN_ID = "admin_0703091991";
+const usersCache = new Map<string, any>();
 
 type CommissionTier = {
   minAmount: number;
@@ -24,11 +25,16 @@ type CommissionTier = {
 
 // --- Utility Functions ---
 export const findUserByIdNumber = async (idNumber: string) => {
+    if (usersCache.has(idNumber)) {
+        return usersCache.get(idNumber);
+    }
+    
     const usersRef = collection(db, "users");
     const q = query(usersRef, where("idNumber", "==", idNumber), limit(1));
     const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) {
+        usersCache.set(idNumber, null);
         return null;
     }
 
@@ -45,6 +51,7 @@ export const findUserByIdNumber = async (idNumber: string) => {
         }
     }
     
+    usersCache.set(idNumber, serializableData);
     return serializableData;
 };
 
@@ -358,18 +365,6 @@ export async function getProviderActivityLog() {
     const paymentsQuery = query(paymentsRef, where("providerId", "==", userId));
     const paymentsSnapshot = await getDocs(paymentsQuery);
 
-    // 3. Fetch all users (cobradores and clientes) related to this provider in a single pass if possible
-    // This part remains tricky without querying by array of IDs, so we'll fetch them as needed but cache them.
-    const usersCache = new Map<string, any>();
-    const fetchAndCacheUser = async (idNumber: string) => {
-        if (usersCache.has(idNumber)) {
-            return usersCache.get(idNumber);
-        }
-        const user = await findUserByIdNumber(idNumber);
-        usersCache.set(idNumber, user);
-        return user;
-    };
-    
     // Fetch provider settings once
     const providerData = await getUserData(userId);
     const providersMap = new Map();
@@ -422,7 +417,7 @@ export async function getProviderActivityLog() {
             const creditData = creditsMap.get(entry.creditId);
             if (!creditData) return null;
 
-            const cliente = await fetchAndCacheUser(entry.clienteId);
+            const cliente = await findUserByIdNumber(entry.clienteId);
             // This is still heavy, but we'll keep it for now as the main issue was the N+1 user queries.
             const fullCreditDetails = await getFullCreditDetails({ ...creditData, id: entry.creditId }, providersMap);
             
@@ -454,7 +449,6 @@ export async function getCreditsByCobrador() {
     if (cobrador.providerId) {
         const provider = await getUserData(cobrador.providerId);
         if (provider && !provider.isActive) {
-            // If provider is inactive, cobrador cannot operate.
             return [];
         }
     }
@@ -463,44 +457,49 @@ export async function getCreditsByCobrador() {
     const providerSnap = await getDoc(providerDocRef);
     const providerSettings = providerSnap.exists() ? providerSnap.data() : {};
 
+    // 1. Fetch all credits for the cobrador
     const creditsRef = collection(db, "credits");
     const q = query(creditsRef, where("cobradorId", "==", cobrador.idNumber));
-    const querySnapshot = await getDocs(q);
+    const creditsSnapshot = await getDocs(q);
+    const allCredits = creditsSnapshot.docs.map(docSnapshot => ({
+        id: docSnapshot.id,
+        ...docSnapshot.data()
+    }));
+    
+    const creditIds = allCredits.map(c => c.id);
+    if(creditIds.length === 0) return [];
 
-    const creditsPromises = querySnapshot.docs.map(async (docSnapshot) => {
-        const creditData = docSnapshot.data();
+    // 2. Fetch all payments for all those credits in one go
+    const paymentsRef = collection(db, "payments");
+    const paymentsQuery = query(paymentsRef, where("creditId", "in", creditIds));
+    const paymentsSnapshot = await getDocs(paymentsQuery);
+    const allPayments = paymentsSnapshot.docs.map(p => p.data());
+
+    // 3. Process credits with fetched payments
+    const creditsPromises = allCredits.map(async (creditData) => {
+        const serializableData: { [key: string]: any } = { ...creditData };
         
-        const serializableData: { [key: string]: any } = { id: docSnapshot.id, ...creditData };
-        
-        // Convert Timestamps to strings
         serializableData.paymentDates = (serializableData.paymentDates || []).map((d: any) => 
             d instanceof Timestamp ? d.toDate().toISOString() : d
         );
         serializableData.fecha = serializableData.fecha instanceof Timestamp ? serializableData.fecha.toDate().toISOString() : serializableData.fecha;
-        serializableData.updatedAt = serializableData.updatedAt instanceof Timestamp ? serializableData.updatedAt.toDate().toISOString() : serializableData.updatedAt;
-        serializableData.createdAt = serializableData.createdAt instanceof Timestamp ? serializableData.createdAt.toDate().toISOString() : serializableData.createdAt;
 
         const cliente = await findUserByIdNumber(creditData.clienteId as string);
         serializableData.clienteName = cliente?.name || 'No disponible';
 
-        // Fetch payments for this credit
-        const paymentsRef = collection(db, "payments");
-        const paymentsQuery = query(paymentsRef, where("creditId", "==", serializableData.id));
-        const paymentsSnapshot = await getDocs(paymentsQuery);
-        const payments = paymentsSnapshot.docs.map(p => p.data());
+        const creditPayments = allPayments.filter(p => p.creditId === creditData.id);
         
-        // Payments that reduce capital and commission
-        const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
+        const capitalAndCommissionPayments = creditPayments.filter(p => p.type === 'cuota' || p.type === 'total');
         const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
 
-        serializableData.paidInstallments = payments.filter(p => p.type === 'cuota').length;
+        serializableData.paidInstallments = creditPayments.filter(p => p.type === 'cuota').length;
         serializableData.paidAmount = paidCapitalAndCommission;
         
         const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
         const remainingBalance = totalLoanAmount - paidCapitalAndCommission;
         serializableData.remainingBalance = remainingBalance;
 
-        serializableData.agreementAmount = payments.filter(p => p.type === 'acuerdo').reduce((sum, p) => sum + p.amount, 0);
+        serializableData.agreementAmount = creditPayments.filter(p => p.type === 'acuerdo').reduce((sum, p) => sum + p.amount, 0);
         
         serializableData.lateInterestRate = providerSettings.isLateInterestActive ? (providerSettings.lateInterestRate || 0) : 0;
 
@@ -511,9 +510,7 @@ export async function getCreditsByCobrador() {
         return serializableData;
     });
     
-    const credits = await Promise.all(creditsPromises);
-
-    return credits;
+    return Promise.all(creditsPromises);
 }
 
 
@@ -719,12 +716,24 @@ export async function getDailyCollectionSummary() {
 export async function getPaymentRoute() {
     const { user: cobradorData } = await getAuthenticatedUser();
     if (!cobradorData || cobradorData.role !== 'cobrador') return { routes: [], dailyGoal: 0, collectedToday: 0 };
-
+    
     const allCredits = await getCreditsByCobrador();
     const activeCredits = allCredits.filter(c => c.estado === 'Activo' && Array.isArray(c.paymentDates) && c.paymentDates.length > 0);
     const timeZone = 'America/Bogota';
     
     let dailyGoal = 0;
+    
+    // --- Optimized Data Fetching ---
+    // 1. Fetch all payments for all active credits at once
+    const activeCreditIds = activeCredits.map(c => c.id);
+    let allPayments: any[] = [];
+    if (activeCreditIds.length > 0) {
+        const paymentsRef = collection(db, "payments");
+        const paymentsQuery = query(paymentsRef, where("creditId", "in", activeCreditIds));
+        const paymentsSnapshot = await getDocs(paymentsQuery);
+        allPayments = paymentsSnapshot.docs.map(p => p.data());
+    }
+    // --- End Optimization ---
     
     const routeEntriesPromises = activeCredits.map(async (credit) => {
         if (!Array.isArray(credit.paymentDates)) return null;
@@ -742,14 +751,12 @@ export async function getPaymentRoute() {
         
         const clienteData = await findUserByIdNumber(credit.clienteId);
         
-        const paymentsRef = collection(db, "payments");
-        const paymentsQuery = query(paymentsRef, where("creditId", "==", credit.id));
-        const paymentsSnapshot = await getDocs(paymentsQuery);
         const todayStart = startOfDay(toZonedTime(new Date(), timeZone));
         const todayEnd = endOfDay(toZonedTime(new Date(), timeZone));
 
-        const isPaidToday = paymentsSnapshot.docs.some(pDoc => {
-            const payment = pDoc.data();
+        // Use pre-fetched payments
+        const creditPayments = allPayments.filter(p => p.creditId === credit.id);
+        const isPaidToday = creditPayments.some(payment => {
             const paymentDateInTimeZone = toZonedTime(payment.date.toDate(), timeZone);
             return isWithinInterval(paymentDateInTimeZone, { start: todayStart, end: todayEnd });
         });
@@ -761,19 +768,9 @@ export async function getPaymentRoute() {
 
         const serializableCredit = Object.fromEntries(
             Object.entries(credit).map(([key, value]) => {
-                if (value instanceof Date) {
-                    return [key, value.toISOString()];
-                }
-                 if (value instanceof Timestamp) {
-                    return [key, value.toDate().toISOString()];
-                }
-                if (Array.isArray(value) && value.some(item => item instanceof Timestamp || item instanceof Date)) {
-                     return [key, value.map(item => (item instanceof Timestamp ? item.toDate().toISOString() : (item instanceof Date ? item.toISOString() : item)))];
-                }
                 return [key, value];
             })
         );
-
 
         return {
             ...serializableCredit,
@@ -898,6 +895,8 @@ export async function updateCobrador(values: z.infer<typeof EditCobradorSchema>)
     }
 
     await updateDoc(doc(db, "users", userDoc.id), updateData);
+    usersCache.delete(originalIdNumber);
+    usersCache.delete(idNumber);
 
     return { success: "Cobrador actualizado exitosamente." };
 }
@@ -940,6 +939,9 @@ export async function updateClient(values: z.infer<typeof EditClientSchema>) {
         });
         await batch.commit();
     }
+    
+    usersCache.delete(originalIdNumber);
+    usersCache.delete(idNumber);
 
     return { success: "Cliente actualizado exitosamente." };
 }
@@ -958,6 +960,7 @@ export async function deleteCobrador(idNumber: string) {
     
     const cobradorDoc = userSnapshot.docs[0];
     batch.delete(cobradorDoc.ref);
+    usersCache.delete(idNumber);
 
     const creditsRef = collection(db, "credits");
     const qCredits = query(creditsRef, where("cobradorId", "==", idNumber));
@@ -993,6 +996,7 @@ export async function deleteClientAndCredits(clienteId: string) {
     const userQuery = query(usersRef, where("idNumber", "==", clienteId));
     const userSnapshot = await getDocs(userQuery);
     userSnapshot.forEach(doc => batch.delete(doc.ref));
+    usersCache.delete(clienteId);
 
     const creditsRef = collection(db, "credits");
     const creditQuery = query(creditsRef, where("clienteId", "==", clienteId));
@@ -1046,7 +1050,6 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
         '“DIAS DEL RECAUDO”': paymentFrequency,
         '“VALOR DE LA CUOTA”': installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
         '“INTERES”': `${creditData.commissionPercentage || 0}`,
-        '“DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”': firstPaymentDate,
     };
     
     for (const [key, value] of Object.entries(replacements)) {
@@ -1127,6 +1130,7 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
         createdAt: Timestamp.now(),
         city: provider.city || 'N/A'
     });
+    usersCache.delete(idNumber);
 
 
     const valor = parseFloat(creditAmount.replace(/\./g, '').replace(',', '.'));
@@ -1483,6 +1487,7 @@ export async function saveProviderSettings(providerId: string, settings: { commi
       if (Object.keys(updateData).length > 0) {
         updateData.updatedAt = Timestamp.now();
         await updateDoc(providerRef, updateData);
+        usersCache.delete(providerSnap.data().idNumber);
         return { success: true };
       }
 
@@ -1834,6 +1839,7 @@ export async function toggleProviderStatus(providerId: string, newStatus: boolea
             updateData.activatedAt = Timestamp.now();
         }
         await updateDoc(providerRef, updateData);
+        usersCache.clear();
         return { success: true };
     } catch (e) {
         console.error(e);
@@ -1875,6 +1881,7 @@ export async function deleteProvider(providerId: string) {
 
     try {
         await batch.commit();
+        usersCache.clear();
         return { success: true };
     } catch (e) {
         console.error(e);
@@ -1915,6 +1922,8 @@ export async function updateProvider(values: z.infer<typeof EditProviderSchema>)
     }
 
     await updateDoc(doc(db, "users", userDoc.id), updateData);
+    usersCache.delete(originalIdNumber);
+    usersCache.delete(idNumber);
 
     return { success: "Proveedor actualizado exitosamente." };
 }
@@ -1941,3 +1950,5 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
         return { error: "No se pudo guardar la configuración." };
     }
 }
+
+    
