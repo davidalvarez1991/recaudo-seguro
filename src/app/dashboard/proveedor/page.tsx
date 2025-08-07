@@ -1,7 +1,7 @@
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Eye, TrendingUp, Landmark, Users, DollarSign, ShieldAlert } from "lucide-react";
+import { UserPlus, Eye, TrendingUp, Landmark, Users, DollarSign, ShieldAlert, PiggyBank } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import { getCobradoresByProvider, getUserData, getProviderFinancialSummary, getAdminSettings } from "@/lib/actions";
@@ -60,7 +60,7 @@ export default async function ProveedorDashboard() {
   let companyName = "Perfil de Proveedor";
   let idNumber = "";
   let isActive = false;
-  let financialSummary = { activeCapital: 0, collectedCommission: 0, uniqueClientCount: 0 };
+  let financialSummary = { activeCapital: 0, collectedCommission: 0, uniqueClientCount: 0, myCapital: 0 };
   let adminSettings = { pricePerClient: 3500 };
   let subscriptionCost = 0;
 
@@ -138,8 +138,8 @@ export default async function ProveedorDashboard() {
           <RenewalCountdown />
 
           <Separator />
-            
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card className="bg-purple-50 dark:bg-purple-900/30 border-purple-200">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-purple-800 dark:text-purple-200">Clientes Únicos</CardTitle>
@@ -156,6 +156,15 @@ export default async function ProveedorDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold text-teal-900 dark:text-teal-300">{formatCurrency(subscriptionCost)}</div>
+              </CardContent>
+            </Card>
+             <Card className="bg-orange-50 dark:bg-orange-900/30 border-orange-200 md:col-span-2 lg:col-span-1">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-orange-800 dark:text-orange-200">Mi Capital Total</CardTitle>
+                <PiggyBank className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-orange-900 dark:text-orange-300">{formatCurrency(financialSummary.myCapital)}</div>
               </CardContent>
             </Card>
           </div>

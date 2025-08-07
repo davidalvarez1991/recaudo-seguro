@@ -1771,7 +1771,7 @@ export async function getCobradorSelfDailySummary() {
 
 export async function getProviderFinancialSummary() {
   const { userId: providerId } = await getAuthenticatedUser();
-  if (!providerId) return { activeCapital: 0, collectedCommission: 0, uniqueClientCount: 0 };
+  if (!providerId) return { activeCapital: 0, collectedCommission: 0, uniqueClientCount: 0, myCapital: 0 };
 
   let activeCapital = 0;
   let collectedCommission = 0;
@@ -1802,16 +1802,24 @@ export async function getProviderFinancialSummary() {
     }
 
     if (credit.estado === 'Activo') {
-        const capitalProportionInLoan = totalLoanAmount > 0 ? (credit.valor || 0) / totalLoanAmount : 0;
-        const totalCapitalPaid = totalPaidAmount * capitalProportionInLoan;
-        activeCapital += (credit.valor || 0) - totalCapitalPaid;
+        if (totalLoanAmount > 0) {
+            const capitalProportionInLoan = (credit.valor || 0) / totalLoanAmount;
+            const totalCapitalPaid = totalPaidAmount * capitalProportionInLoan;
+            activeCapital += (credit.valor || 0) - totalCapitalPaid;
+        } else {
+            activeCapital += (credit.valor || 0);
+        }
     }
   }
 
+  const finalActiveCapital = Math.max(0, activeCapital);
+  const myCapital = finalActiveCapital + collectedCommission;
+
   return { 
-    activeCapital: Math.max(0, activeCapital),
+    activeCapital: finalActiveCapital,
     collectedCommission,
-    uniqueClientCount: uniqueClientIds.size
+    uniqueClientCount: uniqueClientIds.size,
+    myCapital,
   };
 }
 
@@ -1989,4 +1997,5 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
     
 
     
+
 
