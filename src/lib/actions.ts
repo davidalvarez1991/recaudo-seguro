@@ -768,6 +768,9 @@ export async function getPaymentRoute() {
 
         const serializableCredit = Object.fromEntries(
             Object.entries(credit).map(([key, value]) => {
+                 if (value instanceof Timestamp) {
+                    return [key, value.toDate().toISOString()];
+                }
                 return [key, value];
             })
         );
@@ -1046,7 +1049,7 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
         '“CIUDAD”': clienteData.city || 'CIUDAD NO DEFINIDA',
         '“VALOR PRESTAMO”': (creditData.valor || 0).toLocaleString('es-CO'),
         '“CUOTAS DEL CREDITO”': creditData.cuotas?.toString() || '0',
-        '“DIA DONDE EL COBRADOR SELECIONA EL PRIMER DIA DE PAGO DE LA CUOTA”': firstPaymentDate,
+        '“DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”': firstPaymentDate,
         '“DIAS DEL RECAUDO”': paymentFrequency,
         '“VALOR DE LA CUOTA”': installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
         '“INTERES”': `${creditData.commissionPercentage || 0}`,
@@ -1722,7 +1725,6 @@ export async function getCobradorSelfDailySummary() {
     const creditsSnapshot = await getDocs(creditsQuery);
     
     let renewedCredits = 0;
-    let missedPayments = 0;
     const missedClients = new Set();
 
     creditsSnapshot.docs.forEach(doc => {
@@ -1737,7 +1739,7 @@ export async function getCobradorSelfDailySummary() {
         }
     });
     
-    missedPayments = missedClients.size;
+    const missedPayments = missedClients.size;
     
     return { successfulPayments, renewedCredits, missedPayments };
 }

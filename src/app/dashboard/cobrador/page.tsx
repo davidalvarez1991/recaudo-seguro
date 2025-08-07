@@ -69,6 +69,12 @@ export default async function CobradorDashboard() {
         collectedToday = paymentRouteData.collectedToday;
     }
   }
+  
+  const serializableDailySummary = {
+      successfulPayments: dailySummary.successfulPayments,
+      renewedCredits: dailySummary.renewedCredits,
+      missedPayments: dailySummary.missedPayments
+  };
 
   return (
     <div className="space-y-8">
@@ -106,7 +112,7 @@ export default async function CobradorDashboard() {
           </div>
         </CardHeader>
         <CardContent className="space-y-8">
-            <DailyStats initialData={dailySummary} />
+            <DailyStats initialData={serializableDailySummary} />
 
             <Separator />
             
