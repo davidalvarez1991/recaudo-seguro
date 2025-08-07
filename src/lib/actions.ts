@@ -1802,7 +1802,7 @@ export async function getProviderFinancialSummary() {
     }
 
     if (credit.estado === 'Activo') {
-        const capitalProportionInLoan = (credit.valor || 0) / totalLoanAmount;
+        const capitalProportionInLoan = totalLoanAmount > 0 ? (credit.valor || 0) / totalLoanAmount : 0;
         const totalCapitalPaid = totalPaidAmount * capitalProportionInLoan;
         activeCapital += (credit.valor || 0) - totalCapitalPaid;
     }
@@ -1989,3 +1989,4 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
     
 
     
+
