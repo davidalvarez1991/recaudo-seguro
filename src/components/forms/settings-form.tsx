@@ -1,10 +1,11 @@
 
+
 "use client";
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Save, Percent, Trash2, PlusCircle, DollarSign, Loader2, Type, FileText } from "lucide-react";
+import { Save, Percent, Trash2, PlusCircle, DollarSign, Loader2, Type, FileText, PiggyBank } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -75,6 +76,7 @@ const formatCurrencyForInput = (value: number | string | undefined): string => {
 };
 
 export function SettingsForm({ providerId }: SettingsFormProps) {
+  const [baseCapital, setBaseCapital] = useState("");
   const [commissionTiers, setCommissionTiers] = useState<CommissionTier[]>([]);
   const [lateInterestRate, setLateInterestRate] = useState("2");
   const [isLateInterestActive, setIsLateInterestActive] = useState(false);
@@ -92,6 +94,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
       try {
         const userData = await getUserData(providerId);
         if (userData) {
+          setBaseCapital(formatCurrencyForInput(userData.baseCapital || 0));
           setLateInterestRate((userData.lateInterestRate || 2).toString());
           setIsLateInterestActive(userData.isLateInterestActive || false);
           setIsContractGenerationActive(userData.isContractGenerationActive || false);
@@ -157,8 +160,11 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
                 return;
             }
         }
+
+        const numericBaseCapital = parseInt(baseCapital.replace(/\D/g, ''), 10) || 0;
     
         const settingsToSave = {
+            baseCapital: numericBaseCapital,
             commissionTiers,
             lateInterestRate: rate,
             isLateInterestActive,
@@ -193,6 +199,33 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
 
   return (
     <div className="space-y-8 pt-6">
+      
+      <Card className="border-dashed">
+        <CardHeader>
+          <CardTitle>Gestión de Capital</CardTitle>
+          <CardDescription>
+            Establece el monto total de tu capital para prestar. Este valor será la base para el contador "Mi Capital Total" en tu panel principal.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label htmlFor="base-capital">Capital Base para Prestar</Label>
+            <div className="relative">
+              <PiggyBank className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="base-capital"
+                value={baseCapital}
+                onChange={(e) => setBaseCapital(formatCurrencyForInput(e.target.value))}
+                className="pl-8"
+                placeholder="10.000.000"
+                disabled={isSaving}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Separator />
 
       <Card className="border-dashed">
         <CardHeader>

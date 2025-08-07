@@ -1472,7 +1472,7 @@ export async function registerPaymentAgreement(creditId: string, amount: number)
     return { success: "Acuerdo registrado. El calendario de pagos ha sido actualizado." };
 }
 
-export async function saveProviderSettings(providerId: string, settings: { commissionTiers?: CommissionTier[], lateInterestRate?: number, isLateInterestActive?: boolean, isContractGenerationActive?: boolean, contractTemplate?: string }) {
+export async function saveProviderSettings(providerId: string, settings: { baseCapital?: number, commissionTiers?: CommissionTier[], lateInterestRate?: number, isLateInterestActive?: boolean, isContractGenerationActive?: boolean, contractTemplate?: string }) {
   if (!providerId) return { error: "ID de proveedor no válido." };
   
   const providerRef = doc(db, "users", providerId);
@@ -1483,6 +1483,9 @@ export async function saveProviderSettings(providerId: string, settings: { commi
       }
 
       const updateData: any = {};
+      if (settings.baseCapital !== undefined) {
+          updateData.baseCapital = settings.baseCapital;
+      }
       if (settings.commissionTiers !== undefined) {
         updateData.commissionTiers = settings.commissionTiers;
       }
@@ -1762,13 +1765,12 @@ export async function getCobradorSelfDailySummary() {
 }
 
 export async function getProviderFinancialSummary() {
-  const { userId: providerId } = await getAuthenticatedUser();
+  const { userId: providerId, user: providerData } = await getAuthenticatedUser();
   if (!providerId) return { activeCapital: 0, collectedCommission: 0, uniqueClientCount: 0, myCapital: 0 };
 
   let activeCapital = 0;
   let collectedCommission = 0;
-  let totalCapitalBase = 0;
-  let totalCommissionFromPaidCredits = 0;
+  let myCapital = providerData?.baseCapital || 0; // Start with the configured base capital
 
   const uniqueClientIds = new Set<string>();
 
@@ -1801,17 +1803,9 @@ export async function getProviderFinancialSummary() {
         const totalCapitalPaid = totalPaidAmount * capitalProportionInLoan;
         activeCapital += (credit.valor || 0) - totalCapitalPaid;
     }
-    
-    // For "Mi Capital Total" calculation
-    totalCapitalBase += credit.valor || 0;
-    if (credit.estado === 'Pagado') {
-        totalCommissionFromPaidCredits += credit.commission || 0;
-    }
   }
 
   const finalActiveCapital = Math.max(0, activeCapital);
-  
-  const myCapital = totalCapitalBase + totalCommissionFromPaidCredits;
 
   return { 
     activeCapital: finalActiveCapital,
@@ -1996,6 +1990,7 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
     
 
     
+
 
 
 
