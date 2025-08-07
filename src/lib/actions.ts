@@ -1737,7 +1737,7 @@ export async function getCobradorSelfDailySummary() {
 
     creditsSnapshot.docs.forEach(doc => {
         const credit = doc.data();
-        if (credit.updatedAt && isWithinInterval(toZonedTime(credit.updatedAt.toDate(), timeZone), { start: todayStart, end: todayEnd })) {
+        if (credit.updatedAt && credit.updatedAt instanceof Timestamp && isWithinInterval(toZonedTime(credit.updatedAt.toDate(), timeZone), { start: todayStart, end: todayEnd })) {
             if (credit.estado === 'Renovado') {
                 renewedCredits++;
             }
@@ -1763,6 +1763,7 @@ export async function getProviderFinancialSummary() {
 
   let activeCapital = 0;
   let collectedCommission = 0;
+  let myCapital = 0;
   const uniqueClientIds = new Set<string>();
 
   const creditsRef = collection(db, "credits");
@@ -1798,10 +1799,11 @@ export async function getProviderFinancialSummary() {
             activeCapital += (credit.valor || 0);
         }
     }
+    
+    myCapital += (credit.valor || 0) + (credit.commission || 0);
   }
 
   const finalActiveCapital = Math.max(0, activeCapital);
-  const myCapital = finalActiveCapital + collectedCommission;
 
   return { 
     activeCapital: finalActiveCapital,
@@ -1985,6 +1987,7 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
     
 
     
+
 
 
 
