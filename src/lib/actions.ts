@@ -340,20 +340,45 @@ const getFullCreditDetails = async (creditData: any, providersMap: Map<string, a
     }
 };
 
-
 export async function getProviderActivityLog() {
     const { userId, role } = await getAuthenticatedUser();
     if (role !== 'proveedor' || !userId) return [];
 
     let activityLog: any[] = [];
 
+    // --- Optimized Data Fetching ---
     // 1. Fetch all credits for the provider
     const creditsRef = collection(db, "credits");
     const creditsQuery = query(creditsRef, where("providerId", "==", userId));
     const creditsSnapshot = await getDocs(creditsQuery);
-    
     const creditsMap = new Map(creditsSnapshot.docs.map(doc => [doc.id, { id: doc.id, ...doc.data() }]));
 
+    // 2. Fetch all payments for the provider
+    const paymentsRef = collection(db, "payments");
+    const paymentsQuery = query(paymentsRef, where("providerId", "==", userId));
+    const paymentsSnapshot = await getDocs(paymentsQuery);
+
+    // 3. Fetch all users (cobradores and clientes) related to this provider in a single pass if possible
+    // This part remains tricky without querying by array of IDs, so we'll fetch them as needed but cache them.
+    const usersCache = new Map<string, any>();
+    const fetchAndCacheUser = async (idNumber: string) => {
+        if (usersCache.has(idNumber)) {
+            return usersCache.get(idNumber);
+        }
+        const user = await findUserByIdNumber(idNumber);
+        usersCache.set(idNumber, user);
+        return user;
+    };
+    
+    // Fetch provider settings once
+    const providerData = await getUserData(userId);
+    const providersMap = new Map();
+    if (providerData) {
+        providersMap.set(userId, providerData);
+    }
+    // --- End Optimized Data Fetching ---
+
+    // Process credits
     for (const credit of creditsMap.values()) {
         const date = credit.fecha instanceof Timestamp ? credit.fecha.toDate() : new Date(credit.fecha);
         activityLog.push({
@@ -368,11 +393,7 @@ export async function getProviderActivityLog() {
         });
     }
 
-    // 2. Fetch all payments for the provider
-    const paymentsRef = collection(db, "payments");
-    const paymentsQuery = query(paymentsRef, where("providerId", "==", userId));
-    const paymentsSnapshot = await getDocs(paymentsQuery);
-
+    // Process payments
     for (const doc of paymentsSnapshot.docs) {
         const payment = doc.data();
         const credit = creditsMap.get(payment.creditId);
@@ -392,19 +413,17 @@ export async function getProviderActivityLog() {
         });
     }
 
-    // 3. Sort by date descending
+    // Sort by date descending
     activityLog.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    // 4. Enrich with details
-    const providersSnapshot = await getDocs(query(collection(db, "users"), where("role", "==", "proveedor")));
-    const providersMap = new Map(providersSnapshot.docs.map(doc => [doc.id, doc.data()]));
-
+    // Enrich with details using the cache
     const enrichedLogPromises = activityLog.map(async (entry) => {
         try {
             const creditData = creditsMap.get(entry.creditId);
             if (!creditData) return null;
-            
-            const cliente = await findUserByIdNumber(entry.clienteId);
+
+            const cliente = await fetchAndCacheUser(entry.clienteId);
+            // This is still heavy, but we'll keep it for now as the main issue was the N+1 user queries.
             const fullCreditDetails = await getFullCreditDetails({ ...creditData, id: entry.creditId }, providersMap);
             
             if (!fullCreditDetails) return null;
@@ -421,7 +440,7 @@ export async function getProviderActivityLog() {
             return null; // Skip problematic entries
         }
     });
-    
+
     const enrichedLog = (await Promise.all(enrichedLogPromises)).filter(Boolean) as any[];
 
     return enrichedLog;
@@ -1026,7 +1045,8 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
         '“DIA DONDE EL COBRADOR SELECIONA EL PRIMER DIA DE PAGO DE LA CUOTA”': firstPaymentDate,
         '“DIAS DEL RECAUDO”': paymentFrequency,
         '“VALOR DE LA CUOTA”': installmentAmount.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }),
-        '“PORCENTAJE DE COMISION”': `${creditData.commissionPercentage || 0}`
+        '“INTERES”': `${creditData.commissionPercentage || 0}`,
+        '“DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”': firstPaymentDate,
     };
     
     for (const [key, value] of Object.entries(replacements)) {
