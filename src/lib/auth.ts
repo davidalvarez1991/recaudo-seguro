@@ -16,7 +16,7 @@ type AuthResult = {
 }
 
 export async function getAuthenticatedUser(): Promise<AuthResult> {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const userId = cookieStore.get('loggedInUser')?.value
     const role = cookieStore.get('userRole')?.value
     
