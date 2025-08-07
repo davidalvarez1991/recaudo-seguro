@@ -518,7 +518,11 @@ export async function getCreditsByCobrador() {
         return serializableData;
     });
     
-    return Promise.all(creditsPromises);
+    const results = await Promise.all(creditsPromises);
+    return results.map(credit => {
+        const { updatedAt, ...rest } = credit;
+        return rest;
+    });
 }
 
 
@@ -1763,7 +1767,9 @@ export async function getProviderFinancialSummary() {
 
   let activeCapital = 0;
   let collectedCommission = 0;
-  let myCapital = 0;
+  let totalCapitalBase = 0;
+  let totalCommissionFromPaidCredits = 0;
+
   const uniqueClientIds = new Set<string>();
 
   const creditsRef = collection(db, "credits");
@@ -1791,20 +1797,21 @@ export async function getProviderFinancialSummary() {
     }
 
     if (credit.estado === 'Activo') {
-        if (totalLoanAmount > 0) {
-            const capitalProportionInLoan = (credit.valor || 0) / totalLoanAmount;
-            const totalCapitalPaid = totalPaidAmount * capitalProportionInLoan;
-            activeCapital += (credit.valor || 0) - totalCapitalPaid;
-        } else {
-            activeCapital += (credit.valor || 0);
-        }
+        const capitalProportionInLoan = totalLoanAmount > 0 ? (credit.valor || 0) / totalLoanAmount : 0;
+        const totalCapitalPaid = totalPaidAmount * capitalProportionInLoan;
+        activeCapital += (credit.valor || 0) - totalCapitalPaid;
+    }
+    
+    // For "Mi Capital Total" calculation
+    totalCapitalBase += credit.valor || 0;
+    if (credit.estado === 'Pagado') {
+        totalCommissionFromPaidCredits += credit.commission || 0;
     }
   }
 
   const finalActiveCapital = Math.max(0, activeCapital);
   
-  // "My Capital" is the sum of the capital still out on the street plus the commission that has already been collected.
-  myCapital = finalActiveCapital + collectedCommission;
+  const myCapital = totalCapitalBase + totalCommissionFromPaidCredits;
 
   return { 
     activeCapital: finalActiveCapital,
@@ -1989,6 +1996,7 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
     
 
     
+
 
 
 
