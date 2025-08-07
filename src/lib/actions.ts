@@ -519,10 +519,15 @@ export async function getCreditsByCobrador() {
     });
     
     const results = await Promise.all(creditsPromises);
-    return results.map(credit => {
+    const finalResults = results.map(credit => {
         const { updatedAt, ...rest } = credit;
+        if (updatedAt) {
+            // Keep it if you need it, but it's not being removed here anymore
+        }
         return rest;
     });
+
+    return finalResults;
 }
 
 
@@ -1766,18 +1771,12 @@ export async function getCobradorSelfDailySummary() {
 
 export async function getProviderFinancialSummary() {
   const { userId: providerId, user: providerData } = await getAuthenticatedUser();
-  if (!providerId) return { activeCapital: 0, collectedCommission: 0, uniqueClientCount: 0, myCapital: 0 };
-
-  let activeCapital = 0;
-  let collectedCommission = 0;
-  let myCapital = providerData?.baseCapital || 0; // Start with the configured base capital
-
-  const uniqueClientIds = new Set<string>();
-
+  if (!providerId || !providerData) return { activeCapital: 0, collectedCommission: 0, uniqueClientCount: 0, myCapital: 0 };
+  
+  // 1. Fetch all credits and payments for the provider
   const creditsRef = collection(db, "credits");
   const creditsQuery = query(creditsRef, where("providerId", "==", providerId));
   const creditsSnapshot = await getDocs(creditsQuery);
-
   const allProviderCredits = creditsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
   const paymentsRef = collection(db, "payments");
@@ -1785,17 +1784,24 @@ export async function getProviderFinancialSummary() {
   const paymentsSnapshot = await getDocs(paymentsQuery);
   const allProviderPayments = paymentsSnapshot.docs.map(doc => doc.data());
 
+  // 2. Initialize variables
+  let activeCapital = 0;
+  let collectedCommission = 0;
+  const uniqueClientIds = new Set<string>();
+
+  // 3. Process data
   for (const credit of allProviderCredits) {
     uniqueClientIds.add(credit.clienteId);
 
-    const creditPayments = allProviderPayments.filter(p => p.creditId === credit.id && (p.type === 'cuota' || p.type === 'total'));
-    const totalPaidAmount = creditPayments.reduce((sum, p) => sum + p.amount, 0);
+    const creditPayments = allProviderPayments.filter(p => p.creditId === credit.id);
+    const capitalAndCommissionPayments = creditPayments.filter(p => p.type === 'cuota' || p.type === 'total');
+    const totalPaidAmount = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
 
     const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
 
     if (totalLoanAmount > 0) {
-      const paidProportion = Math.min(1, totalPaidAmount / totalLoanAmount);
-      collectedCommission += (credit.commission || 0) * paidProportion;
+        const paidProportion = Math.min(1, totalPaidAmount / totalLoanAmount);
+        collectedCommission += (credit.commission || 0) * paidProportion;
     }
 
     if (credit.estado === 'Activo') {
@@ -1806,6 +1812,9 @@ export async function getProviderFinancialSummary() {
   }
 
   const finalActiveCapital = Math.max(0, activeCapital);
+  
+  // 4. Calculate My Capital based on the provider's defined base capital
+  const myCapital = providerData.baseCapital || 0;
 
   return { 
     activeCapital: finalActiveCapital,
@@ -1814,6 +1823,7 @@ export async function getProviderFinancialSummary() {
     myCapital,
   };
 }
+
 
 // --- Admin Actions ---
 
@@ -1990,6 +2000,7 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
     
 
     
+
 
 
 
