@@ -5,14 +5,15 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Save, Percent, Trash2, PlusCircle, DollarSign, Loader2, Type, FileText, PiggyBank } from "lucide-react";
+import { Save, Percent, Trash2, PlusCircle, DollarSign, Loader2, Type, FileText, PiggyBank, TrendingUp, RefreshCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { getUserData, saveProviderSettings } from "@/lib/actions";
+import { getUserData, saveProviderSettings, getProviderFinancialSummary, reinvestCommission } from "@/lib/actions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { useRouter } from "next/navigation";
 
 const defaultContractTemplate = `CONTRATO DE PRÉSTAMO CON GARANTÍA DE EMBARGO DE BIENES MUEBLES
 Entre los suscritos a saber:
@@ -77,6 +78,7 @@ const formatCurrencyForInput = (value: number | string | undefined): string => {
 
 export function SettingsForm({ providerId }: SettingsFormProps) {
   const [baseCapital, setBaseCapital] = useState("");
+  const [collectedCommission, setCollectedCommission] = useState(0);
   const [commissionTiers, setCommissionTiers] = useState<CommissionTier[]>([]);
   const [lateInterestRate, setLateInterestRate] = useState("2");
   const [isLateInterestActive, setIsLateInterestActive] = useState(false);
@@ -84,15 +86,20 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
   const [contractTemplate, setContractTemplate] = useState(defaultContractTemplate);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isReinvesting, setIsReinvesting] = useState(false);
+  const router = useRouter();
 
   const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchUserData = async () => {
+  const fetchProviderData = async () => {
       if (!providerId) return;
       setIsLoading(true);
       try {
-        const userData = await getUserData(providerId);
+        const [userData, financialSummary] = await Promise.all([
+            getUserData(providerId),
+            getProviderFinancialSummary()
+        ]);
+        
         if (userData) {
           setBaseCapital(formatCurrencyForInput(userData.baseCapital || 0));
           setLateInterestRate((userData.lateInterestRate || 2).toString());
@@ -106,13 +113,20 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
               setCommissionTiers([{ minAmount: undefined, maxAmount: undefined, percentage: undefined }]);
           }
         }
+        
+        if (financialSummary) {
+            setCollectedCommission(financialSummary.collectedCommission);
+        }
+
       } catch (error) {
         toast({ title: "Error", description: "No se pudieron cargar los datos de configuración.", variant: "destructive" });
       } finally {
         setIsLoading(false);
       }
     };
-    fetchUserData();
+
+  useEffect(() => {
+    fetchProviderData();
   }, [providerId, toast]);
   
 
@@ -180,6 +194,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
             variant: "default",
             className: "bg-accent text-accent-foreground border-accent",
           });
+          router.refresh();
         } else {
            toast({ title: "Error", description: result.error, variant: "destructive" });
         }
@@ -187,6 +202,34 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
         setIsSaving(false);
     }
   };
+  
+  const handleReinvest = async () => {
+      if (collectedCommission <= 0) {
+          toast({ title: "Sin ganancias", description: "No hay ganancias de comisión disponibles para reinvertir.", variant: "default" });
+          return;
+      }
+      
+      setIsReinvesting(true);
+      try {
+        const result = await reinvestCommission();
+        if (result.success) {
+             toast({
+                title: "Reinversión Exitosa",
+                description: `${formatCurrencyForInput(collectedCommission)} han sido añadidos a tu capital base.`,
+                className: "bg-accent text-accent-foreground border-accent",
+            });
+            await fetchProviderData(); // Refresh all data on the page
+            router.refresh();
+        } else {
+            toast({ title: "Error", description: result.error, variant: "destructive" });
+        }
+
+      } catch(e) {
+          toast({ title: "Error del servidor", description: "No se pudo completar la reinversión.", variant: "destructive" });
+      } finally {
+        setIsReinvesting(false);
+      }
+  }
 
 
   if (isLoading) {
@@ -222,6 +265,28 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
               />
             </div>
           </div>
+        </CardContent>
+      </Card>
+      
+      <Card className="border-dashed">
+        <CardHeader>
+          <CardTitle>Reinvertir Ganancias</CardTitle>
+          <CardDescription>
+            Añade las ganancias de tus comisiones recaudadas a tu capital base para aumentar tu capacidad de préstamo.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+            <div className="space-y-2">
+                 <Label>Ganancia de Comisión Disponible</Label>
+                 <div className="flex items-center gap-2 p-3 rounded-md bg-green-50 dark:bg-green-900/30 border border-green-200">
+                    <TrendingUp className="h-6 w-6 text-green-600"/>
+                    <p className="text-2xl font-bold text-green-700">{formatCurrencyForInput(collectedCommission)}</p>
+                 </div>
+            </div>
+             <Button onClick={handleReinvest} disabled={isReinvesting || collectedCommission <= 0}>
+                {isReinvesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                Añadir Ganancias al Capital
+             </Button>
         </CardContent>
       </Card>
 

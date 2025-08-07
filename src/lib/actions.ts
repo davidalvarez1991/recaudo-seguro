@@ -352,8 +352,6 @@ export async function getProviderActivityLog() {
     const { userId, role } = await getAuthenticatedUser();
     if (role !== 'proveedor' || !userId) return [];
 
-    let activityLog: any[] = [];
-
     // --- Optimized Data Fetching ---
     // 1. Fetch all credits for the provider
     const creditsRef = collection(db, "credits");
@@ -373,6 +371,7 @@ export async function getProviderActivityLog() {
         providersMap.set(userId, providerData);
     }
     // --- End Optimized Data Fetching ---
+    let activityLog: any[] = [];
 
     // Process credits
     for (const credit of creditsMap.values()) {
@@ -521,9 +520,6 @@ export async function getCreditsByCobrador() {
     const results = await Promise.all(creditsPromises);
     const finalResults = results.map(credit => {
         const { updatedAt, ...rest } = credit;
-        if (updatedAt) {
-            // Keep it if you need it, but it's not being removed here anymore
-        }
         return rest;
     });
 
@@ -1763,7 +1759,6 @@ export async function getCobradorSelfDailySummary() {
     
     const summary = { successfulPayments, renewedCredits, missedPayments };
     
-    // Convert any complex objects to simple ones for serialization
     const serializableSummary = JSON.parse(JSON.stringify(summary));
     
     return serializableSummary;
@@ -1780,7 +1775,7 @@ export async function getProviderFinancialSummary() {
   const allProviderCredits = creditsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
   const paymentsRef = collection(db, "payments");
-  const paymentsQuery = query(paymentsRef, where("providerId", "==", providerId));
+  const paymentsQuery = query(paymentsRef, where("providerId", "==", providerId), where("reinvested", "!=", true));
   const paymentsSnapshot = await getDocs(paymentsQuery);
   const allProviderPayments = paymentsSnapshot.docs.map(doc => doc.data());
 
@@ -1823,6 +1818,71 @@ export async function getProviderFinancialSummary() {
     myCapital,
   };
 }
+
+export async function reinvestCommission() {
+    const { userId: providerId } = await getAuthenticatedUser();
+    if (!providerId) return { error: "Proveedor no autenticado." };
+
+    try {
+        const providerRef = doc(db, "users", providerId);
+        const providerSnap = await getDoc(providerRef);
+        if (!providerSnap.exists()) {
+            return { error: "Proveedor no encontrado." };
+        }
+        const providerData = providerSnap.data();
+
+        // 1. Calculate available commission to reinvest
+        const paymentsRef = collection(db, "payments");
+        const paymentsQuery = query(paymentsRef, where("providerId", "==", providerId), where("reinvested", "!=", true));
+        const paymentsSnapshot = await getDocs(paymentsQuery);
+        
+        let commissionToReinvest = 0;
+        const batch = writeBatch(db);
+        const creditsMap = new Map();
+
+        for(const paymentDoc of paymentsSnapshot.docs) {
+            const payment = paymentDoc.data();
+            let creditData = creditsMap.get(payment.creditId);
+            if (!creditData) {
+                const creditSnap = await getDoc(doc(db, "credits", payment.creditId));
+                if (creditSnap.exists()) {
+                    creditData = creditSnap.data();
+                    creditsMap.set(payment.creditId, creditData);
+                }
+            }
+            
+            if (creditData && (payment.type === 'cuota' || payment.type === 'total')) {
+                 const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
+                 if (totalLoanAmount > 0) {
+                     const commissionProportion = (creditData.commission || 0) / totalLoanAmount;
+                     commissionToReinvest += payment.amount * commissionProportion;
+                 }
+            }
+            
+            // Mark payment as reinvested
+            batch.update(paymentDoc.ref, { reinvested: true });
+        };
+        
+        if (commissionToReinvest <= 0) {
+            return { error: "No hay comisiones para reinvertir." };
+        }
+
+        // 2. Add commission to base capital
+        const currentBaseCapital = providerData.baseCapital || 0;
+        const newBaseCapital = currentBaseCapital + commissionToReinvest;
+        batch.update(providerRef, { baseCapital: newBaseCapital, updatedAt: Timestamp.now() });
+        
+        // 3. Commit all changes
+        await batch.commit();
+
+        return { success: true, newCapital: newBaseCapital };
+
+    } catch (e) {
+        console.error("Error reinvesting commission:", e);
+        return { error: "Ocurrió un error en el servidor al reinvertir." };
+    }
+}
+
 
 
 // --- Admin Actions ---
@@ -2000,6 +2060,7 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
     
 
     
+
 
 
 
