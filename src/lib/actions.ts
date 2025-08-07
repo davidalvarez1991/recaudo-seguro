@@ -479,10 +479,17 @@ export async function getCreditsByCobrador() {
     const creditsPromises = allCredits.map(async (creditData) => {
         const serializableData: { [key: string]: any } = { ...creditData };
         
+        for (const key in serializableData) {
+            if (serializableData[key] instanceof Timestamp) {
+                serializableData[key] = serializableData[key].toDate().toISOString();
+            }
+        }
+        
         serializableData.paymentDates = (serializableData.paymentDates || []).map((d: any) => 
             d instanceof Timestamp ? d.toDate().toISOString() : d
         );
-        serializableData.fecha = serializableData.fecha instanceof Timestamp ? serializableData.fecha.toDate().toISOString() : serializableData.fecha;
+        serializableData.fecha = serializableData.fecha ? new Date(serializableData.fecha).toISOString() : new Date().toISOString();
+
 
         const cliente = await findUserByIdNumber(creditData.clienteId as string);
         serializableData.clienteName = cliente?.name || 'No disponible';
@@ -1221,6 +1228,11 @@ export async function createNewCreditForClient(values: z.infer<typeof NewCreditS
         missedPaymentDays: 0,
     });
     
+    const clienteData = await findUserByIdNumber(clienteId);
+     if (clienteData) {
+        await generateAndSaveContract(newCreditRef.id, providerId, creditDataForContract, clienteData, []);
+    }
+    
     return { success: true, newCreditId: newCreditRef.id };
 }
 
@@ -1294,6 +1306,11 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
     });
     
     await batch.commit();
+
+    const clienteData = await findUserByIdNumber(clienteId);
+    if (clienteData) {
+        await generateAndSaveContract(newCreditRef.id, providerId, creditDataForContract, clienteData, []);
+    }
 
     return { success: true, newCreditId: newCreditRef.id };
 }
