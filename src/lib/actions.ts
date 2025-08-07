@@ -1,4 +1,5 @@
 
+
 "use server";
 
 import { z } from "zod";
@@ -1230,6 +1231,7 @@ export async function createNewCreditForClient(values: z.infer<typeof NewCreditS
     
     const clienteData = await findUserByIdNumber(clienteId);
      if (clienteData) {
+        // Pass empty array for now, will be populated in the next step
         await generateAndSaveContract(newCreditRef.id, providerId, creditDataForContract, clienteData, []);
     }
     
@@ -1309,6 +1311,7 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
 
     const clienteData = await findUserByIdNumber(clienteId);
     if (clienteData) {
+        // Pass empty array for now, will be populated in the next step
         await generateAndSaveContract(newCreditRef.id, providerId, creditDataForContract, clienteData, []);
     }
 
@@ -1758,7 +1761,12 @@ export async function getCobradorSelfDailySummary() {
     
     const missedPayments = missedClients.size;
     
-    return { successfulPayments, renewedCredits, missedPayments };
+    const summary = { successfulPayments, renewedCredits, missedPayments };
+    
+    // Convert any complex objects to simple ones for serialization
+    const serializableSummary = JSON.parse(JSON.stringify(summary));
+    
+    return serializableSummary;
 }
 
 export async function getProviderFinancialSummary() {
@@ -1784,22 +1792,18 @@ export async function getProviderFinancialSummary() {
     uniqueClientIds.add(credit.clienteId);
 
     const creditPayments = allProviderPayments.filter(p => p.creditId === credit.id && (p.type === 'cuota' || p.type === 'total'));
-    const paidAmount = creditPayments.reduce((sum, p) => sum + p.amount, 0);
+    const totalPaidAmount = creditPayments.reduce((sum, p) => sum + p.amount, 0);
 
     const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
+
     if (totalLoanAmount > 0) {
-      const paidProportion = paidAmount / totalLoanAmount;
+      const paidProportion = Math.min(1, totalPaidAmount / totalLoanAmount);
       collectedCommission += (credit.commission || 0) * paidProportion;
     }
 
     if (credit.estado === 'Activo') {
-        const totalCapitalPaid = creditPayments.reduce((sum, p) => {
-             if (totalLoanAmount > 0) {
-                 const capitalProportionOfPayment = (credit.valor || 0) / totalLoanAmount;
-                 return sum + (p.amount * capitalProportionOfPayment);
-             }
-             return sum;
-        }, 0);
+        const capitalProportionInLoan = (credit.valor || 0) / totalLoanAmount;
+        const totalCapitalPaid = totalPaidAmount * capitalProportionInLoan;
         activeCapital += (credit.valor || 0) - totalCapitalPaid;
     }
   }
