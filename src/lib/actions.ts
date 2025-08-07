@@ -1229,12 +1229,6 @@ export async function createNewCreditForClient(values: z.infer<typeof NewCreditS
         missedPaymentDays: 0,
     });
     
-    const clienteData = await findUserByIdNumber(clienteId);
-     if (clienteData) {
-        // Pass empty array for now, will be populated in the next step
-        await generateAndSaveContract(newCreditRef.id, providerId, creditDataForContract, clienteData, []);
-    }
-    
     return { success: true, newCreditId: newCreditRef.id };
 }
 
@@ -1308,12 +1302,6 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
     });
     
     await batch.commit();
-
-    const clienteData = await findUserByIdNumber(clienteId);
-    if (clienteData) {
-        // Pass empty array for now, will be populated in the next step
-        await generateAndSaveContract(newCreditRef.id, providerId, creditDataForContract, clienteData, []);
-    }
 
     return { success: true, newCreditId: newCreditRef.id };
 }
@@ -1997,5 +1985,6 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
     
 
     
+
 
 

@@ -1,4 +1,5 @@
 
+
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { UserPlus, Eye, TrendingUp, Landmark, Users, DollarSign, ShieldAlert, PiggyBank } from "lucide-react";
@@ -42,8 +43,8 @@ const InactiveProviderView = ({ companyName, idNumber }: { companyName?: string,
                 </CardDescription>
             </CardHeader>
             <CardContent className="flex justify-center">
-                <Button asChild className="bg-accent hover:bg-accent/90">
-                    <a href={whatsappLink} target="_blank" rel="noopener noreferrer">
+                <Button asChild className="bg-green-600 hover:bg-green-700 text-white">
+                    <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
                         <WhatsAppIcon />
                         Contactar al Administrador
                     </a>
