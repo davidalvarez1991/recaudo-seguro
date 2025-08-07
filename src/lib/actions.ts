@@ -1833,15 +1833,31 @@ export async function reinvestCommission() {
 
         // 1. Calculate available commission to reinvest
         const paymentsRef = collection(db, "payments");
-        const paymentsQuery = query(paymentsRef, where("providerId", "==", providerId), where("reinvested", "!=", true));
-        const paymentsSnapshot = await getDocs(paymentsQuery);
         
+        // Firestore doesn't support inequality checks on one field while filtering on another without a composite index.
+        // We'll perform two separate queries and merge the results.
+        const queryReinvestedFalse = query(paymentsRef, where("providerId", "==", providerId), where("reinvested", "==", false));
+        const queryReinvestedNull = query(paymentsRef, where("providerId", "==", providerId), where("reinvested", "==", null));
+
+        const [reinvestedFalseSnapshot, reinvestedNullSnapshot] = await Promise.all([
+            getDocs(queryReinvestedFalse),
+            getDocs(queryReinvestedNull)
+        ]);
+
+        const unreinvestedDocs = [...reinvestedFalseSnapshot.docs, ...reinvestedNullSnapshot.docs];
+        // Use a map to handle potential duplicates if a doc somehow matched both, though unlikely.
+        const paymentsMap = new Map();
+        unreinvestedDocs.forEach(doc => {
+            if (!paymentsMap.has(doc.id)) {
+                paymentsMap.set(doc.id, { doc, data: doc.data() });
+            }
+        });
+
         let commissionToReinvest = 0;
         const batch = writeBatch(db);
         const creditsMap = new Map();
 
-        for(const paymentDoc of paymentsSnapshot.docs) {
-            const payment = paymentDoc.data();
+        for(const { doc: paymentDoc, data: payment } of paymentsMap.values()) {
             let creditData = creditsMap.get(payment.creditId);
             if (!creditData) {
                 const creditSnap = await getDoc(doc(db, "credits", payment.creditId));
@@ -2060,6 +2076,7 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
     
 
     
+
 
 
 
