@@ -1841,18 +1841,20 @@ export async function reinvestCommission(amountToReinvest: number) {
 
         // 1. Get all unreinvested payments for the provider
         const paymentsRef = collection(db, "payments");
-        const q = query(paymentsRef, where("providerId", "==", providerId), where("reinvested", "==", false), orderBy("date", "asc"));
+        const q = query(paymentsRef, where("providerId", "==", providerId), where("reinvested", "==", false));
         const paymentsSnapshot = await getDocs(q);
         
         if (paymentsSnapshot.empty) {
             return { error: "No hay comisiones disponibles para reinvertir." };
         }
 
+        const sortedPayments = paymentsSnapshot.docs.sort((a,b) => a.data().date.toMillis() - b.data().date.toMillis());
+
         const batch = writeBatch(db);
         const creditsMap = new Map();
         let accumulatedCommissionToReinvest = 0;
 
-        for (const paymentDoc of paymentsSnapshot.docs) {
+        for (const paymentDoc of sortedPayments) {
             if (accumulatedCommissionToReinvest >= amountToReinvest) {
                 break; // Stop once we have collected enough commission
             }
@@ -1894,7 +1896,7 @@ export async function reinvestCommission(amountToReinvest: number) {
         return { success: true, newCapital: newBaseCapital, reinvestedAmount: finalReinvestedAmount };
     } catch (e: any) {
         console.error("Error reinvesting commission:", e);
-        if (e.message?.includes('The query requires an index')) {
+        if (e.message?.includes('query requires an index')) {
             return { error: "Se requiere un índice de base de datos. Por favor, contacta a soporte." };
         }
         return { error: "Ocurrió un error en el servidor al reinvertir." };
@@ -2081,6 +2083,7 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
     
 
     
+
 
 
 
