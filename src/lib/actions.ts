@@ -1873,12 +1873,25 @@ export async function deleteProvider(providerId: string) {
     const batch = writeBatch(db);
 
     const providerRef = doc(db, "users", providerId);
+    const providerSnap = await getDoc(providerRef);
+    const providerData = providerSnap.data();
+
+    if (providerData) {
+        usersCache.delete(providerData.idNumber);
+    }
     batch.delete(providerRef);
+
 
     const cobradoresRef = collection(db, "users");
     const cobradoresQuery = query(cobradoresRef, where("providerId", "==", providerId));
     const cobradoresSnapshot = await getDocs(cobradoresQuery);
-    cobradoresSnapshot.forEach(doc => batch.delete(doc.ref));
+    cobradoresSnapshot.forEach(doc => {
+        const cobradorData = doc.data();
+        if (cobradorData) {
+            usersCache.delete(cobradorData.idNumber);
+        }
+        batch.delete(doc.ref);
+    });
     
     const creditsRef = collection(db, "credits");
     const creditsQuery = query(creditsRef, where("providerId", "==", providerId));
@@ -1900,7 +1913,6 @@ export async function deleteProvider(providerId: string) {
 
     try {
         await batch.commit();
-        usersCache.clear();
         return { success: true };
     } catch (e) {
         console.error(e);
@@ -1969,5 +1981,7 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
         return { error: "No se pudo guardar la configuración." };
     }
 }
+
+    
 
     
