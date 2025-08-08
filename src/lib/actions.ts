@@ -1075,7 +1075,7 @@ const generateContractText = async (providerId: string, creditData: any, cliente
         '“NOMBRE DE LA EMPRESA”': providerData.companyName?.toUpperCase() || 'EMPRESA NO DEFINIDA',
         '“NOMBRE DEL CLIENTE”': (clienteData.name || 'CLIENTE NO DEFINIDO').toUpperCase(),
         '“CEDULA DEL CLIENTE”': clienteData.idNumber || 'DOCUMENTO NO DEFINIDO',
-        '“CIUDAD”': clienteData.city || providerData.city || 'CIUDAD NO DEFINIDA',
+        '“CIUDAD”': providerData.city || 'CIUDAD NO DEFINIDA',
         '“VALOR PRESTAMO”': (creditData.valor || 0).toLocaleString('es-CO'),
         '“CUOTAS DEL CREDITO”': creditData.cuotas?.toString() || '0',
         '“DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”': firstPaymentDate,
@@ -1552,7 +1552,7 @@ export async function registerMissedPayment(creditId: string) {
 
 type ContractGenParams = {
     creditData: { valor: number, cuotas: number, commission?: number, commissionPercentage?: number };
-    clienteData: { name: string, idNumber: string, city?: string };
+    clienteData: { name: string, idNumber: string };
     paymentDates: string[];
 }
 export async function getContractForAcceptance(params: ContractGenParams) {
@@ -2150,4 +2150,5 @@ export async function getProviderCommissionTiers(): Promise<CommissionTier[]> {
     
 
     
+
 

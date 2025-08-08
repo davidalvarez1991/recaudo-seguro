@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useForm, Controller } from "react-hook-form";
@@ -119,14 +120,17 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   };
   
   const handleNextStep = async (currentStep: number, nextStep: number) => {
-    let fieldsToValidate = step1Fields;
-    if (form.getValues('requiresGuarantor')) {
-      fieldsToValidate = [...fieldsToValidate, ...step1GuarantorFields];
+    let fieldsToValidate: (keyof FormData)[] = [];
+    if (currentStep === 1) {
+        fieldsToValidate = step1Fields;
+        if (form.getValues('requiresGuarantor')) {
+            fieldsToValidate = [...fieldsToValidate, ...step1GuarantorFields];
+        }
+        if (form.getValues('requiresReferences')) {
+            fieldsToValidate = [...fieldsToValidate, ...step1ReferencesFields];
+        }
     }
-     if (form.getValues('requiresReferences')) {
-      fieldsToValidate = [...fieldsToValidate, ...step1ReferencesFields];
-    }
-    
+
     const isValid = await form.trigger(fieldsToValidate as any);
     if (!isValid) return;
     
@@ -198,7 +202,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 clienteData: {
                     name: fullName,
                     idNumber: currentFormData.idNumber!,
-                    city: 'N/A', 
                 },
                 paymentDates: selectedDates.map(d => d.toISOString())
             });
