@@ -1052,12 +1052,12 @@ export async function deleteClientAndCredits(clienteId: string) {
     return { success: true };
 }
 
-const generateAndSaveContract = async (creditId: string, providerId: string, creditData: any, clienteData: any, paymentDates: Date[]) => {
+const generateContractText = async (providerId: string, creditData: any, clienteData: any, paymentDates: Date[]) => {
     const providerSnap = await getDoc(doc(db, "users", providerId));
-    if (!providerSnap.exists()) return;
+    if (!providerSnap.exists()) return null;
     
     const providerData = providerSnap.data();
-    if (!providerData.isContractGenerationActive || !providerData.contractTemplate) return;
+    if (!providerData.isContractGenerationActive || !providerData.contractTemplate) return null;
 
     let contractText = providerData.contractTemplate;
 
@@ -1088,29 +1088,14 @@ const generateAndSaveContract = async (creditId: string, providerId: string, cre
         contractText = contractText.replace(new RegExp(key, 'g'), value);
     }
     
-    const contractQuery = query(collection(db, "contracts"), where("creditId", "==", creditId), limit(1));
-    const contractSnapshot = await getDocs(contractQuery);
-
-    if (contractSnapshot.empty) {
-        await addDoc(collection(db, "contracts"), {
-            creditId: creditId,
-            providerId: providerId,
-            clienteId: clienteData.idNumber,
-            contractText: contractText,
-            createdAt: Timestamp.now(),
-            acceptedAt: null,
-        });
-    } else {
-        const contractRef = contractSnapshot.docs[0].ref;
-        await updateDoc(contractRef, { contractText });
-    }
+    return contractText;
 };
 
 
-export async function createClientAndCredit(values: z.infer<typeof ClientCreditSchema>) {
+export async function createClientCreditAndContract(data: { clientData: z.infer<typeof ClientCreditSchema>, paymentDates: string[] }) {
     const { user: cobrador } = await getAuthenticatedUser();
     if (!cobrador || cobrador.role !== 'cobrador') return { error: "Acción no autorizada." };
-    
+
     const providerId = cobrador.providerId;
     if(!providerId) return { error: "El cobrador no tiene un proveedor asociado." };
 
@@ -1122,32 +1107,30 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
     if (!provider.isActive) {
         return { error: "La cuenta de tu proveedor está inactiva. No puedes crear nuevos créditos." };
     }
-    
-    const validatedFields = ClientCreditSchema.safeParse(values);
 
+    const { clientData, paymentDates } = data;
+    
+    const validatedFields = ClientCreditSchema.safeParse(clientData);
     if (!validatedFields.success) {
-        const errors = validatedFields.error.flatten().fieldErrors;
-        const firstError = Object.values(errors)[0]?.[0] || "Datos del formulario inválidos.";
-        return { error: firstError };
+        return { error: "Datos del formulario inválidos." };
     }
     
-    const { 
-        idNumber, firstName, secondName, firstLastName, secondLastName, address, contactPhone, 
-        creditAmount, installments, requiresGuarantor, requiresReferences,
-        guarantorName, guarantorIdNumber, guarantorAddress, guarantorPhone,
-        familyReferenceName, familyReferencePhone, familyReferenceAddress,
-        personalReferenceName, personalReferencePhone, personalReferenceAddress
-    } = validatedFields.data;
-    
-    let clienteData = await findUserByIdNumber(idNumber);
-    if (clienteData) {
-        return { error: "Ya existe un cliente con este número de cédula. Utilice la opción de renovar o crear un nuevo crédito desde el historial del cliente." };
-    }
-    
-    const fullName = [firstName, secondName, firstLastName, secondLastName].filter(Boolean).join(" ");
+    const { idNumber } = validatedFields.data;
 
+    const existingClient = await findUserByIdNumber(idNumber);
+    if (existingClient) {
+        return { error: "Ya existe un cliente con esta cédula. Utilice la opción de renovar o crear un nuevo crédito desde el historial del cliente." };
+    }
+    
+    const batch = writeBatch(db);
+    const now = Timestamp.now();
+
+    // 1. Create client
+    const { firstName, secondName, firstLastName, secondLastName, address, contactPhone, creditAmount, installments, requiresGuarantor, requiresReferences, ...restOfClientData } = validatedFields.data;
+    const fullName = [firstName, secondName, firstLastName, secondLastName].filter(Boolean).join(" ");
     const hashedPassword = await bcrypt.hash(idNumber, 10);
-    const newUserDocRef = await addDoc(collection(db, "users"),{
+    const newUserRef = doc(collection(db, "users"));
+    batch.set(newUserRef, {
         idNumber,
         name: fullName,
         firstName,
@@ -1159,52 +1142,70 @@ export async function createClientAndCredit(values: z.infer<typeof ClientCreditS
         providerId,
         address,
         contactPhone,
-        createdAt: Timestamp.now(),
+        createdAt: now,
         city: provider.city || 'N/A'
     });
     usersCache.delete(idNumber);
 
-
-    const valor = parseFloat(creditAmount.replace(/\./g, '').replace(',', '.'));
+    // 2. Create credit
+    const valor = parseFloat(creditAmount.replace(/\./g, ''));
     const { commission, percentage } = calculateCommission(valor, provider.commissionTiers);
-
-    const creditDataForContract = {
+    const creditRef = doc(collection(db, "credits"));
+    const creditDataObject = {
         valor,
-        cuotas: parseInt(installments, 10),
-        commission: commission,
+        commission,
         commissionPercentage: percentage,
-    };
-    
-    const creditRef = await addDoc(collection(db, "credits"), {
-        ...creditDataForContract,
+        cuotas: parseInt(installments, 10),
         clienteId: idNumber,
         cobradorId: cobrador.idNumber,
         providerId,
-        fecha: Timestamp.now(),
+        fecha: now,
         estado: 'Activo',
+        paymentDates: paymentDates.map(d => Timestamp.fromDate(new Date(d))),
+        paymentScheduleSet: true,
+        missedPaymentDays: 0,
         guarantor: requiresGuarantor ? {
-            name: guarantorName,
-            idNumber: guarantorIdNumber,
-            address: guarantorAddress,
-            phone: guarantorPhone,
+            name: restOfClientData.guarantorName,
+            idNumber: restOfClientData.guarantorIdNumber,
+            address: restOfClientData.guarantorAddress,
+            phone: restOfClientData.guarantorPhone,
         } : null,
         references: requiresReferences ? {
             familiar: {
-                name: familyReferenceName,
-                phone: familyReferencePhone,
-                address: familyReferenceAddress
+                name: restOfClientData.familyReferenceName,
+                phone: restOfClientData.familyReferencePhone,
+                address: restOfClientData.familyReferenceAddress
             },
             personal: {
-                name: personalReferenceName,
-                phone: personalReferencePhone,
-                address: personalReferenceAddress
+                name: restOfClientData.personalReferenceName,
+                phone: restOfClientData.personalReferencePhone,
+                address: restOfClientData.personalReferenceAddress
             }
         } : null,
-        missedPaymentDays: 0,
-    });
-    
-    return { success: true, creditId: creditRef.id };
+    };
+    batch.set(creditRef, creditDataObject);
+
+    // 3. Create Contract (if applicable)
+    if (provider.isContractGenerationActive) {
+        const contractText = await generateContractText(providerId, creditDataObject, { name: fullName, idNumber, city: provider.city }, paymentDates.map(d => new Date(d)));
+        if (contractText) {
+            const contractRef = doc(collection(db, "contracts"));
+            batch.set(contractRef, {
+                creditId: creditRef.id,
+                providerId,
+                clienteId: idNumber,
+                contractText,
+                createdAt: now,
+                acceptedAt: now,
+            });
+        }
+    }
+
+    await batch.commit();
+
+    return { success: true };
 }
+
 
 export async function createNewCreditForClient(values: z.infer<typeof NewCreditSchema>) {
     const { user: cobrador } = await getAuthenticatedUser();
@@ -1354,7 +1355,18 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
         
         const clienteData = await findUserByIdNumber(creditData.clienteId);
         if (clienteData) {
-            await generateAndSaveContract(creditId, creditData.providerId, creditData, clienteData, dateObjects);
+            const contractText = await generateContractText(creditData.providerId, creditData, clienteData, dateObjects);
+            if (contractText) {
+                const contractRef = doc(collection(db, "contracts"));
+                 await setDoc(contractRef, {
+                    creditId: creditId,
+                    providerId: creditData.providerId,
+                    clienteId: creditData.clienteId,
+                    contractText: contractText,
+                    createdAt: Timestamp.now(),
+                    acceptedAt: null,
+                });
+            }
         }
         
         return { success: true };
@@ -1553,17 +1565,22 @@ export async function registerMissedPayment(creditId: string) {
   }
 }
 
-export async function getContractForAcceptance(creditId: string) {
-    if (!creditId) return { error: "ID de crédito no válido." };
-    const q = query(collection(db, "contracts"), where("creditId", "==", creditId), limit(1));
-    const snapshot = await getDocs(q);
+type ContractGenParams = {
+    creditData: { valor: number, cuotas: number, commission?: number, commissionPercentage?: number };
+    clienteData: { name: string, idNumber: string, city: string };
+    paymentDates: string[];
+}
+export async function getContractForAcceptance(params: ContractGenParams) {
+    const { user } = await getAuthenticatedUser();
+    if (!user || !user.providerId) return { error: "No se pudo identificar al proveedor." };
+    
+    const text = await generateContractText(user.providerId, params.creditData, params.clienteData, params.paymentDates.map(d=>new Date(d)));
 
-    if (snapshot.empty) {
-        return { contractText: null };
+    if (!text) {
+        return { error: "La generación de contratos no está activa para este proveedor." };
     }
 
-    const contract = snapshot.docs[0].data();
-    return { contractText: contract.contractText };
+    return { contractText: text };
 }
 
 export async function acceptContract(creditId: string) {
@@ -1865,13 +1882,11 @@ export async function reinvestCommission(amountToReinvest: number) {
         const providerRef = doc(db, "users", providerId);
         
         const paymentsRef = collection(db, "payments");
-        const paymentsQuery = query(paymentsRef, where("providerId", "==", providerId));
+        const paymentsQuery = query(paymentsRef, where("providerId", "==", providerId), where("reinvested", "==", false));
         const paymentsSnapshot = await getDocs(paymentsQuery);
 
-        const allProviderPayments = paymentsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-
-        const unreinvestedPayments = allProviderPayments
-            .filter(p => !p.reinvested)
+        const unreinvestedPayments = paymentsSnapshot.docs
+            .map(d => ({ id: d.id, ...d.data() }))
             .sort((a,b) => a.date.toMillis() - b.date.toMillis());
         
         if (unreinvestedPayments.length === 0) {
@@ -1926,7 +1941,17 @@ export async function reinvestCommission(amountToReinvest: number) {
     } catch (e: any) {
         console.error("Error reinvesting commission:", e);
         if (e.message?.includes('query requires an index')) {
-            return { error: "Se requiere un índice de base de datos. Por favor, contacta a soporte." };
+            const paymentsRef = collection(db, "payments");
+            const q = query(paymentsRef, where("providerId", "==", providerId));
+            const snapshot = await getDocs(q);
+            const payments = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+            const unreinvested = payments.filter(p => p.reinvested === false);
+             if (unreinvested.length === 0) {
+                return { error: "No hay comisiones disponibles para reinvertir." };
+            }
+
+            return { error: `Se requiere un índice de base de datos para esta operación (${unreinvested.length} pagos). Por favor, contacta a soporte.` };
         }
         return { error: "Ocurrió un error en el servidor al reinvertir." };
     }
@@ -2130,20 +2155,4 @@ export async function getFinancialAdviceForProvider() {
 
     
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    

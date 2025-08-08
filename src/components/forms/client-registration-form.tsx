@@ -14,12 +14,12 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, DollarSign, Eraser, FileText, X, Save, StepForward, CheckCircle2, AlertCircle, Upload, CalendarIcon, RefreshCw, BadgeInfo, ShieldCheck } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ClientCreditSchema } from "@/lib/schemas";
-import { createClientAndCredit, savePaymentSchedule, getContractForAcceptance, acceptContract } from "@/lib/actions";
+import { createClientCreditAndContract, getContractForAcceptance } from "@/lib/actions";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -34,21 +34,22 @@ type ClientRegistrationFormProps = {
   onFormSubmit?: () => void;
 };
 
+type FormData = z.infer<typeof ClientCreditSchema>;
+
 export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormProps) {
   const [step, setStep] = useState(1);
   const [isPending, setIsPending] = useState(false);
   const [requiresGuarantor, setRequiresGuarantor] = useState(false);
   const [requiresReferences, setRequiresReferences] = useState(false);
-  const [createdCreditId, setCreatedCreditId] = useState<string | null>(null);
-  const [contractText, setContractText] = useState<string | null>(null);
   
-  // State for payment schedule
+  const [formData, setFormData] = useState<Partial<FormData>>({});
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [month, setMonth] = useState(new Date());
+  const [contractText, setContractText] = useState<string | null>(null);
 
   const { toast } = useToast();
 
-  const form = useForm<z.infer<typeof ClientCreditSchema>>({
+  const form = useForm<FormData>({
     resolver: zodResolver(ClientCreditSchema),
     defaultValues: {
       idNumber: "",
@@ -116,33 +117,12 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     form.setValue('creditAmount', formattedValue);
   };
   
-  const handleNextStep = async () => {
+  const handleNextStep = async (currentStep: number, nextStep: number) => {
     const isValid = await form.trigger();
     if (!isValid) return;
-
-    setIsPending(true);
-    try {
-        const result = await createClientAndCredit(form.getValues());
-        
-        if (result.success && result.creditId) {
-            setCreatedCreditId(result.creditId);
-            setStep(2);
-        } else {
-            toast({
-                title: "Error en el registro",
-                description: result.error,
-                variant: "destructive",
-            });
-        }
-    } catch (e) {
-         toast({
-            title: "Error de red",
-            description: "No se pudo conectar con el servidor.",
-            variant: "destructive",
-        });
-    } finally {
-        setIsPending(false);
-    }
+    
+    setFormData(prev => ({ ...prev, ...form.getValues() }));
+    setStep(nextStep);
   };
 
     const handleDateSelect = (dates: Date[] | undefined) => {
@@ -165,57 +145,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
 
         setSelectedDates(validDates.sort((a,b) => a.getTime() - b.getTime()));
     };
-    
-    const handleSaveSchedule = async () => {
-        const validDates = selectedDates.filter(d => d instanceof Date && !isNaN(d.getTime()));
-
-        if (!createdCreditId || validDates.length === 0) {
-             toast({
-                title: "Información incompleta",
-                description: "Debes seleccionar las fechas de pago.",
-                variant: "destructive"
-            });
-            return;
-        }
-        
-        const installments = parseInt(form.getValues('installments') || '0', 10);
-        if (validDates.length !== installments) {
-             toast({
-                title: "Fechas no coinciden",
-                description: `Debes seleccionar exactamente ${installments} fechas de pago. Has seleccionado ${validDates.length}.`,
-                variant: "destructive"
-            });
-            return;
-        }
-
-        setIsPending(true);
-        const result = await savePaymentSchedule({
-            creditId: createdCreditId,
-            paymentDates: validDates.map(d => d.toISOString())
-        });
-        
-        if (result.success) {
-            const contractData = await getContractForAcceptance(createdCreditId);
-            if (contractData.contractText) {
-                setContractText(contractData.contractText);
-                setStep(3);
-            } else {
-                 toast({ 
-                    title: "Registro Completado",
-                    description: "El cliente y su crédito han sido creados exitosamente (sin contrato).",
-                    variant: "default",
-                    className: "bg-accent text-accent-foreground border-accent",
-                });
-                if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new CustomEvent('creditos-updated'));
-                }
-                onFormSubmit?.();
-            }
-        } else {
-            toast({ title: "Error al guardar calendario", description: result.error, variant: "destructive" });
-        }
-        setIsPending(false);
-    };
 
     const handleResetDates = () => {
       setSelectedDates([]);
@@ -225,31 +154,77 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       });
     }
 
-    const handleAcceptContract = async () => {
-        if (!createdCreditId) return;
-        
-        setIsPending(true);
-        const result = await acceptContract(createdCreditId);
-
-        if (result.success) {
-            toast({
-                title: "Registro Finalizado",
-                description: "El contrato fue aceptado y el crédito está activo.",
-                variant: "default",
-                className: "bg-accent text-accent-foreground border-accent",
-            });
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('creditos-updated'));
-            }
-            onFormSubmit?.();
-        } else {
-            toast({
-                title: "Error",
-                description: result.error || "No se pudo aceptar el contrato.",
-                variant: "destructive",
-            });
+    const goToContractStep = async () => {
+        const currentFormData = { ...formData, ...form.getValues() };
+        if (selectedDates.length === 0) {
+            toast({ title: "Fechas requeridas", description: "Debes seleccionar las fechas de pago.", variant: "destructive" });
+            return;
         }
-        setIsPending(false);
+
+        const installments = parseInt(currentFormData.installments || '0', 10);
+        if (selectedDates.length !== installments) {
+            toast({ title: "Fechas no coinciden", description: `Debes seleccionar exactamente ${installments} fechas. Has seleccionado ${selectedDates.length}.`, variant: "destructive" });
+            return;
+        }
+
+        setIsPending(true);
+        try {
+             const contractData = await getContractForAcceptance({
+                creditData: {
+                    valor: parseFloat(currentFormData.creditAmount!.replace(/\./g, '')),
+                    cuotas: installments,
+                },
+                clienteData: {
+                    name: [currentFormData.firstName, currentFormData.secondName, currentFormData.firstLastName, currentFormData.secondLastName].filter(Boolean).join(" "),
+                    idNumber: currentFormData.idNumber!,
+                    city: 'N/A', // We don't have this on client form, will be taken from provider
+                },
+                paymentDates: selectedDates.map(d => d.toISOString())
+            });
+
+            if (contractData.contractText) {
+                setContractText(contractData.contractText);
+                setStep(3);
+            } else {
+                toast({ title: "Error", description: "No se pudo generar el contrato.", variant: "destructive"});
+            }
+        } catch(e) {
+             toast({ title: "Error de red", description: "No se pudo generar el contrato.", variant: "destructive"});
+        } finally {
+            setIsPending(false);
+        }
+    };
+
+
+    const handleFinalSubmit = async () => {
+        setIsPending(true);
+        const finalData = { ...formData, ...form.getValues() };
+        
+        try {
+            const result = await createClientCreditAndContract({
+                clientData: finalData,
+                paymentDates: selectedDates.map(d => d.toISOString())
+            });
+            
+            if (result.success) {
+                toast({
+                    title: "Registro Finalizado",
+                    description: "El cliente, su crédito y contrato han sido creados exitosamente.",
+                    variant: "default",
+                    className: "bg-accent text-accent-foreground border-accent",
+                });
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('creditos-updated'));
+                }
+                onFormSubmit?.();
+            } else {
+                toast({ title: "Error en el registro", description: result.error, variant: "destructive" });
+            }
+        } catch (e) {
+            toast({ title: "Error de red", description: "No se pudo conectar con el servidor.", variant: "destructive" });
+        } finally {
+            setIsPending(false);
+        }
     }
     
   const renderStep = () => {
@@ -590,9 +565,9 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                   />
               </div>
             </ScrollArea>
-            <Button type="button" onClick={handleNextStep} className="w-full mt-4" disabled={isPending}>
+            <Button type="button" onClick={() => handleNextStep(1, 2)} className="w-full mt-4" disabled={isPending}>
               {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              {isPending ? "Guardando..." : "Guardar y Siguiente"}
+              {isPending ? "Guardando..." : "Siguiente"}
             </Button>
           </>
         );
@@ -655,9 +630,9 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     <Button type="button" variant="outline" onClick={() => setStep(1)} className="w-full" disabled={isPending}>
                         Volver
                     </Button>
-                    <Button type="button" onClick={handleSaveSchedule} className="w-full" disabled={isPending || selectedDates.length === 0}>
+                    <Button type="button" onClick={goToContractStep} className="w-full" disabled={isPending || selectedDates.length === 0}>
                         {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                        {isPending ? 'Guardando...' : 'Siguiente'}
+                        {isPending ? 'Generando...' : 'Siguiente'}
                     </Button>
                 </div>
             </>
@@ -680,9 +655,9 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                         contractText
                     )}
                 </ScrollArea>
-                <Button type="button" onClick={handleAcceptContract} className="w-full bg-accent hover:bg-accent/90" disabled={isPending || !contractText}>
+                <Button type="button" onClick={handleFinalSubmit} className="w-full bg-accent hover:bg-accent/90" disabled={isPending || !contractText}>
                     {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
-                    {isPending ? "Procesando..." : "Aceptar y Finalizar Contrato"}
+                    {isPending ? "Procesando..." : "Crear y Finalizar Registro"}
                 </Button>
             </div>
         )
@@ -702,3 +677,5 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
+
+    
