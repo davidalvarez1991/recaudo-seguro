@@ -739,8 +739,6 @@ export async function getPaymentRoute() {
     
     let dailyGoal = 0;
     
-    // --- Optimized Data Fetching ---
-    // 1. Fetch all payments for all active credits at once
     const activeCreditIds = activeCredits.map(c => c.id);
     let allPayments: any[] = [];
     if (activeCreditIds.length > 0) {
@@ -749,16 +747,19 @@ export async function getPaymentRoute() {
         const paymentsSnapshot = await getDocs(paymentsQuery);
         allPayments = paymentsSnapshot.docs.map(p => p.data());
     }
-    // --- End Optimization ---
     
     const routeEntriesPromises = activeCredits.map(async (credit) => {
-        if (!Array.isArray(credit.paymentDates)) return null;
+        if (!Array.isArray(credit.paymentDates) || credit.paymentDates.length === 0) return null;
         
         const sortedDates = credit.paymentDates
             .map(d => parseISO(d))
             .sort((a, b) => a.getTime() - b.getTime());
 
-        const nextPaymentDate = sortedDates.find(date => isFuture(date) || isToday(toZonedTime(date, timeZone)));
+        const paidInstallmentsCount = credit.paidInstallments || 0;
+
+        if (paidInstallmentsCount >= sortedDates.length) return null; // Credit is fully paid
+
+        const nextPaymentDate = sortedDates[paidInstallmentsCount];
 
         if (!nextPaymentDate) return null;
         
@@ -770,7 +771,6 @@ export async function getPaymentRoute() {
         const todayStart = startOfDay(toZonedTime(new Date(), timeZone));
         const todayEnd = endOfDay(toZonedTime(new Date(), timeZone));
 
-        // Use pre-fetched payments
         const creditPayments = allPayments.filter(p => p.creditId === credit.id);
         const isPaidToday = creditPayments.some(payment => {
             const paymentDateInTimeZone = toZonedTime(payment.date.toDate(), timeZone);
@@ -778,7 +778,7 @@ export async function getPaymentRoute() {
         });
         
         const nextPaymentZoned = toZonedTime(nextPaymentDate, timeZone);
-        if (isToday(nextPaymentZoned)) {
+        if (isToday(nextPaymentZoned) && !isPaidToday) {
             dailyGoal += installmentAmount + credit.lateFee;
         }
 
@@ -807,7 +807,6 @@ export async function getPaymentRoute() {
     const routeEntries = (await Promise.all(routeEntriesPromises)).filter(Boolean);
     const sortedRoutes = (routeEntries as any[]).sort((a, b) => new Date(a.nextPaymentDate).getTime() - new Date(b.nextPaymentDate).getTime());
 
-    // Calculate collected today
     const paymentsRef = collection(db, "payments");
     const today = toZonedTime(new Date(), timeZone);
     const paymentsQuery = query(paymentsRef, where("cobradorId", "==", cobradorData.idNumber));
@@ -1839,18 +1838,14 @@ export async function reinvestCommission(amountToReinvest: number) {
 
     try {
         const providerRef = doc(db, "users", providerId);
-        const providerSnap = await getDoc(providerRef);
-        if (!providerSnap.exists()) {
-            return { error: "Proveedor no encontrado." };
-        }
-        const providerData = providerSnap.data();
-
+        
         const paymentsRef = collection(db, "payments");
         const paymentsQuery = query(paymentsRef, where("providerId", "==", providerId));
         const paymentsSnapshot = await getDocs(paymentsQuery);
 
-        const unreinvestedPayments = paymentsSnapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() }))
+        const allProviderPayments = paymentsSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        const unreinvestedPayments = allProviderPayments
             .filter(p => !p.reinvested)
             .sort((a,b) => a.date.toMillis() - b.date.toMillis());
 
@@ -1858,21 +1853,24 @@ export async function reinvestCommission(amountToReinvest: number) {
             return { error: "No hay comisiones disponibles para reinvertir." };
         }
         
+        const creditIds = [...new Set(unreinvestedPayments.map(p => p.creditId))];
         const creditsMap = new Map();
+
+        if (creditIds.length > 0) {
+            const creditsQuery = query(collection(db, "credits"), where("__name__", "in", creditIds));
+            const creditsSnapshot = await getDocs(creditsQuery);
+            creditsSnapshot.forEach(doc => {
+                creditsMap.set(doc.id, doc.data());
+            });
+        }
+        
         let accumulatedCommissionToReinvest = 0;
         const batch = writeBatch(db);
 
         for (const payment of unreinvestedPayments) {
             if (accumulatedCommissionToReinvest >= amountToReinvest) break;
 
-            let creditData = creditsMap.get(payment.creditId);
-            if (!creditData) {
-                const creditSnap = await getDoc(doc(db, "credits", payment.creditId));
-                if (creditSnap.exists()) {
-                    creditData = creditSnap.data();
-                    creditsMap.set(payment.creditId, creditData);
-                }
-            }
+            const creditData = creditsMap.get(payment.creditId);
             
             if (creditData) {
                 const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
@@ -2103,6 +2101,7 @@ export async function getFinancialAdviceForProvider() {
     
 
     
+
 
 
 
