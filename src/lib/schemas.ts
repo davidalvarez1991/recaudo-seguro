@@ -88,11 +88,19 @@ export const ClientCreditSchema = z.object({
   references: ReferencesSchema.optional(),
 
 }).superRefine((data, ctx) => {
-    if (data.requiresGuarantor && !data.guarantor) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Los datos del fiador son requeridos.", path: ['guarantor.name']});
+    if (data.requiresGuarantor) {
+      if(!data.guarantor?.name) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El nombre del fiador es requerido.", path: ['guarantor.name']});
+      if(!data.guarantor?.idNumber) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La cédula del fiador es requerida.", path: ['guarantor.idNumber']});
+      if(!data.guarantor?.address) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La dirección del fiador es requerida.", path: ['guarantor.address']});
+      if(!data.guarantor?.phone) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El teléfono del fiador es requerido.", path: ['guarantor.phone']});
     }
-    if (data.requiresReferences && !data.references) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Los datos de las referencias son requeridos.", path: ['references.familiar.name']});
+    if (data.requiresReferences) {
+      if(!data.references?.familiar.name) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El nombre es requerido.", path: ['references.familiar.name']});
+      if(!data.references?.familiar.phone) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El teléfono es requerido.", path: ['references.familiar.phone']});
+      if(!data.references?.familiar.address) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La dirección es requerida.", path: ['references.familiar.address']});
+      if(!data.references?.personal.name) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El nombre es requerido.", path: ['references.personal.name']});
+      if(!data.references?.personal.phone) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El teléfono es requerido.", path: ['references.personal.phone']});
+      if(!data.references?.personal.address) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La dirección es requerida.", path: ['references.personal.address']});
     }
 });
 

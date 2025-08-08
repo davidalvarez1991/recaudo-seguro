@@ -36,6 +36,18 @@ type ClientRegistrationFormProps = {
 
 type FormData = z.infer<typeof ClientCreditSchema>;
 
+const step1Fields: (keyof FormData)[] = [
+    "idNumber", "firstName", "secondName", "firstLastName", "secondLastName",
+    "address", "contactPhone", "creditAmount", "installments", "requiresGuarantor",
+    "requiresReferences"
+];
+const step1GuarantorFields: (keyof FormData)[] = ["guarantor.name", "guarantor.idNumber", "guarantor.address", "guarantor.phone"];
+const step1ReferencesFields: (keyof FormData)[] = [
+    "references.familiar.name", "references.familiar.phone", "references.familiar.address",
+    "references.personal.name", "references.personal.phone", "references.personal.address"
+];
+
+
 export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormProps) {
   const [step, setStep] = useState(1);
   const [isPending, setIsPending] = useState(false);
@@ -72,6 +84,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         personal: { name: "", phone: "", address: "" }
       }
     },
+    mode: "onChange"
   });
 
   const requiresGuarantor = form.watch('requiresGuarantor');
@@ -91,7 +104,15 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   };
   
   const handleNextStep = async (currentStep: number, nextStep: number) => {
-    const isValid = await form.trigger();
+    let fieldsToValidate = step1Fields;
+    if (form.getValues('requiresGuarantor')) {
+      fieldsToValidate = [...fieldsToValidate, ...step1GuarantorFields];
+    }
+     if (form.getValues('requiresReferences')) {
+      fieldsToValidate = [...fieldsToValidate, ...step1ReferencesFields];
+    }
+    
+    const isValid = await form.trigger(fieldsToValidate as any);
     if (!isValid) return;
     
     setFormData(prev => ({ ...prev, ...form.getValues() }));
