@@ -134,7 +134,10 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     const isValid = await form.trigger(fieldsToValidate as any);
     if (!isValid) return;
     
-    setFormData(prev => ({ ...prev, ...form.getValues() }));
+    // Capture all values from the form when moving from step 1
+    if (currentStep === 1) {
+        setFormData(form.getValues());
+    }
     setStep(nextStep);
   };
 
@@ -174,13 +177,12 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     };
 
     const goToContractStep = async () => {
-        const currentFormData = { ...formData, ...form.getValues() };
         if (selectedDates.length === 0) {
             toast({ title: "Fechas requeridas", description: "Debes seleccionar las fechas de pago.", variant: "destructive" });
             return;
         }
 
-        const installments = parseInt(currentFormData.installments || '0', 10);
+        const installments = parseInt(formData.installments || '0', 10);
         if (selectedDates.length !== installments) {
             toast({ title: "Fechas no coinciden", description: `Debes seleccionar exactamente ${installments} fechas. Has seleccionado ${selectedDates.length}.`, variant: "destructive" });
             return;
@@ -188,8 +190,8 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
 
         setIsPending(true);
         try {
-            const fullName = [currentFormData.firstName, currentFormData.secondName, currentFormData.firstLastName, currentFormData.secondLastName].filter(Boolean).join(" ");
-            const creditValue = parseFloat(currentFormData.creditAmount?.replace(/\./g, '') || '0');
+            const fullName = [formData.firstName, formData.secondName, formData.firstLastName, formData.secondLastName].filter(Boolean).join(" ");
+            const creditValue = parseFloat(formData.creditAmount?.replace(/\./g, '') || '0');
             const { commission, percentage } = calculateCommission(creditValue, commissionTiers);
 
             const contractData = await getContractForAcceptance({
@@ -201,7 +203,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 },
                 clienteData: {
                     name: fullName,
-                    idNumber: currentFormData.idNumber!,
+                    idNumber: formData.idNumber!,
                 },
                 paymentDates: selectedDates.map(d => d.toISOString())
             });
@@ -222,11 +224,10 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
 
     const handleFinalSubmit = async () => {
         setIsPending(true);
-        const finalData = { ...formData, ...form.getValues() };
         
         try {
             const result = await createClientCreditAndContract({
-                clientData: finalData,
+                clientData: formData as FormData,
                 paymentDates: selectedDates.map(d => d.toISOString())
             });
             
