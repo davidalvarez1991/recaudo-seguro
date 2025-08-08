@@ -49,6 +49,25 @@ export const CobradorRegisterSchema = z.object({
   }),
 });
 
+const GuarantorSchema = z.object({
+  name: z.string().min(3, "El nombre del fiador es obligatorio."),
+  idNumber: z.string().min(6, "La cédula del fiador es obligatoria."),
+  address: z.string().min(5, "La dirección del fiador es obligatoria."),
+  phone: z.string().min(10, "El teléfono del fiador debe tener 10 dígitos."),
+});
+
+const ReferencesSchema = z.object({
+  familiar: z.object({
+    name: z.string().min(3, "El nombre de la referencia familiar es obligatorio."),
+    phone: z.string().min(10, "El teléfono de la referencia familiar debe tener 10 dígitos."),
+    address: z.string().min(5, "La dirección de la referencia familiar es obligatoria."),
+  }),
+  personal: z.object({
+    name: z.string().min(3, "El nombre de la referencia personal es obligatorio."),
+    phone: z.string().min(10, "El teléfono de la referencia personal debe tener 10 dígitos."),
+    address: z.string().min(5, "La dirección de la referencia personal es obligatoria."),
+  })
+});
 
 export const ClientCreditSchema = z.object({
   idNumber: z.string().min(6, "La cédula debe tener al menos 6 caracteres."),
@@ -59,61 +78,24 @@ export const ClientCreditSchema = z.object({
   address: z.string().min(5, "La dirección es obligatoria."),
   contactPhone: z.string().min(10, "El teléfono debe tener 10 dígitos."),
   
-  requiresGuarantor: z.boolean().default(false),
-  requiresReferences: z.boolean().default(false),
-  
-  // Guarantor fields
-  guarantorName: z.string().optional(),
-  guarantorIdNumber: z.string().optional(),
-  guarantorAddress: z.string().optional(),
-  guarantorPhone: z.string().optional(),
-
-  // References fields
-  familyReferenceName: z.string().optional(),
-  familyReferencePhone: z.string().optional(),
-  familyReferenceAddress: z.string().optional(),
-  personalReferenceName: z.string().optional(),
-  personalReferencePhone: z.string().optional(),
-  personalReferenceAddress: z.string().optional(),
-
   creditAmount: z.string().min(1, "El valor del crédito es obligatorio."),
   installments: z.string().min(1, "El número de cuotas es obligatorio."),
+
+  requiresGuarantor: z.boolean().default(false),
+  guarantor: GuarantorSchema.optional(),
+
+  requiresReferences: z.boolean().default(false),
+  references: ReferencesSchema.optional(),
+
 }).superRefine((data, ctx) => {
-    if (data.requiresGuarantor) {
-        if (!data.guarantorName || data.guarantorName.length < 3) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El nombre del fiador es obligatorio.", path: ['guarantorName']});
-        }
-         if (!data.guarantorIdNumber || data.guarantorIdNumber.length < 6) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La cédula del fiador es obligatoria.", path: ['guarantorIdNumber']});
-        }
-        if (!data.guarantorAddress || data.guarantorAddress.length < 5) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La dirección del fiador es obligatoria.", path: ['guarantorAddress']});
-        }
-        if (!data.guarantorPhone || data.guarantorPhone.length < 10) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El teléfono del fiador debe tener 10 dígitos.", path: ['guarantorPhone']});
-        }
+    if (data.requiresGuarantor && !data.guarantor) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Los datos del fiador son requeridos.", path: ['guarantor.name']});
     }
-    if (data.requiresReferences) {
-        if (!data.familyReferenceName || data.familyReferenceName.length < 3) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El nombre de la referencia familiar es obligatorio.", path: ['familyReferenceName']});
-        }
-        if (!data.familyReferencePhone || data.familyReferencePhone.length < 10) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El teléfono de la referencia familiar debe tener 10 dígitos.", path: ['familyReferencePhone']});
-        }
-        if (!data.familyReferenceAddress || data.familyReferenceAddress.length < 5) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La dirección de la referencia familiar es obligatoria.", path: ['familyReferenceAddress']});
-        }
-        if (!data.personalReferenceName || data.personalReferenceName.length < 3) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El nombre de la referencia personal es obligatorio.", path: ['personalReferenceName']});
-        }
-        if (!data.personalReferencePhone || data.personalReferencePhone.length < 10) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El teléfono de la referencia personal debe tener 10 dígitos.", path: ['personalReferencePhone']});
-        }
-        if (!data.personalReferenceAddress || data.personalReferenceAddress.length < 5) {
-            ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La dirección de la referencia personal es obligatoria.", path: ['personalReferenceAddress']});
-        }
+    if (data.requiresReferences && !data.references) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Los datos de las referencias son requeridos.", path: ['references.familiar.name']});
     }
 });
+
 
 export const EditCobradorSchema = z.object({
   originalIdNumber: z.string(),

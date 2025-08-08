@@ -1112,6 +1112,7 @@ export async function createClientCreditAndContract(data: { clientData: z.infer<
     
     const validatedFields = ClientCreditSchema.safeParse(clientData);
     if (!validatedFields.success) {
+        console.log(validatedFields.error.flatten().fieldErrors);
         return { error: "Datos del formulario inválidos." };
     }
     
@@ -1126,7 +1127,7 @@ export async function createClientCreditAndContract(data: { clientData: z.infer<
     const now = Timestamp.now();
 
     // 1. Create client
-    const { firstName, secondName, firstLastName, secondLastName, address, contactPhone, creditAmount, installments, requiresGuarantor, requiresReferences, ...restOfClientData } = validatedFields.data;
+    const { firstName, secondName, firstLastName, secondLastName, address, contactPhone, creditAmount, installments, guarantor, references } = validatedFields.data;
     const fullName = [firstName, secondName, firstLastName, secondLastName].filter(Boolean).join(" ");
     const hashedPassword = await bcrypt.hash(idNumber, 10);
     const newUserRef = doc(collection(db, "users"));
@@ -1164,24 +1165,8 @@ export async function createClientCreditAndContract(data: { clientData: z.infer<
         paymentDates: paymentDates.map(d => Timestamp.fromDate(new Date(d))),
         paymentScheduleSet: true,
         missedPaymentDays: 0,
-        guarantor: requiresGuarantor ? {
-            name: restOfClientData.guarantorName,
-            idNumber: restOfClientData.guarantorIdNumber,
-            address: restOfClientData.guarantorAddress,
-            phone: restOfClientData.guarantorPhone,
-        } : null,
-        references: requiresReferences ? {
-            familiar: {
-                name: restOfClientData.familyReferenceName,
-                phone: restOfClientData.familyReferencePhone,
-                address: restOfClientData.familyReferenceAddress
-            },
-            personal: {
-                name: restOfClientData.personalReferenceName,
-                phone: restOfClientData.personalReferencePhone,
-                address: restOfClientData.personalReferenceAddress
-            }
-        } : null,
+        guarantor: validatedFields.data.requiresGuarantor ? guarantor : null,
+        references: validatedFields.data.requiresReferences ? references : null,
     };
     batch.set(creditRef, creditDataObject);
 
@@ -1881,13 +1866,15 @@ export async function reinvestCommission(amountToReinvest: number) {
     try {
         const providerRef = doc(db, "users", providerId);
         
+        // Fetch all payments for the provider first, then filter and sort in memory.
         const paymentsRef = collection(db, "payments");
-        const paymentsQuery = query(paymentsRef, where("providerId", "==", providerId), where("reinvested", "==", false));
+        const paymentsQuery = query(paymentsRef, where("providerId", "==", providerId));
         const paymentsSnapshot = await getDocs(paymentsQuery);
 
         const unreinvestedPayments = paymentsSnapshot.docs
             .map(d => ({ id: d.id, ...d.data() }))
-            .sort((a,b) => a.date.toMillis() - b.date.toMillis());
+            .filter(p => p.reinvested === false)
+            .sort((a, b) => a.date.toMillis() - b.date.toMillis());
         
         if (unreinvestedPayments.length === 0) {
             return { error: "No hay comisiones disponibles para reinvertir." };
@@ -1897,11 +1884,18 @@ export async function reinvestCommission(amountToReinvest: number) {
         const creditsMap = new Map();
 
         if (creditIds.length > 0) {
-            const creditsQuery = query(collection(db, "credits"), where("__name__", "in", creditIds));
-            const creditsSnapshot = await getDocs(creditsQuery);
-            creditsSnapshot.forEach(doc => {
-                creditsMap.set(doc.id, doc.data());
-            });
+            // Firestore 'in' queries are limited to 30 elements. Chunk if necessary.
+            const chunks = [];
+            for (let i = 0; i < creditIds.length; i += 30) {
+                chunks.push(creditIds.slice(i, i + 30));
+            }
+            for (const chunk of chunks) {
+                const creditsQuery = query(collection(db, "credits"), where("__name__", "in", chunk));
+                const creditsSnapshot = await getDocs(creditsQuery);
+                creditsSnapshot.forEach(doc => {
+                    creditsMap.set(doc.id, doc.data());
+                });
+            }
         }
         
         let accumulatedCommissionToReinvest = 0;
@@ -1941,17 +1935,7 @@ export async function reinvestCommission(amountToReinvest: number) {
     } catch (e: any) {
         console.error("Error reinvesting commission:", e);
         if (e.message?.includes('query requires an index')) {
-            const paymentsRef = collection(db, "payments");
-            const q = query(paymentsRef, where("providerId", "==", providerId));
-            const snapshot = await getDocs(q);
-            const payments = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-
-            const unreinvested = payments.filter(p => p.reinvested === false);
-             if (unreinvested.length === 0) {
-                return { error: "No hay comisiones disponibles para reinvertir." };
-            }
-
-            return { error: `Se requiere un índice de base de datos para esta operación (${unreinvested.length} pagos). Por favor, contacta a soporte.` };
+            return { error: `Se requiere un índice de base de datos para esta operación. Por favor, contacta a soporte.` };
         }
         return { error: "Ocurrió un error en el servidor al reinvertir." };
     }

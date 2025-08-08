@@ -14,9 +14,9 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, DollarSign, Eraser, FileText, X, Save, StepForward, CheckCircle2, AlertCircle, Upload, CalendarIcon, RefreshCw, BadgeInfo, ShieldCheck } from "lucide-react";
+import { Loader2, DollarSign, Save, StepForward, CheckCircle2, ShieldCheck } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ClientCreditSchema } from "@/lib/schemas";
 import { createClientCreditAndContract, getContractForAcceptance } from "@/lib/actions";
@@ -26,7 +26,7 @@ import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
-import { addDays, getDay, isSameDay, startOfDay, format } from 'date-fns';
+import { startOfDay, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from "@/components/ui/badge";
 
@@ -39,8 +39,6 @@ type FormData = z.infer<typeof ClientCreditSchema>;
 export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormProps) {
   const [step, setStep] = useState(1);
   const [isPending, setIsPending] = useState(false);
-  const [requiresGuarantor, setRequiresGuarantor] = useState(false);
-  const [requiresReferences, setRequiresReferences] = useState(false);
   
   const [formData, setFormData] = useState<Partial<FormData>>({});
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
@@ -59,50 +57,25 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       secondLastName: "",
       address: "",
       contactPhone: "",
-      guarantorName: "",
-      guarantorIdNumber: "",
-      guarantorAddress: "",
-      guarantorPhone: "",
-      familyReferenceName: "",
-      familyReferencePhone: "",
-      familyReferenceAddress: "",
-      personalReferenceName: "",
-      personalReferencePhone: "",
-      personalReferenceAddress: "",
       creditAmount: "",
       installments: "",
       requiresGuarantor: false,
       requiresReferences: false,
+      guarantor: {
+        name: "",
+        idNumber: "",
+        address: "",
+        phone: ""
+      },
+      references: {
+        familiar: { name: "", phone: "", address: "" },
+        personal: { name: "", phone: "", address: "" }
+      }
     },
-    context: {
-        requiresGuarantor: false,
-        requiresReferences: false,
-    }
   });
 
-  useEffect(() => {
-    form.setValue('requiresGuarantor', requiresGuarantor);
-    if (!requiresGuarantor) {
-      form.setValue('guarantorName', '');
-      form.setValue('guarantorIdNumber', '');
-      form.setValue('guarantorAddress', '');
-      form.setValue('guarantorPhone', '');
-    }
-    form.trigger(['guarantorName', 'guarantorIdNumber', 'guarantorAddress', 'guarantorPhone']);
-  }, [requiresGuarantor, form]);
-  
-  useEffect(() => {
-    form.setValue('requiresReferences', requiresReferences);
-    if (!requiresReferences) {
-      form.setValue('familyReferenceName', '');
-      form.setValue('familyReferencePhone', '');
-      form.setValue('familyReferenceAddress', '');
-      form.setValue('personalReferenceName', '');
-      form.setValue('personalReferencePhone', '');
-      form.setValue('personalReferenceAddress', '');
-    }
-    form.trigger(['familyReferenceName', 'familyReferencePhone', 'familyReferenceAddress', 'personalReferenceName', 'personalReferencePhone', 'personalReferenceAddress']);
-  }, [requiresReferences, form]);
+  const requiresGuarantor = form.watch('requiresGuarantor');
+  const requiresReferences = form.watch('requiresReferences');
 
   const formatCurrency = (value: string) => {
     if (!value) return "";
@@ -146,14 +119,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         setSelectedDates(validDates.sort((a,b) => a.getTime() - b.getTime()));
     };
 
-    const handleResetDates = () => {
-      setSelectedDates([]);
-      toast({
-        title: "Selección reiniciada",
-        description: "Puedes volver a elegir las fechas de pago.",
-      });
-    }
-
     const goToContractStep = async () => {
         const currentFormData = { ...formData, ...form.getValues() };
         if (selectedDates.length === 0) {
@@ -169,13 +134,14 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
 
         setIsPending(true);
         try {
-             const contractData = await getContractForAcceptance({
+            const fullName = [currentFormData.firstName, currentFormData.secondName, currentFormData.firstLastName, currentFormData.secondLastName].filter(Boolean).join(" ");
+            const contractData = await getContractForAcceptance({
                 creditData: {
                     valor: parseFloat(currentFormData.creditAmount!.replace(/\./g, '')),
                     cuotas: installments,
                 },
                 clienteData: {
-                    name: [currentFormData.firstName, currentFormData.secondName, currentFormData.firstLastName, currentFormData.secondLastName].filter(Boolean).join(" "),
+                    name: fullName,
                     idNumber: currentFormData.idNumber!,
                     city: 'N/A', // We don't have this on client form, will be taken from provider
                 },
@@ -329,7 +295,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                   />
                   <Separator className="my-6" />
                   
-                  <Controller
+                  <FormField
                       control={form.control}
                       name="requiresGuarantor"
                       render={({ field }) => (
@@ -340,10 +306,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                               <FormControl>
                                   <Switch
                                       checked={field.value}
-                                      onCheckedChange={(checked) => {
-                                          field.onChange(checked);
-                                          setRequiresGuarantor(checked);
-                                      }}
+                                      onCheckedChange={field.onChange}
                                       disabled={isPending}
                                   />
                               </FormControl>
@@ -355,12 +318,12 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                         <h4 className="font-semibold text-md">Información del Fiador</h4>
                          <FormField
                             control={form.control}
-                            name="guarantorName"
+                            name="guarantor.name"
                             render={({ field }) => (
                                 <FormItem>
                                 <FormLabel>Nombre Completo del Fiador</FormLabel>
                                 <FormControl>
-                                    <Input {...field} value={field.value || ''} placeholder="Nombre del fiador" disabled={isPending} />
+                                    <Input {...field} placeholder="Nombre del fiador" disabled={isPending} />
                                 </FormControl>
                                 <FormMessage />
                                 </FormItem>
@@ -368,12 +331,12 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                         />
                          <FormField
                             control={form.control}
-                            name="guarantorIdNumber"
+                            name="guarantor.idNumber"
                             render={({ field }) => (
                                 <FormItem>
                                 <FormLabel>Cédula del Fiador</FormLabel>
                                 <FormControl>
-                                    <Input {...field} value={field.value || ''} placeholder="Cédula del fiador" disabled={isPending} />
+                                    <Input {...field} placeholder="Cédula del fiador" disabled={isPending} />
                                 </FormControl>
                                 <FormMessage />
                                 </FormItem>
@@ -381,12 +344,12 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                         />
                         <FormField
                             control={form.control}
-                            name="guarantorAddress"
+                            name="guarantor.address"
                             render={({ field }) => (
                                 <FormItem>
                                 <FormLabel>Dirección del Fiador</FormLabel>
                                 <FormControl>
-                                    <Input {...field} value={field.value || ''} placeholder="Dirección del fiador" disabled={isPending} />
+                                    <Input {...field} placeholder="Dirección del fiador" disabled={isPending} />
                                 </FormControl>
                                 <FormMessage />
                                 </FormItem>
@@ -394,12 +357,12 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                         />
                          <FormField
                             control={form.control}
-                            name="guarantorPhone"
+                            name="guarantor.phone"
                             render={({ field }) => (
                                 <FormItem>
                                 <FormLabel>Teléfono del Fiador</FormLabel>
                                 <FormControl>
-                                    <Input {...field} value={field.value || ''} type="tel" placeholder="Teléfono del fiador" disabled={isPending} />
+                                    <Input {...field} type="tel" placeholder="Teléfono del fiador" disabled={isPending} />
                                 </FormControl>
                                 <FormMessage />
                                 </FormItem>
@@ -408,7 +371,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                       </div>
                   )}
 
-                  <Controller
+                  <FormField
                       control={form.control}
                       name="requiresReferences"
                       render={({ field }) => (
@@ -419,10 +382,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                               <FormControl>
                                   <Switch
                                       checked={field.value}
-                                      onCheckedChange={(checked) => {
-                                          field.onChange(checked);
-                                          setRequiresReferences(checked);
-                                      }}
+                                      onCheckedChange={field.onChange}
                                       disabled={isPending}
                                   />
                               </FormControl>
@@ -435,12 +395,12 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                             <h4 className="font-semibold text-md">Referencia Familiar</h4>
                             <FormField
                                 control={form.control}
-                                name="familyReferenceName"
+                                name="references.familiar.name"
                                 render={({ field }) => (
                                     <FormItem>
                                     <FormLabel>Nombre</FormLabel>
                                     <FormControl>
-                                        <Input {...field} value={field.value || ''} placeholder="Nombre completo del familiar" disabled={isPending} />
+                                        <Input {...field} placeholder="Nombre completo del familiar" disabled={isPending} />
                                     </FormControl>
                                     <FormMessage />
                                     </FormItem>
@@ -448,12 +408,12 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                             />
                             <FormField
                                 control={form.control}
-                                name="familyReferencePhone"
+                                name="references.familiar.phone"
                                 render={({ field }) => (
                                     <FormItem>
                                     <FormLabel>Número telefónico</FormLabel>
                                     <FormControl>
-                                        <Input {...field} value={field.value || ''} type="tel" placeholder="Teléfono del familiar" disabled={isPending} />
+                                        <Input {...field} type="tel" placeholder="Teléfono del familiar" disabled={isPending} />
                                     </FormControl>
                                     <FormMessage />
                                     </FormItem>
@@ -461,12 +421,12 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                             />
                             <FormField
                                 control={form.control}
-                                name="familyReferenceAddress"
+                                name="references.familiar.address"
                                 render={({ field }) => (
                                     <FormItem>
                                     <FormLabel>Dirección</FormLabel>
                                     <FormControl>
-                                        <Input {...field} value={field.value || ''} placeholder="Dirección del familiar" disabled={isPending} />
+                                        <Input {...field} placeholder="Dirección del familiar" disabled={isPending} />
                                     </FormControl>
                                     <FormMessage />
                                     </FormItem>
@@ -478,12 +438,12 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                             <h4 className="font-semibold text-md">Referencia Personal</h4>
                              <FormField
                                 control={form.control}
-                                name="personalReferenceName"
+                                name="references.personal.name"
                                 render={({ field }) => (
                                     <FormItem>
                                     <FormLabel>Nombre</FormLabel>
                                     <FormControl>
-                                        <Input {...field} value={field.value || ''} placeholder="Nombre completo del conocido" disabled={isPending} />
+                                        <Input {...field} placeholder="Nombre completo del conocido" disabled={isPending} />
                                     </FormControl>
                                     <FormMessage />
                                     </FormItem>
@@ -491,12 +451,12 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                             />
                             <FormField
                                 control={form.control}
-                                name="personalReferencePhone"
+                                name="references.personal.phone"
                                 render={({ field }) => (
                                     <FormItem>
                                     <FormLabel>Número telefónico</FormLabel>
                                     <FormControl>
-                                        <Input {...field} value={field.value || ''} type="tel" placeholder="Teléfono del conocido" disabled={isPending} />
+                                        <Input {...field} type="tel" placeholder="Teléfono del conocido" disabled={isPending} />
                                     </FormControl>
                                     <FormMessage />
                                     </FormItem>
@@ -504,12 +464,12 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                             />
                             <FormField
                                 control={form.control}
-                                name="personalReferenceAddress"
+                                name="references.personal.address"
                                 render={({ field }) => (
                                     <FormItem>
                                     <FormLabel>Dirección</FormLabel>
                                     <FormControl>
-                                        <Input {...field} value={field.value || ''} placeholder="Dirección del conocido" disabled={isPending} />
+                                        <Input {...field} placeholder="Dirección del conocido" disabled={isPending} />
                                     </FormControl>
                                     <FormMessage />
                                     </FormItem>
@@ -531,7 +491,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                               <FormControl>
                                   <Input
                                       {...field}
-                                      value={field.value || ''}
                                       type="text"
                                       placeholder="1.000.000" 
                                       disabled={isPending} 
@@ -553,7 +512,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                         <FormControl>
                           <Input 
                               {...field}
-                              value={field.value || ''}
                               type="number" 
                               placeholder="12" 
                               disabled={isPending}
@@ -582,10 +540,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                                 Haz clic en los días para establecer el cronograma.
                             </p>
                         </div>
-                         <Button variant="ghost" size="icon" onClick={handleResetDates} disabled={isPending}>
-                            <RefreshCw className="h-4 w-4" />
-                            <span className="sr-only">Refrescar Selección</span>
-                         </Button>
                     </div>
                     <div className="rounded-md border flex justify-center">
                         <Calendar
@@ -677,5 +631,3 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
-
-    
