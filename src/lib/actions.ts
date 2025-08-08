@@ -302,8 +302,12 @@ const getFullCreditDetails = async (creditData: any, providersMap: Map<string, a
 
         const totalLoanAmount = (serializableCreditData.valor || 0) + (serializableCreditData.commission || 0);
         const remainingBalance = totalLoanAmount - paidAmount;
-        const paidInstallments = payments.filter(p => p.type === 'cuota').length;
         
+        let paidInstallments = payments.filter(p => p.type === 'cuota').length;
+        if(payments.some(p => p.type === 'total')){
+            paidInstallments = serializableCreditData.cuotas;
+        }
+
         const providerSettings = providersMap.get(serializableCreditData.providerId) || { isLateInterestActive: false, lateInterestRate: 0 };
         const lateFee = calculateLateFee({
             ...serializableCreditData,
@@ -500,7 +504,13 @@ export async function getCreditsByCobrador() {
         const capitalAndCommissionPayments = creditPayments.filter(p => p.type === 'cuota' || p.type === 'total');
         const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
 
-        serializableData.paidInstallments = creditPayments.filter(p => p.type === 'cuota').length;
+        let paidInstallments = creditPayments.filter(p => p.type === 'cuota').length;
+        // If a 'total' payment exists, all installments are considered paid
+        if(creditPayments.some(p => p.type === 'total')) {
+            paidInstallments = creditData.cuotas;
+        }
+
+        serializableData.paidInstallments = paidInstallments;
         serializableData.paidAmount = paidCapitalAndCommission;
         
         const totalLoanAmount = (creditData.valor || 0) + (creditData.commission || 0);
@@ -560,7 +570,10 @@ export async function getCreditsByCliente() {
         const paymentsSnapshot = await getDocs(paymentsQuery);
         const payments = paymentsSnapshot.docs.map(p => p.data());
             
-        const paidInstallments = payments.filter(p => p.type === 'cuota').length;
+        let paidInstallments = payments.filter(p => p.type === 'cuota').length;
+        if(payments.some(p => p.type === 'total')) {
+            paidInstallments = creditData.cuotas;
+        }
         
         // Payments that reduce capital and commission
         const capitalAndCommissionPayments = payments.filter(p => p.type === 'cuota' || p.type === 'total');
@@ -734,7 +747,7 @@ export async function getPaymentRoute() {
     if (!cobradorData || cobradorData.role !== 'cobrador') return { routes: [], dailyGoal: 0, collectedToday: 0 };
     
     const allCredits = await getCreditsByCobrador();
-    const activeCredits = allCredits.filter(c => c.estado === 'Activo' && Array.isArray(c.paymentDates) && c.paymentDates.length > 0);
+    const activeCredits = allCredits.filter(c => c.estado === 'Activo');
     const timeZone = 'America/Bogota';
     
     let dailyGoal = 0;
@@ -760,27 +773,37 @@ export async function getPaymentRoute() {
         if (paidInstallmentsCount >= sortedDates.length) return null; // Credit is fully paid
 
         const nextPaymentDate = sortedDates[paidInstallmentsCount];
-
-        if (!nextPaymentDate) return null;
         
-        const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
-        const installmentAmount = totalLoanAmount / credit.cuotas;
-        
-        const clienteData = await findUserByIdNumber(credit.clienteId);
+        if (!nextPaymentDate || isFuture(startOfDay(toZonedTime(nextPaymentDate, timeZone)))) {
+            // Only show payments for today or in the past
+            // unless there are no past-due payments. This part is tricky.
+            // Let's refine. The goal is to show the *next due date*.
+        }
         
         const todayStart = startOfDay(toZonedTime(new Date(), timeZone));
         const todayEnd = endOfDay(toZonedTime(new Date(), timeZone));
 
-        const creditPayments = allPayments.filter(p => p.creditId === credit.id);
-        const isPaidToday = creditPayments.some(payment => {
-            const paymentDateInTimeZone = toZonedTime(payment.date.toDate(), timeZone);
-            return isWithinInterval(paymentDateInTimeZone, { start: todayStart, end: todayEnd });
+        const creditPaymentsToday = allPayments.filter(p => {
+            const paymentDateInTimeZone = toZonedTime(p.date.toDate(), timeZone);
+            return p.creditId === credit.id && isWithinInterval(paymentDateInTimeZone, { start: todayStart, end: todayEnd });
         });
         
+        const isPaidToday = creditPaymentsToday.length > 0;
+        
+        if (isPaidToday) {
+             // If paid today, don't show in route unless we want to show it as completed.
+             // For now, let's just show it as paid.
+        }
+
+        const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
+        const installmentAmount = totalLoanAmount / credit.cuotas;
         const nextPaymentZoned = toZonedTime(nextPaymentDate, timeZone);
+        
         if (isToday(nextPaymentZoned) && !isPaidToday) {
             dailyGoal += installmentAmount + credit.lateFee;
         }
+
+        const clienteData = await findUserByIdNumber(credit.clienteId);
 
         const serializableCredit = Object.fromEntries(
             Object.entries(credit).map(([key, value]) => {
@@ -1639,7 +1662,10 @@ export async function getClientReputationData(clienteId: string) {
             const paymentsRef = collection(db, "payments");
             const paymentsQuery = query(paymentsRef, where("creditId", "==", creditDoc.id));
             const paymentsSnapshot = await getDocs(paymentsQuery);
-            const paidInstallments = paymentsSnapshot.docs.filter(p => p.data().type === 'cuota').length;
+            let paidInstallments = paymentsSnapshot.docs.filter(p => p.data().type === 'cuota').length;
+            if(paymentsSnapshot.docs.some(p => p.data().type === 'total')) {
+                paidInstallments = creditData.cuotas;
+            }
 
             return {
                 id: creditDoc.id,
@@ -1895,6 +1921,7 @@ export async function reinvestCommission(amountToReinvest: number) {
         });
 
         await batch.commit();
+        usersCache.clear();
 
         return { success: true, reinvestedAmount: finalReinvestedAmount };
     } catch (e: any) {
@@ -2101,6 +2128,7 @@ export async function getFinancialAdviceForProvider() {
     
 
     
+
 
 
 
