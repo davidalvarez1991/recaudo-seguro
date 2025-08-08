@@ -60,13 +60,13 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       creditAmount: "",
       installments: "",
       requiresGuarantor: false,
-      requiresReferences: false,
       guarantor: {
         name: "",
         idNumber: "",
         address: "",
         phone: ""
       },
+      requiresReferences: false,
       references: {
         familiar: { name: "", phone: "", address: "" },
         personal: { name: "", phone: "", address: "" }
@@ -135,9 +135,11 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         setIsPending(true);
         try {
             const fullName = [currentFormData.firstName, currentFormData.secondName, currentFormData.firstLastName, currentFormData.secondLastName].filter(Boolean).join(" ");
+            const creditValue = parseFloat(currentFormData.creditAmount?.replace(/\./g, '') || '0');
+
             const contractData = await getContractForAcceptance({
                 creditData: {
-                    valor: parseFloat(currentFormData.creditAmount!.replace(/\./g, '')),
+                    valor: creditValue,
                     cuotas: installments,
                 },
                 clienteData: {
