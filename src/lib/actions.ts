@@ -774,11 +774,7 @@ export async function getPaymentRoute() {
 
         const nextPaymentDate = sortedDates[paidInstallmentsCount];
         
-        if (!nextPaymentDate || isFuture(startOfDay(toZonedTime(nextPaymentDate, timeZone)))) {
-            // Only show payments for today or in the past
-            // unless there are no past-due payments. This part is tricky.
-            // Let's refine. The goal is to show the *next due date*.
-        }
+        if (!nextPaymentDate) return null;
         
         const todayStart = startOfDay(toZonedTime(new Date(), timeZone));
         const todayEnd = endOfDay(toZonedTime(new Date(), timeZone));
@@ -790,11 +786,6 @@ export async function getPaymentRoute() {
         
         const isPaidToday = creditPaymentsToday.length > 0;
         
-        if (isPaidToday) {
-             // If paid today, don't show in route unless we want to show it as completed.
-             // For now, let's just show it as paid.
-        }
-
         const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
         const installmentAmount = totalLoanAmount / credit.cuotas;
         const nextPaymentZoned = toZonedTime(nextPaymentDate, timeZone);
@@ -1797,7 +1788,7 @@ export async function getCobradorSelfDailySummary() {
 export async function getProviderFinancialSummary() {
     const { userId: providerId, user: providerData } = await getAuthenticatedUser();
     if (!providerId || !providerData) {
-        return { activeCapital: 0, collectedCommission: 0, uniqueClientCount: 0, myCapital: 0 };
+        return { activeCapital: 0, collectedCommission: 0, uniqueClientCount: 0, myCapital: 0, totalActiveClients: 0, clientsInArrears: 0 };
     }
 
     const creditsRef = collection(db, "credits");
@@ -1808,31 +1799,36 @@ export async function getProviderFinancialSummary() {
     let activeCapital = 0;
     let collectedCommission = 0;
     const uniqueClientIds = new Set<string>();
+    let clientsInArrears = 0;
 
-    if (allProviderCredits.length > 0) {
-        const creditIds = allProviderCredits.map(c => c.id);
+    const activeCredits = allProviderCredits.filter(c => c.estado === 'Activo');
+    
+    if (activeCredits.length > 0) {
+        const creditIds = activeCredits.map(c => c.id);
         const paymentsRef = collection(db, "payments");
         const paymentsQuery = query(paymentsRef, where("creditId", "in", creditIds));
         const paymentsSnapshot = await getDocs(paymentsQuery);
-        const allProviderPayments = paymentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const allPayments = paymentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
-        for (const credit of allProviderCredits) {
-            uniqueClientIds.add(credit.clienteId);
-            const creditPayments = allProviderPayments.filter(p => p.creditId === credit.id);
+        for (const credit of activeCredits) {
+             uniqueClientIds.add(credit.clienteId);
+             if (credit.missedPaymentDays > 0) {
+                 clientsInArrears++;
+             }
+
+            const creditPayments = allPayments.filter(p => p.creditId === credit.id);
             const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
+            
+            const capitalAndCommissionPayments = creditPayments.filter(p => p.type === 'cuota' || p.type === 'total' || p.type === 'acuerdo');
+            const totalPaidAmount = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
 
-            if (credit.estado === 'Activo') {
-                 const capitalAndCommissionPayments = creditPayments.filter(p => p.type === 'cuota' || p.type === 'total' || p.type === 'acuerdo');
-                 const totalPaidAmount = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
+             if (totalLoanAmount > 0) {
+                const capitalProportionInLoan = (credit.valor || 0) / totalLoanAmount;
+                const totalCapitalPaid = totalPaidAmount * capitalProportionInLoan;
+                activeCapital += (credit.valor || 0) - totalCapitalPaid;
+             }
 
-                 if (totalLoanAmount > 0) {
-                    const capitalProportionInLoan = (credit.valor || 0) / totalLoanAmount;
-                    const totalCapitalPaid = totalPaidAmount * capitalProportionInLoan;
-                    activeCapital += (credit.valor || 0) - totalCapitalPaid;
-                 }
-            }
-
-            const unreinvestedPayments = creditPayments.filter(p => !p.reinvested && (p.type === 'cuota' || p.type === 'total' || p.type === 'acuerdo'));
+            const unreinvestedPayments = creditPayments.filter(p => !p.reinvested);
             for (const payment of unreinvestedPayments) {
                  if (totalLoanAmount > 0) {
                     const commissionProportion = (credit.commission || 0) / totalLoanAmount;
@@ -1850,8 +1846,11 @@ export async function getProviderFinancialSummary() {
         collectedCommission: Math.max(0, collectedCommission),
         uniqueClientCount: uniqueClientIds.size,
         myCapital,
+        totalActiveClients: activeCredits.length,
+        clientsInArrears
     };
 }
+
 
 
 export async function reinvestCommission(amountToReinvest: number) {
@@ -1874,7 +1873,7 @@ export async function reinvestCommission(amountToReinvest: number) {
         const unreinvestedPayments = allProviderPayments
             .filter(p => !p.reinvested)
             .sort((a,b) => a.date.toMillis() - b.date.toMillis());
-
+        
         if (unreinvestedPayments.length === 0) {
             return { error: "No hay comisiones disponibles para reinvertir." };
         }
@@ -2116,7 +2115,9 @@ export async function getFinancialAdviceForProvider() {
         const input: FinancialAdviceInput = {
             baseCapital: summary.myCapital,
             activeCapital: summary.activeCapital,
-            collectedCommission: summary.collectedCommission
+            collectedCommission: summary.collectedCommission,
+            totalActiveClients: summary.totalActiveClients,
+            clientsInArrears: summary.clientsInArrears
         };
         const advice = await getFinancialAdvice(input);
         return { advice };
@@ -2128,6 +2129,7 @@ export async function getFinancialAdviceForProvider() {
     
 
     
+
 
 
 
