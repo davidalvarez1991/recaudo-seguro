@@ -4,7 +4,7 @@
 import { useState, useEffect, useTransition, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, User, MoreHorizontal, Pencil, Trash2, Loader2, RefreshCw, CheckCircle, Ban, Users as UsersIcon, DollarSign, Search, CalendarCheck } from "lucide-react";
+import { ArrowLeft, User, MoreHorizontal, Pencil, Trash2, Loader2, RefreshCw, CheckCircle, Ban, Users as UsersIcon, DollarSign, Search, CalendarCheck, Phone } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getAllProviders, toggleProviderStatus, deleteProvider, getAdminSettings } from "@/lib/actions";
@@ -211,7 +211,10 @@ export default function AdminProvidersPage() {
                                     </Avatar>
                                     <div>
                                         <p className="font-medium">{provider.companyName}</p>
-                                        <p className="text-sm text-muted-foreground">{provider.email}</p>
+                                        <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                                            <Phone className="h-3 w-3" />
+                                            {provider.whatsappNumber}
+                                        </p>
                                     </div>
                                 </div>
                             </TableCell>
