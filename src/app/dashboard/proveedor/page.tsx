@@ -12,6 +12,8 @@ import { DailySummaryContainer } from "@/components/proveedor/daily-summary-cont
 import { ClientReputationSearch } from "@/components/dashboard/client-reputation-search";
 import { getAuthenticatedUser } from "@/lib/auth";
 import { RenewalCountdown } from "@/components/proveedor/renewal-countdown";
+import { FinancialAdvisor } from "@/components/proveedor/financial-advisor";
+
 
 type UserData = {
     companyName?: string;
@@ -137,6 +139,10 @@ export default async function ProveedorDashboard() {
         </CardHeader>
         <CardContent className="space-y-8">
           <RenewalCountdown />
+
+          <Separator />
+          
+          <FinancialAdvisor />
 
           <Separator />
 
