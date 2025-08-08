@@ -1075,7 +1075,7 @@ const generateContractText = async (providerId: string, creditData: any, cliente
         '“NOMBRE DE LA EMPRESA”': providerData.companyName?.toUpperCase() || 'EMPRESA NO DEFINIDA',
         '“NOMBRE DEL CLIENTE”': (clienteData.name || 'CLIENTE NO DEFINIDO').toUpperCase(),
         '“CEDULA DEL CLIENTE”': clienteData.idNumber || 'DOCUMENTO NO DEFINIDO',
-        '“CIUDAD”': clienteData.city || 'CIUDAD NO DEFINIDA',
+        '“CIUDAD”': clienteData.city || providerData.city || 'CIUDAD NO DEFINIDA',
         '“VALOR PRESTAMO”': (creditData.valor || 0).toLocaleString('es-CO'),
         '“CUOTAS DEL CREDITO”': creditData.cuotas?.toString() || '0',
         '“DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”': firstPaymentDate,
@@ -1172,7 +1172,7 @@ export async function createClientCreditAndContract(data: { clientData: z.infer<
 
     // 3. Create Contract (if applicable)
     if (provider.isContractGenerationActive) {
-        const contractText = await generateContractText(providerId, creditDataObject, { name: fullName, idNumber, city: provider.city }, paymentDates.map(d => new Date(d)));
+        const contractText = await generateContractText(providerId, creditDataObject, { name: fullName, idNumber }, paymentDates.map(d => new Date(d)));
         if (contractText) {
             const contractRef = doc(collection(db, "contracts"));
             batch.set(contractRef, {
@@ -1552,7 +1552,7 @@ export async function registerMissedPayment(creditId: string) {
 
 type ContractGenParams = {
     creditData: { valor: number, cuotas: number, commission?: number, commissionPercentage?: number };
-    clienteData: { name: string, idNumber: string, city: string };
+    clienteData: { name: string, idNumber: string, city?: string };
     paymentDates: string[];
 }
 export async function getContractForAcceptance(params: ContractGenParams) {
@@ -1868,12 +1868,11 @@ export async function reinvestCommission(amountToReinvest: number) {
         
         // Fetch all payments for the provider first, then filter and sort in memory.
         const paymentsRef = collection(db, "payments");
-        const paymentsQuery = query(paymentsRef, where("providerId", "==", providerId));
+        const paymentsQuery = query(paymentsRef, where("providerId", "==", providerId), where("reinvested", "==", false));
         const paymentsSnapshot = await getDocs(paymentsQuery);
 
         const unreinvestedPayments = paymentsSnapshot.docs
             .map(d => ({ id: d.id, ...d.data() }))
-            .filter(p => p.reinvested === false)
             .sort((a, b) => a.date.toMillis() - b.date.toMillis());
         
         if (unreinvestedPayments.length === 0) {
@@ -2135,8 +2134,20 @@ export async function getFinancialAdviceForProvider() {
         return { error: "No se pudo obtener el consejo financiero." };
     }
 }
+
+export async function getProviderCommissionTiers(): Promise<CommissionTier[]> {
+    const { user } = await getAuthenticatedUser();
+    if (!user || !user.providerId) return [];
+    
+    const provider = await getUserData(user.providerId);
+    if (!provider || !provider.commissionTiers) {
+        return [{ minAmount: 0, maxAmount: 50000000, percentage: 20 }]; // Default
+    }
+    return provider.commissionTiers;
+}
     
 
     
 
     
+

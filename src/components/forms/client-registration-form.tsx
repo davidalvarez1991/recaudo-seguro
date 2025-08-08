@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, DollarSign, Save, StepForward, CheckCircle2, ShieldCheck } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ClientCreditSchema } from "@/lib/schemas";
-import { createClientCreditAndContract, getContractForAcceptance } from "@/lib/actions";
+import { createClientCreditAndContract, getContractForAcceptance, getProviderCommissionTiers } from "@/lib/actions";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -35,6 +35,12 @@ type ClientRegistrationFormProps = {
 };
 
 type FormData = z.infer<typeof ClientCreditSchema>;
+
+type CommissionTier = {
+  minAmount: number;
+  maxAmount: number;
+  percentage: number;
+};
 
 const step1Fields: (keyof FormData)[] = [
     "idNumber", "firstName", "secondName", "firstLastName", "secondLastName",
@@ -56,8 +62,17 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [month, setMonth] = useState(new Date());
   const [contractText, setContractText] = useState<string | null>(null);
+  const [commissionTiers, setCommissionTiers] = useState<CommissionTier[]>([]);
 
   const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchTiers = async () => {
+        const tiers = await getProviderCommissionTiers();
+        setCommissionTiers(tiers);
+    };
+    fetchTiers();
+  }, []);
 
   const form = useForm<FormData>({
     resolver: zodResolver(ClientCreditSchema),
@@ -140,6 +155,20 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         setSelectedDates(validDates.sort((a,b) => a.getTime() - b.getTime()));
     };
 
+    const calculateCommission = (amount: number, tiers: CommissionTier[]): { commission: number; percentage: number } => {
+        if (!tiers || tiers.length === 0) {
+            return { commission: amount * 0.20, percentage: 20 };
+        }
+        const sortedTiers = [...tiers].sort((a, b) => a.minAmount - b.minAmount);
+        const applicableTier = sortedTiers.find(tier => amount >= tier.minAmount && amount <= tier.maxAmount);
+
+        if (applicableTier) {
+            return { commission: amount * (applicableTier.percentage / 100), percentage: applicableTier.percentage };
+        }
+        const fallbackPercentage = sortedTiers[0]?.percentage || 20;
+        return { commission: amount * (fallbackPercentage / 100), percentage: fallbackPercentage };
+    };
+
     const goToContractStep = async () => {
         const currentFormData = { ...formData, ...form.getValues() };
         if (selectedDates.length === 0) {
@@ -157,16 +186,19 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         try {
             const fullName = [currentFormData.firstName, currentFormData.secondName, currentFormData.firstLastName, currentFormData.secondLastName].filter(Boolean).join(" ");
             const creditValue = parseFloat(currentFormData.creditAmount?.replace(/\./g, '') || '0');
+            const { commission, percentage } = calculateCommission(creditValue, commissionTiers);
 
             const contractData = await getContractForAcceptance({
                 creditData: {
                     valor: creditValue,
                     cuotas: installments,
+                    commission: commission,
+                    commissionPercentage: percentage
                 },
                 clienteData: {
                     name: fullName,
                     idNumber: currentFormData.idNumber!,
-                    city: 'N/A', // We don't have this on client form, will be taken from provider
+                    city: 'N/A', 
                 },
                 paymentDates: selectedDates.map(d => d.toISOString())
             });
@@ -175,7 +207,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 setContractText(contractData.contractText);
                 setStep(3);
             } else {
-                toast({ title: "Error", description: "No se pudo generar el contrato.", variant: "destructive"});
+                toast({ title: "Error", description: "No se pudo generar el contrato. Revisa la configuración del proveedor.", variant: "destructive"});
             }
         } catch(e) {
              toast({ title: "Error de red", description: "No se pudo generar el contrato.", variant: "destructive"});
