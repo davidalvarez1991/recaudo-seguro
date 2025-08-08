@@ -780,6 +780,7 @@ export async function getPaymentRoute() {
         const todayEnd = endOfDay(toZonedTime(new Date(), timeZone));
 
         const creditPaymentsToday = allPayments.filter(p => {
+            if (!p.date?.toDate) return false;
             const paymentDateInTimeZone = toZonedTime(p.date.toDate(), timeZone);
             return p.creditId === credit.id && isWithinInterval(paymentDateInTimeZone, { start: todayStart, end: todayEnd });
         });
@@ -1562,7 +1563,7 @@ export async function getContractForAcceptance(params: ContractGenParams) {
     const text = await generateContractText(user.providerId, params.creditData, params.clienteData, params.paymentDates.map(d=>new Date(d)));
 
     if (!text) {
-        return { error: "La generación de contratos no está activa para este proveedor." };
+        return { error: "La generación de contratos no está activa para este proveedor.", contractText: null };
     }
 
     return { contractText: text };
@@ -1868,12 +1869,11 @@ export async function reinvestCommission(amountToReinvest: number) {
         
         // Fetch all payments for the provider first, then filter and sort in memory.
         const paymentsRef = collection(db, "payments");
-        const paymentsQuery = query(paymentsRef, where("providerId", "==", providerId), where("reinvested", "==", false));
+        const paymentsQuery = query(paymentsRef, where("providerId", "==", providerId), where("reinvested", "==", false), orderBy("date", "asc"));
         const paymentsSnapshot = await getDocs(paymentsQuery);
 
         const unreinvestedPayments = paymentsSnapshot.docs
-            .map(d => ({ id: d.id, ...d.data() }))
-            .sort((a, b) => a.date.toMillis() - b.date.toMillis());
+            .map(d => ({ id: d.id, ...d.data() }));
         
         if (unreinvestedPayments.length === 0) {
             return { error: "No hay comisiones disponibles para reinvertir." };
@@ -2150,5 +2150,6 @@ export async function getProviderCommissionTiers(): Promise<CommissionTier[]> {
     
 
     
+
 
 

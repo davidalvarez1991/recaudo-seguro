@@ -147,7 +147,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         const today = startOfDay(new Date());
         const validDates = dates.filter(date => date && date >= today);
 
-        const installments = parseInt(form.getValues('installments') || '0', 10);
+        const installments = parseInt(form.watch('installments') || '0', 10);
         if (installments > 0 && validDates.length > installments) {
             toast({
                 title: "Límite de cuotas alcanzado",
@@ -177,12 +177,15 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     };
 
     const goToContractStep = async () => {
+        const fullFormData = { ...formData, ...form.getValues() };
+        setFormData(fullFormData);
+
         if (selectedDates.length === 0) {
             toast({ title: "Fechas requeridas", description: "Debes seleccionar las fechas de pago.", variant: "destructive" });
             return;
         }
 
-        const installments = parseInt(formData.installments || '0', 10);
+        const installments = parseInt(fullFormData.installments || '0', 10);
         if (selectedDates.length !== installments) {
             toast({ title: "Fechas no coinciden", description: `Debes seleccionar exactamente ${installments} fechas. Has seleccionado ${selectedDates.length}.`, variant: "destructive" });
             return;
@@ -190,8 +193,8 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
 
         setIsPending(true);
         try {
-            const fullName = [formData.firstName, formData.secondName, formData.firstLastName, formData.secondLastName].filter(Boolean).join(" ");
-            const creditValue = parseFloat(formData.creditAmount?.replace(/\./g, '') || '0');
+            const fullName = [fullFormData.firstName, fullFormData.secondName, fullFormData.firstLastName, fullFormData.secondLastName].filter(Boolean).join(" ");
+            const creditValue = parseFloat(fullFormData.creditAmount?.replace(/\./g, '') || '0');
             const { commission, percentage } = calculateCommission(creditValue, commissionTiers);
 
             const contractData = await getContractForAcceptance({
@@ -203,38 +206,48 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 },
                 clienteData: {
                     name: fullName,
-                    idNumber: formData.idNumber!,
+                    idNumber: fullFormData.idNumber!,
                 },
                 paymentDates: selectedDates.map(d => d.toISOString())
             });
-
-            if (contractData.contractText) {
+            
+            // If contract generation is ON, we get text and move to step 3
+            if (contractData && contractData.contractText) {
                 setContractText(contractData.contractText);
                 setStep(3);
             } else {
-                toast({ title: "Error", description: "No se pudo generar el contrato. Revisa la configuración del proveedor.", variant: "destructive"});
+                // If contract generation is OFF, we proceed to final submission directly
+                await handleFinalSubmit(fullFormData);
             }
         } catch(e) {
-             toast({ title: "Error de red", description: "No se pudo generar el contrato.", variant: "destructive"});
+             toast({ title: "Error de red", description: "No se pudo continuar con el proceso.", variant: "destructive"});
         } finally {
             setIsPending(false);
         }
     };
 
 
-    const handleFinalSubmit = async () => {
+    const handleFinalSubmit = async (finalData?: Partial<FormData>) => {
+        const dataToSubmit = finalData || formData;
+
+        if (!dataToSubmit.idNumber) {
+             toast({ title: "Error", description: "Faltan datos del formulario. Por favor, reinicia el proceso.", variant: "destructive" });
+             setIsPending(false);
+             return;
+        }
+        
         setIsPending(true);
         
         try {
             const result = await createClientCreditAndContract({
-                clientData: formData as FormData,
+                clientData: dataToSubmit as FormData,
                 paymentDates: selectedDates.map(d => d.toISOString())
             });
             
             if (result.success) {
                 toast({
                     title: "Registro Finalizado",
-                    description: "El cliente, su crédito y contrato han sido creados exitosamente.",
+                    description: "El cliente y su crédito han sido creados exitosamente.",
                     variant: "default",
                     className: "bg-accent text-accent-foreground border-accent",
                 });
@@ -612,7 +625,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                             locale={es}
                             footer={
                                 <p className="text-sm text-muted-foreground px-3 pt-2">
-                                    Has seleccionado {selectedDates.length} de {form.getValues('installments') || 0} cuotas.
+                                    Has seleccionado {selectedDates.length} de {form.watch('installments') || 0} cuotas.
                                 </p>
                             }
                             modifiers={{
@@ -645,7 +658,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     </Button>
                     <Button type="button" onClick={goToContractStep} className="w-full" disabled={isPending || selectedDates.length === 0}>
                         {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                        {isPending ? 'Generando...' : 'Siguiente'}
+                        {isPending ? 'Procesando...' : 'Finalizar Registro'}
                     </Button>
                 </div>
             </>
@@ -668,7 +681,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                         contractText
                     )}
                 </ScrollArea>
-                <Button type="button" onClick={handleFinalSubmit} className="w-full bg-accent hover:bg-accent/90" disabled={isPending || !contractText}>
+                <Button type="button" onClick={() => handleFinalSubmit()} className="w-full bg-accent hover:bg-accent/90" disabled={isPending || !contractText}>
                     {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
                     {isPending ? "Procesando..." : "Crear y Finalizar Registro"}
                 </Button>
