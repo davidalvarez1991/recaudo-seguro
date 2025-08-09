@@ -681,7 +681,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                         contractText
                     )}
                 </ScrollArea>
-                <Button type="button" onClick={() => handleFinalSubmit()} className="w-full bg-accent hover:bg-accent/90" disabled={isPending || !contractText}>
+                <Button type="button" onClick={() => handleFinalSubmit(formData)} className="w-full bg-accent hover:bg-accent/90" disabled={isPending || !contractText}>
                     {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
                     {isPending ? "Procesando..." : "Crear y Finalizar Registro"}
                 </Button>
@@ -703,3 +703,4 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
+
