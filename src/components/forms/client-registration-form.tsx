@@ -43,17 +43,6 @@ type CommissionTier = {
   percentage: number;
 };
 
-const step1Fields: (keyof FormData)[] = [
-    "idNumber", "firstName", "secondName", "firstLastName", "secondLastName",
-    "address", "contactPhone", "creditAmount", "installments", "requiresGuarantor",
-    "requiresReferences"
-];
-const step1GuarantorFields: (keyof FormData)[] = ["guarantor.name", "guarantor.idNumber", "guarantor.address", "guarantor.phone"];
-const step1ReferencesFields: (keyof FormData)[] = [
-    "references.familiar.name", "references.familiar.phone", "references.familiar.address",
-    "references.personal.name", "references.personal.phone", "references.personal.address"
-];
-
 
 export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormProps) {
   const [step, setStep] = useState(1);
@@ -120,21 +109,29 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   };
   
   const handleNextStep = async (currentStep: number, nextStep: number) => {
-    let fieldsToValidate: (keyof FormData)[] = [];
-    if (currentStep === 1) {
-        fieldsToValidate = step1Fields;
-        if (form.getValues('requiresGuarantor')) {
-            fieldsToValidate = [...fieldsToValidate, ...step1GuarantorFields];
-        }
-        if (form.getValues('requiresReferences')) {
-            fieldsToValidate = [...fieldsToValidate, ...step1ReferencesFields];
-        }
-    }
+    const fieldsToValidate: (keyof FormData | `guarantor.${keyof NonNullable<FormData['guarantor']>}` | `references.${'familiar'|'personal'}.${keyof NonNullable<NonNullable<FormData['references']>['familiar'] | NonNullable<FormData['references']>['personal'] >}`)[] = [
+        "idNumber", "firstName", "secondName", "firstLastName", "secondLastName",
+        "address", "contactPhone", "creditAmount", "installments", "requiresGuarantor",
+        "requiresReferences"
+    ];
 
-    const isValid = await form.trigger(fieldsToValidate as any);
-    if (!isValid) return;
+    if (form.getValues('requiresGuarantor')) {
+        fieldsToValidate.push("guarantor.name", "guarantor.idNumber", "guarantor.address", "guarantor.phone");
+    }
+    if (form.getValues('requiresReferences')) {
+        fieldsToValidate.push(
+            "references.familiar.name", "references.familiar.phone", "references.familiar.address",
+            "references.personal.name", "references.personal.phone", "references.personal.address"
+        );
+    }
     
-    // Save current form data before moving to the next step
+    const isValid = await form.trigger(fieldsToValidate as any);
+    
+    if (!isValid) {
+        toast({ title: "Campos Incompletos", description: "Por favor, revisa los campos marcados en rojo.", variant: "destructive" });
+        return;
+    }
+    
     setFormData(form.getValues());
     setStep(nextStep);
   };
@@ -192,7 +189,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
             const creditValue = parseFloat(formData.creditAmount?.replace(/\./g, '') || '0');
             const { commission, percentage } = calculateCommission(creditValue, commissionTiers);
 
-            const contractData = await getContractForAcceptance({
+            const contractDataResponse = await getContractForAcceptance({
                 creditData: {
                     valor: creditValue,
                     cuotas: installments,
@@ -206,12 +203,12 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 paymentDates: selectedDates.map(d => d.toISOString())
             });
             
-            if (contractData && contractData.contractText) {
-                setContractText(contractData.contractText);
+            if (contractDataResponse.contractText) {
+                setContractText(contractDataResponse.contractText);
                 setStep(3);
             } else {
+                setContractText(null); // Explicitly set to null if no contract
                 // If contracts are disabled, skip to the final confirmation step
-                setContractText(null);
                 setStep(4);
             }
         } catch(e) {
@@ -667,7 +664,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                         Volver
                     </Button>
                     <Button type="button" onClick={() => setStep(4)} className="w-full" disabled={isPending}>
-                        Finalizar Registro
+                        Siguiente
                     </Button>
                 </div>
             </div>
@@ -681,7 +678,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     Listo, tu cliente está a un botón para ser cargado en la plataforma.
                 </p>
                 <div className="flex gap-2 pt-4">
-                     <Button type="button" variant="outline" onClick={() => setStep(3)} className="w-full" disabled={isPending}>
+                     <Button type="button" variant="outline" onClick={() => setStep(contractText ? 3 : 2)} className="w-full" disabled={isPending}>
                         Volver a Revisar
                     </Button>
                     <Button type="button" onClick={handleFinalSubmit} className="w-full bg-accent hover:bg-accent/90" disabled={isPending}>

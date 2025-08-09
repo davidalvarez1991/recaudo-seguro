@@ -1,4 +1,5 @@
 
+
 import { z } from "zod";
 
 export const LoginSchema = z.object({
@@ -50,22 +51,22 @@ export const CobradorRegisterSchema = z.object({
 });
 
 const GuarantorSchema = z.object({
-  name: z.string().min(3, "El nombre del fiador es obligatorio."),
-  idNumber: z.string().min(6, "La cédula del fiador es obligatoria."),
-  address: z.string().min(5, "La dirección del fiador es obligatoria."),
-  phone: z.string().min(10, "El teléfono del fiador debe tener 10 dígitos."),
+  name: z.string().min(1, "El nombre del fiador es obligatorio."),
+  idNumber: z.string().min(1, "La cédula del fiador es obligatoria."),
+  address: z.string().min(1, "La dirección del fiador es obligatoria."),
+  phone: z.string().min(1, "El teléfono del fiador es obligatorio."),
 });
 
 const ReferencesSchema = z.object({
   familiar: z.object({
-    name: z.string().min(3, "El nombre de la referencia familiar es obligatorio."),
-    phone: z.string().min(10, "El teléfono de la referencia familiar debe tener 10 dígitos."),
-    address: z.string().min(5, "La dirección de la referencia familiar es obligatoria."),
+    name: z.string().min(1, "El nombre de la referencia familiar es obligatorio."),
+    phone: z.string().min(1, "El teléfono es obligatorio."),
+    address: z.string().min(1, "La dirección es obligatoria."),
   }),
   personal: z.object({
-    name: z.string().min(3, "El nombre de la referencia personal es obligatorio."),
-    phone: z.string().min(10, "El teléfono de la referencia personal debe tener 10 dígitos."),
-    address: z.string().min(5, "La dirección de la referencia personal es obligatoria."),
+    name: z.string().min(1, "El nombre de la referencia personal es obligatorio."),
+    phone: z.string().min(1, "El teléfono es obligatorio."),
+    address: z.string().min(1, "La dirección es obligatoria."),
   })
 });
 
@@ -86,22 +87,18 @@ export const ClientCreditSchema = z.object({
 
   requiresReferences: z.boolean().default(false),
   references: ReferencesSchema.optional(),
-
-}).superRefine((data, ctx) => {
-    if (data.requiresGuarantor) {
-      if(!data.guarantor?.name) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El nombre del fiador es requerido.", path: ['guarantor.name']});
-      if(!data.guarantor?.idNumber) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La cédula del fiador es requerida.", path: ['guarantor.idNumber']});
-      if(!data.guarantor?.address) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La dirección del fiador es requerida.", path: ['guarantor.address']});
-      if(!data.guarantor?.phone) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El teléfono del fiador es requerido.", path: ['guarantor.phone']});
-    }
-    if (data.requiresReferences) {
-      if(!data.references?.familiar.name) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El nombre es requerido.", path: ['references.familiar.name']});
-      if(!data.references?.familiar.phone) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El teléfono es requerido.", path: ['references.familiar.phone']});
-      if(!data.references?.familiar.address) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La dirección es requerida.", path: ['references.familiar.address']});
-      if(!data.references?.personal.name) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El nombre es requerido.", path: ['references.personal.name']});
-      if(!data.references?.personal.phone) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El teléfono es requerido.", path: ['references.personal.phone']});
-      if(!data.references?.personal.address) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "La dirección es requerida.", path: ['references.personal.address']});
-    }
+})
+.refine(data => !data.requiresGuarantor || (data.guarantor && data.guarantor.name.length > 0 && data.guarantor.idNumber.length > 0 && data.guarantor.address.length > 0 && data.guarantor.phone.length > 0), {
+    message: "Todos los campos del fiador son requeridos cuando la opción está activada.",
+    path: ['guarantor']
+})
+.refine(data => !data.requiresReferences || (
+    data.references && 
+    data.references.familiar.name.length > 0 && data.references.familiar.phone.length > 0 && data.references.familiar.address.length > 0 &&
+    data.references.personal.name.length > 0 && data.references.personal.phone.length > 0 && data.references.personal.address.length > 0
+), {
+    message: "Todos los campos de ambas referencias son requeridos cuando la opción está activada.",
+    path: ['references']
 });
 
 
