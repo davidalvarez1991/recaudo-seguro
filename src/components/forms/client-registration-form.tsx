@@ -147,7 +147,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         const today = startOfDay(new Date());
         const validDates = dates.filter(date => date && date >= today);
 
-        const installments = parseInt(form.watch('installments') || '0', 10);
+        const installments = parseInt(form.getValues('installments') || '0', 10);
         if (installments > 0 && validDates.length > installments) {
             toast({
                 title: "Límite de cuotas alcanzado",
@@ -177,9 +177,9 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     };
 
     const goToContractStep = async () => {
+        // Consolidate form data from step 1 and current form state (which might be just credit info if user goes back and forth)
         const fullFormData = { ...formData, ...form.getValues() };
-        setFormData(fullFormData);
-
+        
         if (selectedDates.length === 0) {
             toast({ title: "Fechas requeridas", description: "Debes seleccionar las fechas de pago.", variant: "destructive" });
             return;
@@ -217,7 +217,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 setStep(3);
             } else {
                 // If contract generation is OFF, we proceed to final submission directly
-                await handleFinalSubmit(fullFormData);
+                await handleFinalSubmit();
             }
         } catch(e) {
              toast({ title: "Error de red", description: "No se pudo continuar con el proceso.", variant: "destructive"});
@@ -227,8 +227,9 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     };
 
 
-    const handleFinalSubmit = async (finalData?: Partial<FormData>) => {
-        const dataToSubmit = finalData || formData;
+    const handleFinalSubmit = async () => {
+        // Use the consolidated formData from state
+        const dataToSubmit = { ...formData, ...form.getValues()};
 
         if (!dataToSubmit.idNumber) {
              toast({ title: "Error", description: "Faltan datos del formulario. Por favor, reinicia el proceso.", variant: "destructive" });
@@ -681,7 +682,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                         contractText
                     )}
                 </ScrollArea>
-                <Button type="button" onClick={() => handleFinalSubmit(formData)} className="w-full bg-accent hover:bg-accent/90" disabled={isPending || !contractText}>
+                <Button type="button" onClick={handleFinalSubmit} className="w-full bg-accent hover:bg-accent/90" disabled={isPending || !contractText}>
                     {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
                     {isPending ? "Procesando..." : "Crear y Finalizar Registro"}
                 </Button>
@@ -703,4 +704,3 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     </Form>
   );
 }
-
