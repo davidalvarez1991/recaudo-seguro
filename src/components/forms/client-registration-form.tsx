@@ -134,6 +134,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     const isValid = await form.trigger(fieldsToValidate as any);
     if (!isValid) return;
     
+    // Save current form data before moving to the next step
     setFormData(form.getValues());
     setStep(nextStep);
   };
@@ -174,14 +175,12 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     };
 
     const goToContractStep = async () => {
-        const fullFormData = { ...formData, ...form.getValues()};
-        
         if (selectedDates.length === 0) {
             toast({ title: "Fechas requeridas", description: "Debes seleccionar las fechas de pago.", variant: "destructive" });
             return;
         }
 
-        const installments = parseInt(fullFormData.installments || '0', 10);
+        const installments = parseInt(formData.installments || '0', 10);
         if (selectedDates.length !== installments) {
             toast({ title: "Fechas no coinciden", description: `Debes seleccionar exactamente ${installments} fechas. Has seleccionado ${selectedDates.length}.`, variant: "destructive" });
             return;
@@ -189,8 +188,8 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
 
         setIsPending(true);
         try {
-            const fullName = [fullFormData.firstName, fullFormData.secondName, fullFormData.firstLastName, fullFormData.secondLastName].filter(Boolean).join(" ");
-            const creditValue = parseFloat(fullFormData.creditAmount?.replace(/\./g, '') || '0');
+            const fullName = [formData.firstName, formData.secondName, formData.firstLastName, formData.secondLastName].filter(Boolean).join(" ");
+            const creditValue = parseFloat(formData.creditAmount?.replace(/\./g, '') || '0');
             const { commission, percentage } = calculateCommission(creditValue, commissionTiers);
 
             const contractData = await getContractForAcceptance({
@@ -202,7 +201,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 },
                 clienteData: {
                     name: fullName,
-                    idNumber: fullFormData.idNumber!,
+                    idNumber: formData.idNumber!,
                 },
                 paymentDates: selectedDates.map(d => d.toISOString())
             });
@@ -211,8 +210,9 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 setContractText(contractData.contractText);
                 setStep(3);
             } else {
-                setContractText(null); // No contract generated
-                setStep(3); // Go to review step anyway, it will show a different view
+                // If contracts are disabled, skip to the final confirmation step
+                setContractText(null);
+                setStep(4);
             }
         } catch(e) {
              toast({ title: "Error de red", description: "No se pudo continuar con el proceso.", variant: "destructive"});
@@ -223,19 +223,10 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
 
 
     const handleFinalSubmit = async () => {
-        const dataToSubmit = { ...formData, ...form.getValues()};
-        
-        if (!dataToSubmit.idNumber) {
-             toast({ title: "Error", description: "Faltan datos del formulario. Por favor, reinicia el proceso.", variant: "destructive" });
-             setIsPending(false);
-             return;
-        }
-        
         setIsPending(true);
-        
         try {
             const result = await createClientCreditAndContract({
-                clientData: dataToSubmit as FormData,
+                clientData: formData as FormData,
                 paymentDates: selectedDates.map(d => d.toISOString()),
                 contractText: contractText,
             });
@@ -662,34 +653,21 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       case 3:
         return (
             <div className="space-y-4">
-                {contractText ? (
-                    <>
-                        <div className="space-y-1">
-                            <Label>Revisión y Aceptación del Contrato</Label>
-                            <p className="text-sm text-muted-foreground">
-                                El cliente debe leer y aceptar los términos para finalizar.
-                            </p>
-                        </div>
-                        <ScrollArea className="h-80 w-full rounded-md border p-4 whitespace-pre-wrap font-mono text-xs">
-                           {contractText}
-                        </ScrollArea>
-                    </>
-                ) : (
-                    <div className="text-center py-8">
-                         <div className="space-y-1">
-                            <Label>Sin Contrato</Label>
-                            <p className="text-sm text-muted-foreground">
-                                La generación de contratos está desactivada.
-                            </p>
-                        </div>
-                    </div>
-                )}
+                <div className="space-y-1">
+                    <Label>Revisión y Aceptación del Contrato</Label>
+                    <p className="text-sm text-muted-foreground">
+                        El cliente debe leer y aceptar los términos para finalizar.
+                    </p>
+                </div>
+                <ScrollArea className="h-80 w-full rounded-md border p-4 whitespace-pre-wrap font-mono text-xs">
+                   {contractText}
+                </ScrollArea>
                  <div className="flex gap-2 mt-6">
                     <Button type="button" variant="outline" onClick={() => setStep(2)} className="w-full" disabled={isPending}>
                         Volver
                     </Button>
                     <Button type="button" onClick={() => setStep(4)} className="w-full" disabled={isPending}>
-                        Siguiente
+                        Finalizar Registro
                     </Button>
                 </div>
             </div>
