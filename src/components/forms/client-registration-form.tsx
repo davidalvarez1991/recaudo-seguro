@@ -177,7 +177,6 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     };
 
     const goToContractStep = async () => {
-        // Consolidate form data from step 1 and current form state (which might be just credit info if user goes back and forth)
         const fullFormData = { ...formData, ...form.getValues() };
         
         if (selectedDates.length === 0) {
@@ -211,10 +210,9 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 paymentDates: selectedDates.map(d => d.toISOString())
             });
             
-            // If contract generation is ON, we get text and move to step 3
             if (contractData && contractData.contractText) {
                 setContractText(contractData.contractText);
-                setStep(3);
+                setStep(3); // Go to contract review step
             } else {
                 // If contract generation is OFF, we proceed to final submission directly
                 await handleFinalSubmit();
@@ -228,9 +226,8 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
 
 
     const handleFinalSubmit = async () => {
-        // Use the consolidated formData from state
         const dataToSubmit = { ...formData, ...form.getValues()};
-
+        
         if (!dataToSubmit.idNumber) {
              toast({ title: "Error", description: "Faltan datos del formulario. Por favor, reinicia el proceso.", variant: "destructive" });
              setIsPending(false);
@@ -242,7 +239,8 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         try {
             const result = await createClientCreditAndContract({
                 clientData: dataToSubmit as FormData,
-                paymentDates: selectedDates.map(d => d.toISOString())
+                paymentDates: selectedDates.map(d => d.toISOString()),
+                contractText: contractText,
             });
             
             if (result.success) {
@@ -659,7 +657,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     </Button>
                     <Button type="button" onClick={goToContractStep} className="w-full" disabled={isPending || selectedDates.length === 0}>
                         {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                        {isPending ? 'Procesando...' : 'Finalizar Registro'}
+                        {isPending ? 'Procesando...' : 'Siguiente'}
                     </Button>
                 </div>
             </>
@@ -684,7 +682,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 </ScrollArea>
                 <Button type="button" onClick={handleFinalSubmit} className="w-full bg-accent hover:bg-accent/90" disabled={isPending || !contractText}>
                     {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
-                    {isPending ? "Procesando..." : "Crear y Finalizar Registro"}
+                    {isPending ? "Procesando..." : "Finalizar Registro"}
                 </Button>
             </div>
         )

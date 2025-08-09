@@ -1093,7 +1093,7 @@ const generateContractText = async (providerId: string, creditData: any, cliente
 };
 
 
-export async function createClientCreditAndContract(data: { clientData: z.infer<typeof ClientCreditSchema>, paymentDates: string[] }) {
+export async function createClientCreditAndContract(data: { clientData: z.infer<typeof ClientCreditSchema>, paymentDates: string[], contractText: string | null }) {
     const { user: cobrador } = await getAuthenticatedUser();
     if (!cobrador || cobrador.role !== 'cobrador') return { error: "Acción no autorizada." };
 
@@ -1109,7 +1109,7 @@ export async function createClientCreditAndContract(data: { clientData: z.infer<
         return { error: "La cuenta de tu proveedor está inactiva. No puedes crear nuevos créditos." };
     }
 
-    const { clientData, paymentDates } = data;
+    const { clientData, paymentDates, contractText } = data;
     
     const validatedFields = ClientCreditSchema.safeParse(clientData);
     if (!validatedFields.success) {
@@ -1171,20 +1171,17 @@ export async function createClientCreditAndContract(data: { clientData: z.infer<
     };
     batch.set(creditRef, creditDataObject);
 
-    // 3. Create Contract (if applicable)
-    if (provider.isContractGenerationActive) {
-        const contractText = await generateContractText(providerId, creditDataObject, { name: fullName, idNumber }, paymentDates.map(d => new Date(d)));
-        if (contractText) {
-            const contractRef = doc(collection(db, "contracts"));
-            batch.set(contractRef, {
-                creditId: creditRef.id,
-                providerId,
-                clienteId: idNumber,
-                contractText,
-                createdAt: now,
-                acceptedAt: now,
-            });
-        }
+    // 3. Create Contract (if applicable and text is provided)
+    if (provider.isContractGenerationActive && contractText) {
+        const contractRef = doc(collection(db, "contracts"));
+        batch.set(contractRef, {
+            creditId: creditRef.id,
+            providerId,
+            clienteId: idNumber,
+            contractText,
+            createdAt: now,
+            acceptedAt: now,
+        });
     }
 
     await batch.commit();
@@ -2177,6 +2174,7 @@ export async function getProviderCommissionTiers(): Promise<CommissionTier[]> {
     
 
     
+
 
 
 
