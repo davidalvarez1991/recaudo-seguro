@@ -134,10 +134,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     const isValid = await form.trigger(fieldsToValidate as any);
     if (!isValid) return;
     
-    // Capture all values from the form when moving from step 1
-    if (currentStep === 1) {
-        setFormData(form.getValues());
-    }
+    setFormData(form.getValues());
     setStep(nextStep);
   };
 
@@ -177,7 +174,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     };
 
     const goToContractStep = async () => {
-        const fullFormData = { ...formData, ...form.getValues() };
+        const fullFormData = { ...formData, ...form.getValues()};
         
         if (selectedDates.length === 0) {
             toast({ title: "Fechas requeridas", description: "Debes seleccionar las fechas de pago.", variant: "destructive" });
@@ -212,10 +209,10 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
             
             if (contractData && contractData.contractText) {
                 setContractText(contractData.contractText);
-                setStep(3); // Go to contract review step
+                setStep(3);
             } else {
-                // If contract generation is OFF, we proceed to final submission directly
-                await handleFinalSubmit();
+                setContractText(null); // No contract generated
+                setStep(3); // Go to review step anyway, it will show a different view
             }
         } catch(e) {
              toast({ title: "Error de red", description: "No se pudo continuar con el proceso.", variant: "destructive"});
@@ -665,25 +662,55 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       case 3:
         return (
             <div className="space-y-4">
-                 <div className="space-y-1">
-                    <Label>Revisión y Aceptación del Contrato</Label>
-                    <p className="text-sm text-muted-foreground">
-                        El cliente debe leer y aceptar los términos para finalizar.
-                    </p>
-                </div>
-                 <ScrollArea className="h-80 w-full rounded-md border p-4 whitespace-pre-wrap font-mono text-xs">
-                    {isPending && !contractText ? (
-                        <div className="flex justify-center items-center h-full">
-                            <Loader2 className="animate-spin" />
+                {contractText ? (
+                    <>
+                        <div className="space-y-1">
+                            <Label>Revisión y Aceptación del Contrato</Label>
+                            <p className="text-sm text-muted-foreground">
+                                El cliente debe leer y aceptar los términos para finalizar.
+                            </p>
                         </div>
-                    ) : (
-                        contractText
-                    )}
-                </ScrollArea>
-                <Button type="button" onClick={handleFinalSubmit} className="w-full bg-accent hover:bg-accent/90" disabled={isPending || !contractText}>
-                    {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
-                    {isPending ? "Procesando..." : "Finalizar Registro"}
-                </Button>
+                        <ScrollArea className="h-80 w-full rounded-md border p-4 whitespace-pre-wrap font-mono text-xs">
+                           {contractText}
+                        </ScrollArea>
+                    </>
+                ) : (
+                    <div className="text-center py-8">
+                         <div className="space-y-1">
+                            <Label>Sin Contrato</Label>
+                            <p className="text-sm text-muted-foreground">
+                                La generación de contratos está desactivada.
+                            </p>
+                        </div>
+                    </div>
+                )}
+                 <div className="flex gap-2 mt-6">
+                    <Button type="button" variant="outline" onClick={() => setStep(2)} className="w-full" disabled={isPending}>
+                        Volver
+                    </Button>
+                    <Button type="button" onClick={() => setStep(4)} className="w-full" disabled={isPending}>
+                        Siguiente
+                    </Button>
+                </div>
+            </div>
+        );
+    case 4:
+        return (
+            <div className="space-y-6 text-center py-8">
+                <ShieldCheck className="w-16 h-16 mx-auto text-green-500"/>
+                <h3 className="text-xl font-bold">Registro Casi Completo</h3>
+                <p className="text-muted-foreground">
+                    Listo, tu cliente está a un botón para ser cargado en la plataforma.
+                </p>
+                <div className="flex gap-2 pt-4">
+                     <Button type="button" variant="outline" onClick={() => setStep(3)} className="w-full" disabled={isPending}>
+                        Volver a Revisar
+                    </Button>
+                    <Button type="button" onClick={handleFinalSubmit} className="w-full bg-accent hover:bg-accent/90" disabled={isPending}>
+                        {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        {isPending ? "Guardando..." : "Finalizar y Guardar Registro"}
+                    </Button>
+                </div>
             </div>
         )
       default:
