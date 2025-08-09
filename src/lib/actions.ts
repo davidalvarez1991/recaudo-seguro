@@ -1076,7 +1076,7 @@ const generateContractText = async (providerId: string, creditData: any, cliente
         '“NOMBRE DE LA EMPRESA”': providerData.companyName?.toUpperCase() || 'EMPRESA NO DEFINIDA',
         '“NOMBRE DEL CLIENTE”': (clienteData.name || 'CLIENTE NO DEFINIDO').toUpperCase(),
         '“CEDULA DEL CLIENTE”': clienteData.idNumber || 'DOCUMENTO NO DEFINIDO',
-        '“CIUDAD”': providerData.city || 'CIUDAD NO DEFINIDA',
+        '“CIUDAD”': providerData.city || 'N/A',
         '“VALOR PRESTAMO”': (creditData.valor || 0).toLocaleString('es-CO'),
         '“CUOTAS DEL CREDITO”': creditData.cuotas?.toString() || '0',
         '“DIA DONDE EL COBRADOR SELECIONA EL PAGO DE LA CUOTA”': firstPaymentDate,
@@ -1556,11 +1556,34 @@ type ContractGenParams = {
     clienteData: { name: string, idNumber: string };
     paymentDates: string[];
 }
-export async function getContractForAcceptance(params: ContractGenParams) {
+export async function getContractForAcceptance(params: ContractGenParams | string) {
     const { user } = await getAuthenticatedUser();
     if (!user || !user.providerId) return { error: "No se pudo identificar al proveedor." };
     
-    const text = await generateContractText(user.providerId, params.creditData, params.clienteData, params.paymentDates.map(d=>new Date(d)));
+    let creditData: any;
+    let clienteData: any;
+    let paymentDates: Date[];
+
+    if(typeof params === 'string') {
+        // This is a creditId
+        const creditRef = doc(db, 'credits', params);
+        const creditSnap = await getDoc(creditRef);
+        if(!creditSnap.exists()) return { error: "Crédito no encontrado" };
+        creditData = creditSnap.data();
+        
+        const clientSnap = await findUserByIdNumber(creditData.clienteId);
+        if(!clientSnap) return { error: "Cliente no encontrado" };
+        clienteData = clientSnap;
+        
+        paymentDates = (creditData.paymentDates || []).map((d: any) => d.toDate());
+
+    } else {
+        creditData = params.creditData;
+        clienteData = params.clienteData;
+        paymentDates = params.paymentDates.map(d => new Date(d));
+    }
+
+    const text = await generateContractText(user.providerId, creditData, clienteData, paymentDates);
 
     if (!text) {
         return { error: "La generación de contratos no está activa para este proveedor.", contractText: null };
@@ -1803,7 +1826,12 @@ export async function getProviderFinancialSummary() {
     let collectedCommission = 0;
     const uniqueClientIds = new Set<string>();
     let clientsInArrears = 0;
-
+    
+    // Count unique clients across ALL credits, not just active ones
+    for (const credit of allProviderCredits) {
+        uniqueClientIds.add(credit.clienteId);
+    }
+    
     const activeCredits = allProviderCredits.filter(c => c.estado === 'Activo');
     
     if (activeCredits.length > 0) {
@@ -1814,7 +1842,6 @@ export async function getProviderFinancialSummary() {
         const allPayments = paymentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
         for (const credit of activeCredits) {
-             uniqueClientIds.add(credit.clienteId);
              if (credit.missedPaymentDays > 0) {
                  clientsInArrears++;
              }
@@ -2150,6 +2177,7 @@ export async function getProviderCommissionTiers(): Promise<CommissionTier[]> {
     
 
     
+
 
 
 
