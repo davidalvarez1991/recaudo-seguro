@@ -110,9 +110,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   
   const handleNextStep = async (currentStep: number, nextStep: number) => {
     const fieldsToValidate: (keyof FormData | `guarantor.${keyof NonNullable<FormData['guarantor']>}` | `references.${'familiar'|'personal'}.${keyof NonNullable<NonNullable<FormData['references']>['familiar'] | NonNullable<FormData['references']>['personal'] >}`)[] = [
-        "idNumber", "firstName", "secondName", "firstLastName", "secondLastName",
-        "address", "contactPhone", "creditAmount", "installments", "requiresGuarantor",
-        "requiresReferences"
+        "idNumber", "firstName", "firstLastName", "address", "contactPhone", "creditAmount", "installments",
     ];
 
     if (form.getValues('requiresGuarantor')) {
@@ -177,16 +175,19 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
             return;
         }
 
-        const installments = parseInt(formData.installments || '0', 10);
+        const currentFormData = form.getValues();
+        const installments = parseInt(currentFormData.installments || '0', 10);
         if (selectedDates.length !== installments) {
             toast({ title: "Fechas no coinciden", description: `Debes seleccionar exactamente ${installments} fechas. Has seleccionado ${selectedDates.length}.`, variant: "destructive" });
             return;
         }
 
         setIsPending(true);
+        setFormData(currentFormData); // Save the latest data before proceeding
+
         try {
-            const fullName = [formData.firstName, formData.secondName, formData.firstLastName, formData.secondLastName].filter(Boolean).join(" ");
-            const creditValue = parseFloat(formData.creditAmount?.replace(/\./g, '') || '0');
+            const fullName = [currentFormData.firstName, currentFormData.secondName, currentFormData.firstLastName, currentFormData.secondLastName].filter(Boolean).join(" ");
+            const creditValue = parseFloat(currentFormData.creditAmount?.replace(/\./g, '') || '0');
             const { commission, percentage } = calculateCommission(creditValue, commissionTiers);
 
             const contractDataResponse = await getContractForAcceptance({
@@ -198,18 +199,17 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 },
                 clienteData: {
                     name: fullName,
-                    idNumber: formData.idNumber!,
+                    idNumber: currentFormData.idNumber!,
                 },
                 paymentDates: selectedDates.map(d => d.toISOString())
             });
             
             if (contractDataResponse.contractText) {
                 setContractText(contractDataResponse.contractText);
-                setStep(3);
+                setStep(3); // Go to contract review step
             } else {
                 setContractText(null); // Explicitly set to null if no contract
-                // If contracts are disabled, skip to the final confirmation step
-                setStep(4);
+                setStep(4); // Skip to final confirmation if contracts are disabled
             }
         } catch(e) {
              toast({ title: "Error de red", description: "No se pudo continuar con el proceso.", variant: "destructive"});
