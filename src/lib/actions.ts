@@ -17,7 +17,6 @@ import { getAuthenticatedUser } from "./auth";
 
 
 const ADMIN_ID = "admin_0703091991";
-const usersCache = new Map<string, any>();
 
 type CommissionTier = {
   minAmount: number;
@@ -27,16 +26,11 @@ type CommissionTier = {
 
 // --- Utility Functions ---
 export const findUserByIdNumber = async (idNumber: string) => {
-    if (usersCache.has(idNumber)) {
-        return usersCache.get(idNumber);
-    }
-    
     const usersRef = collection(db, "users");
     const q = query(usersRef, where("idNumber", "==", idNumber), limit(1));
     const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) {
-        usersCache.set(idNumber, null);
         return null;
     }
 
@@ -53,7 +47,6 @@ export const findUserByIdNumber = async (idNumber: string) => {
         }
     }
     
-    usersCache.set(idNumber, serializableData);
     return serializableData;
 };
 
@@ -164,7 +157,7 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: 'pr
         password: hashedPassword,
         role,
         companyName: companyName,
-        name: companyName,
+        name: companyName, // Ensure name is set for providers as well
         email,
         whatsappNumber,
         city,
@@ -885,7 +878,7 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
     }
     
     const hashedPassword = await bcrypt.hash(values.password, 10);
-
+    
     await addDoc(collection(db, "users"), {
         idNumber: values.idNumber,
         name: values.name,
@@ -929,8 +922,6 @@ export async function updateCobrador(values: z.infer<typeof EditCobradorSchema>)
     }
 
     await updateDoc(doc(db, "users", userDoc.id), updateData);
-    usersCache.delete(originalIdNumber);
-    usersCache.delete(idNumber);
 
     return { success: "Cobrador actualizado exitosamente." };
 }
@@ -974,9 +965,6 @@ export async function updateClient(values: z.infer<typeof EditClientSchema>) {
         await batch.commit();
     }
     
-    usersCache.delete(originalIdNumber);
-    usersCache.delete(idNumber);
-
     return { success: "Cliente actualizado exitosamente." };
 }
 
@@ -994,7 +982,6 @@ export async function deleteCobrador(idNumber: string) {
     
     const cobradorDoc = userSnapshot.docs[0];
     batch.delete(cobradorDoc.ref);
-    usersCache.delete(idNumber);
 
     const creditsRef = collection(db, "credits");
     const qCredits = query(creditsRef, where("cobradorId", "==", idNumber));
@@ -1030,7 +1017,6 @@ export async function deleteClientAndCredits(clienteId: string) {
     const userQuery = query(usersRef, where("idNumber", "==", clienteId));
     const userSnapshot = await getDocs(userQuery);
     userSnapshot.forEach(doc => batch.delete(doc.ref));
-    usersCache.delete(clienteId);
 
     const creditsRef = collection(db, "credits");
     const creditQuery = query(creditsRef, where("clienteId", "==", clienteId));
@@ -1148,7 +1134,6 @@ export async function createClientCreditAndContract(data: { clientData: z.infer<
         createdAt: now,
         city: provider.city || 'N/A'
     });
-    usersCache.delete(idNumber);
 
     // 2. Create credit
     const valor = parseFloat(creditAmount.replace(/\./g, ''));
@@ -1520,7 +1505,6 @@ export async function saveProviderSettings(providerId: string, settings: { baseC
       if (Object.keys(updateData).length > 0) {
         updateData.updatedAt = Timestamp.now();
         await updateDoc(providerRef, updateData);
-        usersCache.delete(providerSnap.data().idNumber);
         return { success: true };
       }
 
@@ -1961,7 +1945,6 @@ export async function reinvestCommission(amountToReinvest: number) {
         });
 
         await batch.commit();
-        usersCache.clear();
 
         return { success: true, reinvestedAmount: finalReinvestedAmount };
     } catch (e: any) {
@@ -2022,7 +2005,6 @@ export async function toggleProviderStatus(providerId: string, newStatus: boolea
             updateData.activatedAt = Timestamp.now();
         }
         await updateDoc(providerRef, updateData);
-        usersCache.clear();
         return { success: true };
     } catch (e) {
         console.error(e);
@@ -2043,7 +2025,6 @@ export async function deleteProvider(providerId: string) {
     if (providerSnap.exists()) {
         const providerData = providerSnap.data();
         if (providerData) {
-            usersCache.delete(providerData.idNumber);
         }
         batch.delete(providerRef);
     }
@@ -2056,7 +2037,6 @@ export async function deleteProvider(providerId: string) {
     cobradoresSnapshot.forEach(doc => {
         const cobradorData = doc.data();
         if (cobradorData) {
-            usersCache.delete(cobradorData.idNumber);
         }
         batch.delete(doc.ref);
     });
@@ -2121,8 +2101,6 @@ export async function updateProvider(values: z.infer<typeof EditProviderSchema>)
     }
 
     await updateDoc(doc(db, "users", userDoc.id), updateData);
-    usersCache.delete(originalIdNumber);
-    usersCache.delete(idNumber);
 
     return { success: "Proveedor actualizado exitosamente." };
 }
@@ -2188,6 +2166,9 @@ export async function getProviderCommissionTiers(): Promise<CommissionTier[]> {
 
 
 
+
+
+    
 
 
     
