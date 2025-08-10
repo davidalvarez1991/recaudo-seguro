@@ -12,13 +12,14 @@ export async function middleware(request: NextRequest) {
   if (isAuthPage && loggedInUserCookie) {
     const userRoleCookie = request.cookies.get('userRole');
     const role = userRoleCookie?.value;
+    // Check for a valid role to prevent redirection loops if role is missing
     if (role && ['admin', 'proveedor', 'cobrador', 'cliente'].includes(role)) {
        const dashboardUrl = new URL(`/dashboard/${role}`, request.url);
        return NextResponse.redirect(dashboardUrl);
     }
   }
 
-  // If user is on a protected dashboard page and is not logged in, redirect to login.
+  // If user is trying to access a protected dashboard page and is not logged in, redirect to login.
   if (pathname.startsWith('/dashboard') && !loggedInUserCookie) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('from', pathname); // Optional: add a redirect after login
@@ -30,6 +31,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    // Apply middleware to all routes except for static assets and API routes.
     '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
 }

@@ -3,25 +3,17 @@ import { UserNav } from "@/components/dashboard/user-nav";
 import { SidebarProvider, Sidebar, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { SidebarContent } from "@/components/dashboard/sidebar-content";
 import { getAuthenticatedUser } from "@/lib/auth";
-import { cookies } from "next/headers";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // The middleware now handles redirection for unauthenticated users,
+  // so we can safely assume user and role exist here.
   const { user, role } = await getAuthenticatedUser();
-
-  if (!user || !role) {
-    // This case handles when cookies are present but invalid.
-    // Ensure cookies are cleared and user is redirected.
-    cookies().delete('loggedInUser');
-    cookies().delete('userRole');
-    redirect('/login');
-  }
 
   return (
       <SidebarProvider defaultOpen={true}>
@@ -43,7 +35,7 @@ export default async function DashboardLayout({
           </header>
           <div className="flex">
             <Sidebar collapsible="icon">
-              <SidebarContent role={role} />
+              <SidebarContent role={role!} />
             </Sidebar>
             <SidebarInset>
               <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
