@@ -163,8 +163,8 @@ export async function register(values: z.infer<typeof RegisterSchema>, role: 'pr
         idNumber,
         password: hashedPassword,
         role,
-        companyName: role === 'proveedor' ? companyName : "",
-        name: role === 'proveedor' ? companyName : "Nuevo Cliente",
+        companyName: companyName,
+        name: companyName,
         email,
         whatsappNumber,
         city,
@@ -1113,7 +1113,7 @@ export async function createClientCreditAndContract(data: { clientData: z.infer<
     
     const validatedFields = ClientCreditSchema.safeParse(clientData);
     if (!validatedFields.success) {
-        console.log(validatedFields.error.flatten().fieldErrors);
+        console.error(validatedFields.error.flatten().fieldErrors);
         return { error: "Datos del formulario inválidos." };
     }
     
@@ -1557,6 +1557,14 @@ export async function getContractForAcceptance(params: ContractGenParams | strin
     const { user } = await getAuthenticatedUser();
     if (!user || !user.providerId) return { error: "No se pudo identificar al proveedor." };
     
+    const providerSnap = await getDoc(doc(db, "users", user.providerId));
+    if (!providerSnap.exists()) return { error: "Proveedor no encontrado", contractText: null };
+    const providerData = providerSnap.data();
+
+    if (!providerData.isContractGenerationActive) {
+        return { error: "Generación de contratos desactivada.", contractText: null };
+    }
+    
     let creditData: any;
     let clienteData: any;
     let paymentDates: Date[];
@@ -1565,11 +1573,11 @@ export async function getContractForAcceptance(params: ContractGenParams | strin
         // This is a creditId
         const creditRef = doc(db, 'credits', params);
         const creditSnap = await getDoc(creditRef);
-        if(!creditSnap.exists()) return { error: "Crédito no encontrado" };
+        if(!creditSnap.exists()) return { error: "Crédito no encontrado", contractText: null };
         creditData = creditSnap.data();
         
         const clientSnap = await findUserByIdNumber(creditData.clienteId);
-        if(!clientSnap) return { error: "Cliente no encontrado" };
+        if(!clientSnap) return { error: "Cliente no encontrado", contractText: null };
         clienteData = clientSnap;
         
         paymentDates = (creditData.paymentDates || []).map((d: any) => d.toDate());
@@ -1583,7 +1591,7 @@ export async function getContractForAcceptance(params: ContractGenParams | strin
     const text = await generateContractText(user.providerId, creditData, clienteData, paymentDates);
 
     if (!text) {
-        return { error: "La generación de contratos no está activa para este proveedor.", contractText: null };
+        return { error: "No se pudo generar el texto del contrato.", contractText: null };
     }
 
     return { contractText: text };
@@ -2179,3 +2187,6 @@ export async function getProviderCommissionTiers(): Promise<CommissionTier[]> {
 
 
 
+
+
+    
