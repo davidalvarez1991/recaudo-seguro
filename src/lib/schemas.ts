@@ -51,22 +51,22 @@ export const CobradorRegisterSchema = z.object({
 });
 
 const GuarantorSchema = z.object({
-  name: z.string().min(1, "El nombre del fiador es obligatorio.").or(z.literal('')),
-  idNumber: z.string().min(1, "La cédula del fiador es obligatoria.").or(z.literal('')),
-  address: z.string().min(1, "La dirección del fiador es obligatoria.").or(z.literal('')),
-  phone: z.string().min(1, "El teléfono del fiador es obligatorio.").or(z.literal('')),
+  name: z.string().optional(),
+  idNumber: z.string().optional(),
+  address: z.string().optional(),
+  phone: z.string().optional(),
 });
 
 const ReferencesSchema = z.object({
   familiar: z.object({
-    name: z.string().min(1, "El nombre de la referencia familiar es obligatorio.").or(z.literal('')),
-    phone: z.string().min(1, "El teléfono es obligatorio.").or(z.literal('')),
-    address: z.string().min(1, "La dirección es obligatoria.").or(z.literal('')),
+    name: z.string().optional(),
+    phone: z.string().optional(),
+    address: z.string().optional(),
   }),
   personal: z.object({
-    name: z.string().min(1, "El nombre de la referencia personal es obligatorio.").or(z.literal('')),
-    phone: z.string().min(1, "El teléfono es obligatorio.").or(z.literal('')),
-    address: z.string().min(1, "La dirección es obligatoria.").or(z.literal('')),
+    name: z.string().optional(),
+    phone: z.string().optional(),
+    address: z.string().optional(),
   })
 });
 
@@ -92,10 +92,10 @@ export const ClientCreditSchema = z.object({
     if (data.requiresGuarantor) {
         return (
             data.guarantor && 
-            data.guarantor.name && data.guarantor.name.length > 0 &&
-            data.guarantor.idNumber && data.guarantor.idNumber.length > 0 &&
-            data.guarantor.address && data.guarantor.address.length > 0 &&
-            data.guarantor.phone && data.guarantor.phone.length > 0
+            data.guarantor.name && data.guarantor.name.trim().length > 0 &&
+            data.guarantor.idNumber && data.guarantor.idNumber.trim().length > 0 &&
+            data.guarantor.address && data.guarantor.address.trim().length > 0 &&
+            data.guarantor.phone && data.guarantor.phone.trim().length > 0
         );
     }
     return true;
@@ -107,12 +107,12 @@ export const ClientCreditSchema = z.object({
     if (data.requiresReferences) {
         return (
             data.references &&
-            data.references.familiar.name && data.references.familiar.name.length > 0 &&
-            data.references.familiar.phone && data.references.familiar.phone.length > 0 &&
-            data.references.familiar.address && data.references.familiar.address.length > 0 &&
-            data.references.personal.name && data.references.personal.name.length > 0 &&
-            data.references.personal.phone && data.references.personal.phone.length > 0 &&
-            data.references.personal.address && data.references.personal.address.length > 0
+            data.references.familiar.name && data.references.familiar.name.trim().length > 0 &&
+            data.references.familiar.phone && data.references.familiar.phone.trim().length > 0 &&
+            data.references.familiar.address && data.references.familiar.address.trim().length > 0 &&
+            data.references.personal.name && data.references.personal.name.trim().length > 0 &&
+            data.references.personal.phone && data.references.personal.phone.trim().length > 0 &&
+            data.references.personal.address && data.references.personal.address.trim().length > 0
         );
     }
     return true;
@@ -166,8 +166,16 @@ export const RenewCreditSchema = z.object({
   installments: z.string().min(1, "El número de cuotas es obligatorio."),
 });
 
+export const RefinanceCreditSchema = z.object({
+  clienteId: z.string().min(1, "La identificación del cliente es obligatoria."),
+  oldCreditId: z.string().min(1, "El ID del crédito anterior es obligatorio."),
+  installments: z.string().min(1, "El número de cuotas es obligatorio."),
+});
+
 export const NewCreditSchema = z.object({
   clienteId: z.string().min(1, "La identificación del cliente es obligatoria."),
   creditAmount: z.string().min(1, "El valor del crédito es obligatorio."),
   installments: z.string().min(1, "El número de cuotas es obligatorio."),
 });
+
+    

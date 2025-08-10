@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw, XCircle, CalendarDays, CheckCircle2, Circle, Star, Search, Handshake, Percent, Sparkles, Filter, X } from "lucide-react";
+import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw, XCircle, CalendarDays, CheckCircle2, Circle, Star, Search, Handshake, Percent, Sparkles, Filter, X, Repeat } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getCreditsByCobrador, registerPayment, registerMissedPayment, registerPaymentAgreement } from "@/lib/actions";
@@ -25,6 +25,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { DateRange } from "react-day-picker";
+import { RefinanceCreditForm } from "@/components/forms/refinance-credit-form";
 
 
 type Credito = {
@@ -68,6 +69,7 @@ export default function CreditosPage() {
   const [paymentType, setPaymentType] = useState<PaymentType>("cuota");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
+  const [isRefinanceModalOpen, setIsRefinanceModalOpen] = useState(false);
   const [isNewCreditModalOpen, setIsNewCreditModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -111,8 +113,8 @@ export default function CreditosPage() {
         return;
     }
 
-    if (credito.estado === 'Renovado') {
-        toast({ title: `Crédito ${credito.estado}`, description: "Este crédito ya fue renovado y no admite más acciones." });
+    if (credito.estado === 'Renovado' || credito.estado === 'Refinanciado') {
+        toast({ title: `Crédito ${credito.estado}`, description: "Este crédito ya fue procesado y no admite más acciones." });
         return;
     }
     
@@ -131,6 +133,11 @@ export default function CreditosPage() {
     setIsModalOpen(false);
     setIsRenewModalOpen(true);
   };
+  
+  const handleRefinanceClick = () => {
+    setIsModalOpen(false);
+    setIsRefinanceModalOpen(true);
+  }
   
   const getInstallmentBreakdown = () => {
     if (!selectedCredit) return { capital: 0, commission: 0 };
@@ -160,7 +167,7 @@ export default function CreditosPage() {
               <div className="space-y-1">
                   <CardTitle className="text-3xl">Historial de Créditos</CardTitle>
                   <CardDescription>
-                  Consulta todos los créditos y renueva los que estén activos.
+                  Consulta todos los créditos y gestiona los que estén activos.
                   </CardDescription>
               </div>
               <Button asChild variant="outline" className="w-full sm:w-auto">
@@ -212,7 +219,7 @@ export default function CreditosPage() {
                         </TableCell>
                         <TableCell className="text-center">{credito.paidInstallments}/{credito.cuotas}</TableCell>
                         <TableCell>
-                           <Badge variant={credito.estado === 'Activo' ? 'default' : credito.estado === 'Pagado' ? 'secondary' : 'outline'}>
+                           <Badge variant={credito.estado === 'Activo' ? 'default' : (credito.estado === 'Pagado' ? 'secondary' : (credito.estado === 'Refinanciado' || credito.estado === 'Renovado' ? 'outline' : 'destructive'))}>
                             {credito.estado}
                           </Badge>
                         </TableCell>
@@ -230,7 +237,7 @@ export default function CreditosPage() {
         </CardContent>
       </Card>
 
-      {/* Details/Renew Modal */}
+      {/* Details/Renew/Refinance Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -294,12 +301,18 @@ export default function CreditosPage() {
               </Accordion>
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row sm:justify-between gap-2">
+            <Button variant="destructive-outline" onClick={handleRefinanceClick}>
+                <Repeat className="mr-2 h-4 w-4" />
+                Refinanciar Deuda
+            </Button>
+            <div className="flex flex-col sm:flex-row gap-2">
              <Button variant="outline" onClick={() => setIsModalOpen(false)}>Cerrar</Button>
              <Button onClick={handleRenewClick} variant="secondary" className="bg-amber-400 hover:bg-amber-500 text-amber-900" disabled={!canRenewCredit(selectedCredit)}>
                 <Star className="mr-2 h-4 w-4" />
                 Renovar Crédito
              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -320,6 +333,29 @@ export default function CreditosPage() {
                 remainingBalance={selectedCredit.remainingBalance}
                 onFormSubmit={() => {
                   setIsRenewModalOpen(false);
+                  fetchCredits();
+                }}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+        
+      {/* Refinance Credit Modal */}
+       <Dialog open={isRefinanceModalOpen} onOpenChange={setIsRefinanceModalOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Refinanciar Deuda</DialogTitle>
+              <DialogDescription>
+                Crear un nuevo crédito para <span className="font-semibold">{selectedCredit?.clienteName}</span> basado en su deuda total actual.
+              </DialogDescription>
+            </DialogHeader>
+            {selectedCredit && (
+              <RefinanceCreditForm
+                clienteId={selectedCredit.clienteId}
+                oldCreditId={selectedCredit.id}
+                totalDebt={selectedCredit.totalDebt}
+                onFormSubmit={() => {
+                  setIsRefinanceModalOpen(false);
                   fetchCredits();
                 }}
               />

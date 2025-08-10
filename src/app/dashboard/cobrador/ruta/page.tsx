@@ -4,9 +4,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, HandCoins, Loader2, Map, Star, Handshake, Percent, XCircle, Calendar as CalendarIcon, X, CheckCircle2, Circle, Home, Phone, Search } from "lucide-react";
+import { ArrowLeft, ClipboardList, HandCoins, Loader2, Map, Star, Handshake, Percent, XCircle, Calendar as CalendarIcon, X, CheckCircle2, Circle, Home, Phone, Search, Repeat } from "lucide-react";
 import Link from "next/link";
-import { getPaymentRoute, registerPayment, registerMissedPayment, registerPaymentAgreement } from "@/lib/actions";
+import { getPaymentRoute, registerPayment, registerMissedPayment } from "@/lib/actions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -20,6 +20,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
+import { RefinanceCreditForm } from "@/components/forms/refinance-credit-form";
 
 
 type PaymentRouteEntry = {
@@ -52,18 +53,11 @@ type GroupedRoutes = {
   [key: string]: PaymentRouteEntry[];
 };
 
-type PaymentType = "cuota" | "total" | "acuerdo" | "comision";
+type PaymentType = "cuota" | "total" | "comision";
 
 const formatCurrency = (value: number) => {
     if (isNaN(value)) return "$0";
     return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-};
-
-const formatCurrencyForInput = (value: string): string => {
-    if (!value) return "";
-    const numberValue = parseInt(value.replace(/\D/g, ''), 10);
-    if (isNaN(numberValue)) return "";
-    return new Intl.NumberFormat('es-CO').format(numberValue);
 };
 
 const formatDateGroup = (dateStr: string) => {    
@@ -89,11 +83,9 @@ export default function RutaDePagoPage() {
     const [selectedCredit, setSelectedCredit] = useState<PaymentRouteEntry | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
+    const [isRefinanceModalOpen, setIsRefinanceModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [paymentType, setPaymentType] = useState<PaymentType>("cuota");
-    const [agreementAmount, setAgreementAmount] = useState("");
-    const [newAgreementDates, setNewAgreementDates] = useState<Date[]>([]);
-    const [month, setMonth] = useState(new Date());
     const [searchTerm, setSearchTerm] = useState("");
     const { toast } = useToast();
 
@@ -111,6 +103,11 @@ export default function RutaDePagoPage() {
 
     useEffect(() => {
         fetchRoute();
+        const handleCreditsUpdate = () => fetchRoute();
+        window.addEventListener('creditos-updated', handleCreditsUpdate);
+        return () => {
+            window.removeEventListener('creditos-updated', handleCreditsUpdate);
+        }
     }, [fetchRoute]);
     
     const groupedRoutes = useMemo(() => {
@@ -135,22 +132,11 @@ export default function RutaDePagoPage() {
     const handleRowClick = (credit: PaymentRouteEntry) => {
         setSelectedCredit(credit);
         setPaymentType("cuota");
-        setAgreementAmount("");
-        setNewAgreementDates([]);
         setIsModalOpen(true);
-    };
-
-    const handleConfirmAction = async () => {
-        if (!selectedCredit) return;
-        if (paymentType === 'acuerdo') {
-            await handlePaymentAgreement();
-        } else {
-            await handleRegisterPayment();
-        }
     };
     
     const handleRegisterPayment = async () => {
-        if (!selectedCredit || paymentType === 'acuerdo') return;
+        if (!selectedCredit) return;
         setIsSubmitting(true);
         const result = await registerPayment(selectedCredit.id, getPaymentAmount(), paymentType);
         if (result.success) {
@@ -159,36 +145,6 @@ export default function RutaDePagoPage() {
             fetchRoute();
         } else {
             toast({ title: "Error al registrar el pago", description: result.error, variant: "destructive" });
-        }
-        setIsSubmitting(false);
-    };
-
-    const handlePaymentAgreement = async () => {
-        if (!selectedCredit) return;
-        
-        const remainingInstallments = selectedCredit.cuotas - selectedCredit.paidInstallments;
-        if (newAgreementDates.length > 0 && newAgreementDates.length !== remainingInstallments) {
-            toast({
-                title: "Fechas no coinciden",
-                description: `Debes seleccionar ${remainingInstallments} fechas para las cuotas restantes.`,
-                variant: "destructive",
-            });
-            return;
-        }
-
-        setIsSubmitting(true);
-        const amount = agreementAmount ? parseFloat(agreementAmount.replace(/\D/g, '')) : 0;
-        const result = await registerPaymentAgreement(
-            selectedCredit.id, 
-            amount,
-            newAgreementDates.length > 0 ? newAgreementDates.map(d => d.toISOString()) : undefined
-        );
-        if (result.success) {
-            toast({ title: "Acuerdo Registrado", description: result.success, className: "bg-accent text-accent-foreground border-accent" });
-            setIsModalOpen(false);
-            fetchRoute();
-        } else {
-            toast({ title: "Error en el Acuerdo", description: result.error, variant: "destructive" });
         }
         setIsSubmitting(false);
     };
@@ -209,7 +165,6 @@ export default function RutaDePagoPage() {
 
     const getPaymentAmount = () => {
         if (!selectedCredit) return 0;
-        if (paymentType === 'acuerdo') return agreementAmount ? parseFloat(agreementAmount.replace(/\D/g, '')) : 0;
         switch (paymentType) {
             case "cuota": return selectedCredit.installmentAmount + selectedCredit.lateFee;
             case "total": return selectedCredit.totalDebt;
@@ -227,24 +182,12 @@ export default function RutaDePagoPage() {
         setIsModalOpen(false);
         setIsRenewModalOpen(true);
     };
+
+    const handleRefinanceClick = () => {
+        setIsModalOpen(false);
+        setIsRefinanceModalOpen(true);
+    }
     
-    const handleAgreementDateSelect = (dates: Date[] | undefined) => {
-        if (!dates || !selectedCredit) return;
-        const remainingInstallments = selectedCredit.cuotas - selectedCredit.paidInstallments;
-        const today = startOfDay(new Date());
-        const validDates = dates.filter(date => date && date >= today);
-
-        if (remainingInstallments > 0 && validDates.length > remainingInstallments) {
-            toast({
-                title: "Límite de cuotas alcanzado",
-                description: `No puedes seleccionar más de ${remainingInstallments} fechas.`,
-                variant: "destructive",
-            });
-            return;
-        }
-        setNewAgreementDates(validDates.sort((a,b) => a.getTime() - b.getTime()));
-    };
-
     const hasInterestOption = (selectedCredit?.lateInterestRate ?? 0) > 0;
     const sortedGroupKeys = Object.keys(groupedRoutes).sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
 
@@ -360,35 +303,13 @@ export default function RutaDePagoPage() {
 
              {/* Payment Modal */}
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogContent className="sm:max-w-2xl">
+                <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Registrar Acción</DialogTitle>
+                        <DialogTitle>Registrar Acción de Pago</DialogTitle>
                         <DialogDescription>Para el cliente <span className="font-semibold">{selectedCredit?.clienteName}</span>.</DialogDescription>
                     </DialogHeader>
                     {selectedCredit && (
                         <div className="py-4 space-y-4">
-                            <Accordion type="single" collapsible className="w-full" defaultValue="item-1">
-                                <AccordionItem value="item-1">
-                                    <AccordionTrigger>Cuotas: {selectedCredit.paidInstallments}/{selectedCredit.cuotas}</AccordionTrigger>
-                                    <AccordionContent>
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-sm pl-2 max-h-24 overflow-y-auto">
-                                            {selectedCredit.paymentDates
-                                                .sort((a,b) => new Date(a).getTime() - new Date(b).getTime())
-                                                .map((dateStr, index) => {
-                                                const isPaid = index < selectedCredit.paidInstallments;
-                                                const isNext = index === selectedCredit.paidInstallments;
-                                                return (
-                                                <div key={index} className={cn("flex items-center gap-2", { "text-muted-foreground": isPaid, "font-bold text-primary": isNext })}>
-                                                    {isPaid ? <CheckCircle2 className="h-4 w-4 text-green-500"/> : <Circle className="h-4 w-4 text-muted-foreground/50"/>}
-                                                    <span>{format(new Date(dateStr), "d 'de' MMM", { locale: es })}</span>
-                                                </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </AccordionContent>
-                                </AccordionItem>
-                            </Accordion>
-
                            <RadioGroup value={paymentType} onValueChange={(value: any) => setPaymentType(value)} className="gap-3 pt-4">
                                 <Label htmlFor="payment-cuota" className="flex items-start gap-4 rounded-md border p-4 cursor-pointer hover:bg-muted/50">
                                     <RadioGroupItem value="cuota" id="payment-cuota" className="mt-1" />
@@ -420,40 +341,6 @@ export default function RutaDePagoPage() {
                                         <p className="font-bold ml-4">{formatCurrency(selectedCredit.totalDebt)}</p>
                                     </div>
                                 </Label>
-                                <Label htmlFor="payment-acuerdo" className="flex flex-col gap-2 rounded-md border p-4 cursor-pointer hover:bg-muted/50">
-                                    <div className="flex items-start gap-4">
-                                      <RadioGroupItem value="acuerdo" id="payment-acuerdo" className="mt-1" />
-                                      <div className="flex justify-between items-center w-full">
-                                        <div className="flex-1">
-                                            <p className="font-semibold flex items-center gap-1.5"><Handshake className="h-4 w-4" /> Realizar Acuerdo</p>
-                                            <p className="text-xs text-muted-foreground">Registra un abono y/o reprograma las fechas de pago futuras.</p>
-                                        </div>
-                                        <p className="font-bold ml-4">{agreementAmount ? formatCurrency(parseFloat(agreementAmount.replace(/\D/g, ''))) : '$0'}</p>
-                                      </div>
-                                    </div>
-                                    {paymentType === 'acuerdo' && (
-                                        <div className="pl-8 pt-2 space-y-4">
-                                          <Input placeholder="Valor del abono (opcional)..." value={agreementAmount} onChange={(e) => setAgreementAmount(formatCurrencyForInput(e.target.value))} />
-                                          <div className="rounded-md border">
-                                              <Calendar
-                                                mode="multiple"
-                                                selected={newAgreementDates}
-                                                onSelect={handleAgreementDateSelect as any}
-                                                month={month}
-                                                onMonthChange={setMonth}
-                                                fromDate={new Date()}
-                                                disabled={(date) => date < startOfDay(new Date())}
-                                                locale={es}
-                                                footer={
-                                                    <p className="text-sm text-muted-foreground px-3 pt-2">
-                                                        Seleccionadas: {newAgreementDates.length} de {selectedCredit.cuotas - selectedCredit.paidInstallments} cuotas restantes.
-                                                    </p>
-                                                }
-                                            />
-                                          </div>
-                                        </div>
-                                    )}
-                                </Label>
                             </RadioGroup>
                         </div>
                     )}
@@ -461,10 +348,15 @@ export default function RutaDePagoPage() {
                         <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancelar</Button>
                         <div className="flex flex-col-reverse sm:flex-row gap-2">
                             <Button variant="destructive" onClick={handleMissedPayment} disabled={isSubmitting || !hasInterestOption}><XCircle className="mr-2 h-4 w-4" />No pagó</Button>
-                            <Button onClick={handleConfirmAction} disabled={isSubmitting}><HandCoins className="mr-2 h-4 w-4" />{isSubmitting ? 'Registrando...' : 'Confirmar'}</Button>
+                            <Button onClick={handleRegisterPayment} disabled={isSubmitting}><HandCoins className="mr-2 h-4 w-4" />{isSubmitting ? 'Registrando...' : 'Confirmar Pago'}</Button>
                             <Button onClick={handleRenewClick} variant="secondary" className="bg-amber-400 hover:bg-amber-500 text-amber-900" disabled={isSubmitting || !canRenewCredit(selectedCredit)}><Star className="mr-2 h-4 w-4" />Renovar</Button>
                         </div>
                     </DialogFooter>
+                      <Separator />
+                      <Button variant="outline" className="w-full" onClick={handleRefinanceClick} disabled={isSubmitting}>
+                        <Repeat className="mr-2 h-4 w-4" />
+                        Refinanciar Deuda del Cliente
+                      </Button>
                 </DialogContent>
             </Dialog>
 
@@ -475,6 +367,31 @@ export default function RutaDePagoPage() {
                     {selectedCredit && <RenewCreditForm clienteId={selectedCredit.clienteId} oldCreditId={selectedCredit.id} remainingBalance={selectedCredit.remainingBalance} onFormSubmit={() => { setIsRenewModalOpen(false); fetchRoute(); }} />}
                 </DialogContent>
             </Dialog>
+            
+            {/* Refinance Credit Modal */}
+            <Dialog open={isRefinanceModalOpen} onOpenChange={setIsRefinanceModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Refinanciar Deuda</DialogTitle>
+                        <DialogDescription>
+                            Crear un nuevo crédito para <span className="font-semibold">{selectedCredit?.clienteName}</span> basado en su deuda total actual.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {selectedCredit && (
+                        <RefinanceCreditForm
+                            clienteId={selectedCredit.clienteId}
+                            oldCreditId={selectedCredit.id}
+                            totalDebt={selectedCredit.totalDebt}
+                            onFormSubmit={() => {
+                                setIsRefinanceModalOpen(false);
+                                fetchRoute();
+                            }}
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 }
+
+    
