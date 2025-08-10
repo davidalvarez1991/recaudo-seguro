@@ -1419,7 +1419,7 @@ export async function registerPayment(creditId: string, amount: number, type: "c
     return { success: `Pago de ${amount.toLocaleString('es-CO')} registrado.` };
 }
 
-export async function registerPaymentAgreement(creditId: string, amount: number) {
+export async function registerPaymentAgreement(creditId: string, amount: number, newDates?: string[]) {
     const { user: cobradorData } = await getAuthenticatedUser();
     if (!cobradorData || cobradorData.role !== 'cobrador') return { error: "Acción no autorizada." };
 
@@ -1428,33 +1428,25 @@ export async function registerPaymentAgreement(creditId: string, amount: number)
     if (!creditSnap.exists()) return { error: "Crédito no encontrado." };
     
     const creditData = creditSnap.data();
-    if (!creditData.paymentDates || creditData.paymentDates.length < 2) {
-        return { error: "El calendario de pagos no es válido para reprogramar." };
-    }
 
-    const dates = creditData.paymentDates.map((ts: Timestamp) => ts.toDate()).sort((a: Date, b: Date) => a.getTime() - b.getTime());
-    const frequencyDays = differenceInDays(dates[1], dates[0]);
-
-    const paymentsSnapshot = await getDocs(query(collection(db, "payments"), where("creditId", "==", creditId)));
-    const paidInstallments = paymentsSnapshot.docs.filter(p => p.data().type === 'cuota').length;
-    
-    if (paidInstallments >= dates.length) {
-        return { error: "El crédito ya ha sido pagado en su totalidad." };
-    }
-    
-    const remainingDates = dates.slice(paidInstallments);
-    const newPaymentDates = remainingDates.map(date => addDays(date, frequencyDays));
-
-    const finalSchedule = [
-        ...dates.slice(0, paidInstallments),
-        ...newPaymentDates
-    ];
-
-    await updateDoc(creditRef, {
-        paymentDates: finalSchedule.map(d => Timestamp.fromDate(d)),
+    const updatePayload: { missedPaymentDays: number, updatedAt: Timestamp, paymentDates?: Timestamp[] } = {
         missedPaymentDays: 0,
         updatedAt: Timestamp.now(),
-    });
+    };
+    
+    if (newDates && newDates.length > 0) {
+        const paymentsSnapshot = await getDocs(query(collection(db, "payments"), where("creditId", "==", creditId)));
+        const paidInstallmentsCount = paymentsSnapshot.docs.filter(p => p.data().type === 'cuota').length;
+        const oldDates = (creditData.paymentDates || []).map((ts: Timestamp) => ts.toDate()).slice(0, paidInstallmentsCount);
+        const finalSchedule = [
+            ...oldDates,
+            ...newDates.map(d => new Date(d))
+        ];
+        updatePayload.paymentDates = finalSchedule.map(d => Timestamp.fromDate(d));
+    }
+
+
+    await updateDoc(creditRef, updatePayload);
 
     if (amount > 0) {
       await addDoc(collection(db, "payments"), {
@@ -1465,7 +1457,7 @@ export async function registerPaymentAgreement(creditId: string, amount: number)
           cobradorId: cobradorData.idNumber,
           providerId: creditData.providerId,
           clienteId: creditData.clienteId,
-          reinvested: false, // Also flag this
+          reinvested: false,
       });
     }
     
@@ -2164,3 +2156,4 @@ export async function getProviderCommissionTiers(): Promise<CommissionTier[]> {
 
 
     
+

@@ -10,7 +10,7 @@ import { getPaymentRoute, registerPayment, registerMissedPayment, registerPaymen
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { format, isToday, isTomorrow, isPast, parseISO } from 'date-fns';
+import { format, isToday, isTomorrow, isPast, parseISO, startOfDay } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 import { RenewCreditForm } from "@/components/forms/renew-credit-form";
@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
 
 
 type PaymentRouteEntry = {
@@ -91,6 +92,8 @@ export default function RutaDePagoPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [paymentType, setPaymentType] = useState<PaymentType>("cuota");
     const [agreementAmount, setAgreementAmount] = useState("");
+    const [newAgreementDates, setNewAgreementDates] = useState<Date[]>([]);
+    const [month, setMonth] = useState(new Date());
     const [searchTerm, setSearchTerm] = useState("");
     const { toast } = useToast();
 
@@ -133,6 +136,7 @@ export default function RutaDePagoPage() {
         setSelectedCredit(credit);
         setPaymentType("cuota");
         setAgreementAmount("");
+        setNewAgreementDates([]);
         setIsModalOpen(true);
     };
 
@@ -161,9 +165,24 @@ export default function RutaDePagoPage() {
 
     const handlePaymentAgreement = async () => {
         if (!selectedCredit) return;
+        
+        const remainingInstallments = selectedCredit.cuotas - selectedCredit.paidInstallments;
+        if (newAgreementDates.length > 0 && newAgreementDates.length !== remainingInstallments) {
+            toast({
+                title: "Fechas no coinciden",
+                description: `Debes seleccionar ${remainingInstallments} fechas para las cuotas restantes.`,
+                variant: "destructive",
+            });
+            return;
+        }
+
         setIsSubmitting(true);
         const amount = agreementAmount ? parseFloat(agreementAmount.replace(/\D/g, '')) : 0;
-        const result = await registerPaymentAgreement(selectedCredit.id, amount);
+        const result = await registerPaymentAgreement(
+            selectedCredit.id, 
+            amount,
+            newAgreementDates.length > 0 ? newAgreementDates.map(d => d.toISOString()) : undefined
+        );
         if (result.success) {
             toast({ title: "Acuerdo Registrado", description: result.success, className: "bg-accent text-accent-foreground border-accent" });
             setIsModalOpen(false);
@@ -207,6 +226,23 @@ export default function RutaDePagoPage() {
     const handleRenewClick = () => {
         setIsModalOpen(false);
         setIsRenewModalOpen(true);
+    };
+    
+    const handleAgreementDateSelect = (dates: Date[] | undefined) => {
+        if (!dates || !selectedCredit) return;
+        const remainingInstallments = selectedCredit.cuotas - selectedCredit.paidInstallments;
+        const today = startOfDay(new Date());
+        const validDates = dates.filter(date => date && date >= today);
+
+        if (remainingInstallments > 0 && validDates.length > remainingInstallments) {
+            toast({
+                title: "Límite de cuotas alcanzado",
+                description: `No puedes seleccionar más de ${remainingInstallments} fechas.`,
+                variant: "destructive",
+            });
+            return;
+        }
+        setNewAgreementDates(validDates.sort((a,b) => a.getTime() - b.getTime()));
     };
 
     const hasInterestOption = (selectedCredit?.lateInterestRate ?? 0) > 0;
@@ -390,14 +426,31 @@ export default function RutaDePagoPage() {
                                       <div className="flex justify-between items-center w-full">
                                         <div className="flex-1">
                                             <p className="font-semibold flex items-center gap-1.5"><Handshake className="h-4 w-4" /> Realizar Acuerdo</p>
-                                            <p className="text-xs text-muted-foreground">Registra un abono y reprograma las fechas de pago futuras.</p>
+                                            <p className="text-xs text-muted-foreground">Registra un abono y/o reprograma las fechas de pago futuras.</p>
                                         </div>
                                         <p className="font-bold ml-4">{agreementAmount ? formatCurrency(parseFloat(agreementAmount.replace(/\D/g, ''))) : '$0'}</p>
                                       </div>
                                     </div>
                                     {paymentType === 'acuerdo' && (
-                                        <div className="pl-8 pt-1">
+                                        <div className="pl-8 pt-2 space-y-4">
                                           <Input placeholder="Valor del abono (opcional)..." value={agreementAmount} onChange={(e) => setAgreementAmount(formatCurrencyForInput(e.target.value))} />
+                                          <div className="rounded-md border">
+                                              <Calendar
+                                                mode="multiple"
+                                                selected={newAgreementDates}
+                                                onSelect={handleAgreementDateSelect as any}
+                                                month={month}
+                                                onMonthChange={setMonth}
+                                                fromDate={new Date()}
+                                                disabled={(date) => date < startOfDay(new Date())}
+                                                locale={es}
+                                                footer={
+                                                    <p className="text-sm text-muted-foreground px-3 pt-2">
+                                                        Seleccionadas: {newAgreementDates.length} de {selectedCredit.cuotas - selectedCredit.paidInstallments} cuotas restantes.
+                                                    </p>
+                                                }
+                                            />
+                                          </div>
                                         </div>
                                     )}
                                 </Label>
@@ -425,5 +478,3 @@ export default function RutaDePagoPage() {
         </Card>
     );
 }
-
-    
