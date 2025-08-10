@@ -3,7 +3,7 @@
 "use server";
 
 import { z } from "zod";
-import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, SavePaymentScheduleSchema, RenewCreditSchema, EditClientSchema, NewCreditSchema, EditProviderSchema } from "./schemas";
+import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, SavePaymentScheduleSchema, RenewCreditSchema, RefinanceCreditSchema, EditClientSchema, NewCreditSchema, EditProviderSchema } from "./schemas";
 import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
 import { db } from "./firebase";
@@ -57,11 +57,11 @@ const calculateCommission = (amount: number, tiers: CommissionTier[] | undefined
     }
     
     // Sort tiers by minAmount to ensure correct matching
-    const sortedTiers = [...tiers].sort((a, b) => a.minAmount - b.minAmount);
+    const sortedTiers = [...tiers].sort((a, b) => (a.minAmount || 0) - (b.minAmount || 0));
     
-    const applicableTier = sortedTiers.find(tier => amount >= tier.minAmount && amount <= tier.maxAmount);
+    const applicableTier = sortedTiers.find(tier => amount >= (tier.minAmount || 0) && amount <= (tier.maxAmount || Infinity));
 
-    if (applicableTier) {
+    if (applicableTier && applicableTier.percentage) {
         return { commission: amount * (applicableTier.percentage / 100), percentage: applicableTier.percentage };
     }
 
@@ -1297,6 +1297,78 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
     return { success: true, newCreditId: newCreditRef.id };
 }
 
+export async function refinanceCredit(values: z.infer<typeof RefinanceCreditSchema>) {
+    const { user: cobrador } = await getAuthenticatedUser();
+    if (!cobrador || cobrador.role !== 'cobrador') return { error: "Acción no autorizada." };
+
+    const providerId = cobrador.providerId;
+    if(!providerId) return { error: "El cobrador no tiene un proveedor asociado." };
+    
+    const providerDocRef = doc(db, "users", providerId);
+    const providerSnap = await getDoc(providerDocRef);
+    if (!providerSnap.exists()) return { error: "Proveedor no encontrado."};
+    const provider = providerSnap.data();
+    
+    if (!provider.isActive) {
+        return { error: "La cuenta de tu proveedor está inactiva. No puedes refinanciar créditos." };
+    }
+
+    const { clienteId, oldCreditId, installments } = values;
+
+    // Recalculate total debt on the server for security
+    const oldCreditRef = doc(db, "credits", oldCreditId);
+    const oldCreditSnap = await getDoc(oldCreditRef);
+    if (!oldCreditSnap.exists()) return { error: "El crédito anterior no fue encontrado." };
+    
+    const oldCreditData = oldCreditSnap.data();
+    const paymentsRef = collection(db, "payments");
+    const paymentsQuery = query(paymentsRef, where("creditId", "==", oldCreditId));
+    const paymentsSnapshot = await getDocs(paymentsQuery);
+    
+    const capitalAndCommissionPayments = paymentsSnapshot.docs.map(p => p.data()).filter(p => p.type === 'cuota' || p.type === 'total');
+    const paidCapitalAndCommission = capitalAndCommissionPayments.reduce((sum, p) => sum + p.amount, 0);
+    const totalOldLoanAmount = (oldCreditData.valor || 0) + (oldCreditData.commission || 0);
+    const remainingBalance = totalOldLoanAmount - paidCapitalAndCommission;
+    
+    const lateInterestRate = provider.isLateInterestActive ? (provider.lateInterestRate || 0) : 0;
+    const lateFee = calculateLateFee({ ...oldCreditData, lateInterestRate });
+    const totalDebt = remainingBalance + lateFee;
+
+    const { commission, percentage } = calculateCommission(totalDebt, provider.commissionTiers);
+    
+    const creditDataForContract = {
+        valor: totalDebt,
+        cuotas: parseInt(installments, 10),
+        commission,
+        commissionPercentage: percentage,
+    };
+
+    const batch = writeBatch(db);
+
+    const newCreditRef = doc(collection(db, "credits"));
+    batch.set(newCreditRef, {
+        ...creditDataForContract,
+        clienteId,
+        cobradorId: cobrador.idNumber,
+        providerId,
+        fecha: Timestamp.now(),
+        estado: 'Activo',
+        paymentScheduleSet: false,
+        missedPaymentDays: 0,
+        refinancedFrom: oldCreditId,
+    });
+
+    batch.update(oldCreditRef, {
+        estado: 'Refinanciado',
+        updatedAt: Timestamp.now(),
+        refinancedWithCreditId: newCreditRef.id,
+    });
+    
+    await batch.commit();
+
+    return { success: true, newCreditId: newCreditRef.id };
+}
+
 export async function savePaymentSchedule(values: z.infer<typeof SavePaymentScheduleSchema>) {
     const validatedFields = SavePaymentScheduleSchema.safeParse(values);
     if (!validatedFields.success) {
@@ -2132,28 +2204,14 @@ export async function getFinancialAdviceForProvider() {
 
 export async function getProviderCommissionTiers(): Promise<CommissionTier[]> {
     const { user } = await getAuthenticatedUser();
-    if (!user || !user.providerId) return [];
+    if (!user) return [];
     
-    const provider = await getUserData(user.providerId);
+    const providerId = user.role === 'proveedor' ? user.id : user.providerId;
+    if (!providerId) return [];
+    
+    const provider = await getUserData(providerId);
     if (!provider || !provider.commissionTiers) {
         return [{ minAmount: 0, maxAmount: 50000000, percentage: 20 }]; // Default
     }
     return provider.commissionTiers;
 }
-    
-
-    
-
-    
-
-
-
-
-
-
-
-    
-
-
-    
-

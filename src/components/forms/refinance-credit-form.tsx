@@ -76,7 +76,9 @@ export function RefinanceCreditForm({ clienteId, oldCreditId, totalDebt, onFormS
       
       const today = startOfDay(new Date());
       const validDates = dates.filter(date => date && date >= today);
-      const installments = parseInt(form.getValues('installments') || '0', 10);
+      const installmentsValue = form.getValues('installments');
+      if (!installmentsValue) return;
+      const installments = parseInt(installmentsValue, 10);
 
       if (installments > 0 && validDates.length > installments) {
           toast({
@@ -99,7 +101,10 @@ export function RefinanceCreditForm({ clienteId, oldCreditId, totalDebt, onFormS
            return;
       }
       
-      const installments = parseInt(form.getValues('installments') || '0', 10);
+      const installmentsValue = form.getValues('installments');
+      if (!installmentsValue) return;
+      const installments = parseInt(installmentsValue, 10);
+
       if (validDates.length !== installments) {
            toast({ title: "Fechas no coinciden", description: `Debes seleccionar exactamente ${installments} fechas.`, variant: "destructive" });
            return;
@@ -198,6 +203,8 @@ export function RefinanceCreditForm({ clienteId, oldCreditId, totalDebt, onFormS
     }
 
     if (step === 2) {
+      const installmentsValue = form.getValues('installments');
+      const installments = installmentsValue ? parseInt(installmentsValue, 10) : 0;
       return (
          <>
             <div className="space-y-4">
@@ -212,7 +219,7 @@ export function RefinanceCreditForm({ clienteId, oldCreditId, totalDebt, onFormS
                         fromDate={new Date()}
                         disabled={(date) => date < startOfDay(new Date())}
                         locale={es}
-                        footer={<p className="text-sm text-muted-foreground px-3 pt-2">Has seleccionado {selectedDates.length} de {form.getValues('installments') || 0} cuotas.</p>}
+                        footer={<p className="text-sm text-muted-foreground px-3 pt-2">Has seleccionado {selectedDates.length} de {installments || 0} cuotas.</p>}
                         modifiers={{ selected: selectedDates }}
                         modifiersClassNames={{ selected: 'bg-primary text-primary-foreground hover:bg-primary/90' }}
                     />
@@ -254,5 +261,3 @@ export function RefinanceCreditForm({ clienteId, oldCreditId, totalDebt, onFormS
     </Form>
   );
 }
-
-    

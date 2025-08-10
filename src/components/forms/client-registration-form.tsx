@@ -170,12 +170,14 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     };
 
     const goToContractStep = async () => {
+        const currentFormData = form.getValues();
+        setFormData(currentFormData);
+
         if (selectedDates.length === 0) {
             toast({ title: "Fechas requeridas", description: "Debes seleccionar las fechas de pago.", variant: "destructive" });
             return;
         }
 
-        const currentFormData = form.getValues();
         const installments = parseInt(currentFormData.installments || '0', 10);
         if (selectedDates.length !== installments) {
             toast({ title: "Fechas no coinciden", description: `Debes seleccionar exactamente ${installments} fechas. Has seleccionado ${selectedDates.length}.`, variant: "destructive" });
@@ -183,8 +185,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         }
 
         setIsPending(true);
-        setFormData(currentFormData); // Save the latest data before proceeding
-
+        
         try {
             const fullName = [currentFormData.firstName, currentFormData.secondName, currentFormData.firstLastName, currentFormData.secondLastName].filter(Boolean).join(" ");
             const creditValue = parseFloat(currentFormData.creditAmount?.replace(/\./g, '') || '0');

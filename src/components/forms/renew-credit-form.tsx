@@ -93,7 +93,10 @@ export function RenewCreditForm({ clienteId, oldCreditId, remainingBalance, onFo
       const today = startOfDay(new Date());
       const validDates = dates.filter(date => date && date >= today);
 
-      const installments = parseInt(form.getValues('installments') || '0', 10);
+      const installmentsValue = form.getValues('installments');
+      if (!installmentsValue) return;
+      const installments = parseInt(installmentsValue, 10);
+
       if (installments > 0 && validDates.length > installments) {
           toast({
               title: "Límite de cuotas alcanzado",
@@ -127,7 +130,10 @@ export function RenewCreditForm({ clienteId, oldCreditId, remainingBalance, onFo
           return;
       }
       
-      const installments = parseInt(form.getValues('installments') || '0', 10);
+      const installmentsValue = form.getValues('installments');
+      if (!installmentsValue) return;
+      const installments = parseInt(installmentsValue, 10);
+      
       if (validDates.length !== installments) {
            toast({
               title: "Fechas no coinciden",
@@ -261,6 +267,8 @@ export function RenewCreditForm({ clienteId, oldCreditId, remainingBalance, onFo
     }
 
     if (step === 2) {
+      const installmentsValue = form.getValues('installments');
+      const installments = installmentsValue ? parseInt(installmentsValue, 10) : 0;
       return (
          <>
             <div className="space-y-4">
@@ -288,7 +296,7 @@ export function RenewCreditForm({ clienteId, oldCreditId, remainingBalance, onFo
                         locale={es}
                         footer={
                             <p className="text-sm text-muted-foreground px-3 pt-2">
-                                Has seleccionado {selectedDates.length} de {form.getValues('installments') || 0} cuotas.
+                                Has seleccionado {selectedDates.length} de {installments || 0} cuotas.
                             </p>
                         }
                         modifiers={{

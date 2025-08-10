@@ -302,7 +302,7 @@ export default function CreditosPage() {
             </div>
           )}
           <DialogFooter className="flex-col sm:flex-row sm:justify-between gap-2">
-            <Button variant="destructive-outline" onClick={handleRefinanceClick}>
+            <Button variant="destructive-outline" onClick={handleRefinanceClick} disabled={!selectedCredit}>
                 <Repeat className="mr-2 h-4 w-4" />
                 Refinanciar Deuda
             </Button>
@@ -389,5 +389,3 @@ export default function CreditosPage() {
     </TooltipProvider>
   );
 }
-
-    

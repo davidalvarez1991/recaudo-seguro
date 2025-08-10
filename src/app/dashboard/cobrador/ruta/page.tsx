@@ -353,7 +353,7 @@ export default function RutaDePagoPage() {
                         </div>
                     </DialogFooter>
                       <Separator />
-                      <Button variant="outline" className="w-full" onClick={handleRefinanceClick} disabled={isSubmitting}>
+                      <Button variant="outline" className="w-full" onClick={handleRefinanceClick} disabled={isSubmitting || !selectedCredit}>
                         <Repeat className="mr-2 h-4 w-4" />
                         Refinanciar Deuda del Cliente
                       </Button>
@@ -393,5 +393,3 @@ export default function RutaDePagoPage() {
         </Card>
     );
 }
-
-    
