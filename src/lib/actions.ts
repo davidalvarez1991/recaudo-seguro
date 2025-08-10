@@ -2215,3 +2215,4 @@ export async function getProviderCommissionTiers(): Promise<CommissionTier[]> {
     }
     return provider.commissionTiers;
 }
+
