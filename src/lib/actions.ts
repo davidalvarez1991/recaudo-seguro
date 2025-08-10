@@ -2021,11 +2021,7 @@ export async function deleteProvider(providerId: string) {
     const providerRef = doc(db, "users", providerId);
     const providerSnap = await getDoc(providerRef);
     
-    // Invalidate provider cache
     if (providerSnap.exists()) {
-        const providerData = providerSnap.data();
-        if (providerData) {
-        }
         batch.delete(providerRef);
     }
     
@@ -2033,11 +2029,7 @@ export async function deleteProvider(providerId: string) {
     const cobradoresQuery = query(cobradoresRef, where("providerId", "==", providerId));
     const cobradoresSnapshot = await getDocs(cobradoresQuery);
     
-    // Invalidate cobrador caches
     cobradoresSnapshot.forEach(doc => {
-        const cobradorData = doc.data();
-        if (cobradorData) {
-        }
         batch.delete(doc.ref);
     });
     

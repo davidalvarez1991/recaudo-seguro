@@ -51,22 +51,22 @@ export const CobradorRegisterSchema = z.object({
 });
 
 const GuarantorSchema = z.object({
-  name: z.string().min(1, "El nombre del fiador es obligatorio."),
-  idNumber: z.string().min(1, "La cédula del fiador es obligatoria."),
-  address: z.string().min(1, "La dirección del fiador es obligatoria."),
-  phone: z.string().min(1, "El teléfono del fiador es obligatorio."),
+  name: z.string().min(1, "El nombre del fiador es obligatorio.").or(z.literal('')),
+  idNumber: z.string().min(1, "La cédula del fiador es obligatoria.").or(z.literal('')),
+  address: z.string().min(1, "La dirección del fiador es obligatoria.").or(z.literal('')),
+  phone: z.string().min(1, "El teléfono del fiador es obligatorio.").or(z.literal('')),
 });
 
 const ReferencesSchema = z.object({
   familiar: z.object({
-    name: z.string().min(1, "El nombre de la referencia familiar es obligatorio."),
-    phone: z.string().min(1, "El teléfono es obligatorio."),
-    address: z.string().min(1, "La dirección es obligatoria."),
+    name: z.string().min(1, "El nombre de la referencia familiar es obligatorio.").or(z.literal('')),
+    phone: z.string().min(1, "El teléfono es obligatorio.").or(z.literal('')),
+    address: z.string().min(1, "La dirección es obligatoria.").or(z.literal('')),
   }),
   personal: z.object({
-    name: z.string().min(1, "El nombre de la referencia personal es obligatorio."),
-    phone: z.string().min(1, "El teléfono es obligatorio."),
-    address: z.string().min(1, "La dirección es obligatoria."),
+    name: z.string().min(1, "El nombre de la referencia personal es obligatorio.").or(z.literal('')),
+    phone: z.string().min(1, "El teléfono es obligatorio.").or(z.literal('')),
+    address: z.string().min(1, "La dirección es obligatoria.").or(z.literal('')),
   })
 });
 
@@ -88,18 +88,39 @@ export const ClientCreditSchema = z.object({
   requiresReferences: z.boolean().default(false),
   references: ReferencesSchema.optional(),
 })
-.refine(data => !data.requiresGuarantor || (data.guarantor && data.guarantor.name.length > 0 && data.guarantor.idNumber.length > 0 && data.guarantor.address.length > 0 && data.guarantor.phone.length > 0), {
+.refine(data => {
+    if (data.requiresGuarantor) {
+        return (
+            data.guarantor && 
+            data.guarantor.name && data.guarantor.name.length > 0 &&
+            data.guarantor.idNumber && data.guarantor.idNumber.length > 0 &&
+            data.guarantor.address && data.guarantor.address.length > 0 &&
+            data.guarantor.phone && data.guarantor.phone.length > 0
+        );
+    }
+    return true;
+}, {
     message: "Todos los campos del fiador son requeridos cuando la opción está activada.",
-    path: ['guarantor']
+    path: ['guarantor.name'] // Path to a specific field to show the error
 })
-.refine(data => !data.requiresReferences || (
-    data.references && 
-    data.references.familiar.name.length > 0 && data.references.familiar.phone.length > 0 && data.references.familiar.address.length > 0 &&
-    data.references.personal.name.length > 0 && data.references.personal.phone.length > 0 && data.references.personal.address.length > 0
-), {
+.refine(data => {
+    if (data.requiresReferences) {
+        return (
+            data.references &&
+            data.references.familiar.name && data.references.familiar.name.length > 0 &&
+            data.references.familiar.phone && data.references.familiar.phone.length > 0 &&
+            data.references.familiar.address && data.references.familiar.address.length > 0 &&
+            data.references.personal.name && data.references.personal.name.length > 0 &&
+            data.references.personal.phone && data.references.personal.phone.length > 0 &&
+            data.references.personal.address && data.references.personal.address.length > 0
+        );
+    }
+    return true;
+}, {
     message: "Todos los campos de ambas referencias son requeridos cuando la opción está activada.",
-    path: ['references']
+    path: ['references.familiar.name'] // Path to a specific field to show the error
 });
+
 
 
 export const EditCobradorSchema = z.object({
