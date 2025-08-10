@@ -61,14 +61,6 @@ const formatCurrency = (value: number) => {
     return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 };
 
-const formatCurrencyForInput = (value: string): string => {
-    if (!value) return "";
-    const numberValue = parseInt(value.replace(/\D/g, ''), 10);
-    if (isNaN(numberValue)) return "";
-    return new Intl.NumberFormat('es-CO').format(numberValue);
-};
-
-
 const formatDateGroup = (dateStr: string) => {    
     const date = parseISO(dateStr);
     const timeZone = 'America/Bogota';
@@ -91,10 +83,6 @@ export default function RutaDePagoPage() {
     const [loading, setLoading] = useState(true);
     const [selectedCredit, setSelectedCredit] = useState<PaymentRouteEntry | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isAgreementModalOpen, setIsAgreementModalOpen] = useState(false);
-    const [agreementStep, setAgreementStep] = useState(1);
-    const [agreementAmount, setAgreementAmount] = useState("");
-    const [selectedDates, setSelectedDates] = useState<Date[]>([]);
     const [isRenewModalOpen, setIsRenewModalOpen] = useState(false);
     const [isRefinanceModalOpen, setIsRefinanceModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -175,56 +163,6 @@ export default function RutaDePagoPage() {
         }
         setIsSubmitting(false);
     };
-    
-    const openAgreementModal = () => {
-        setIsModalOpen(false);
-        setAgreementStep(1);
-        setAgreementAmount("");
-        setSelectedDates([]);
-        setIsAgreementModalOpen(true);
-    }
-    
-    const handleDateSelect = (dates: Date[] | undefined) => {
-        if (!dates || !selectedCredit) return;
-        const remainingInstallments = selectedCredit.cuotas - selectedCredit.paidInstallments;
-        if (dates.length > remainingInstallments) {
-            toast({
-                title: "Límite de fechas alcanzado",
-                description: `Puedes seleccionar un máximo de ${remainingInstallments} fechas nuevas.`,
-                variant: "destructive"
-            });
-            return;
-        }
-        setSelectedDates(dates.sort((a,b) => a.getTime() - b.getTime()));
-    }
-    
-    const confirmAgreement = async () => {
-        if (!selectedCredit) return;
-        
-        const remainingInstallments = selectedCredit.cuotas - selectedCredit.paidInstallments;
-        if (selectedDates.length > 0 && selectedDates.length !== remainingInstallments) {
-            toast({ title: "Revisa las fechas", description: `Debes seleccionar exactamente ${remainingInstallments} nuevas fechas para las cuotas restantes.`, variant: "destructive" });
-            return;
-        }
-        
-        setIsSubmitting(true);
-        const amount = parseFloat(agreementAmount.replace(/\D/g, '')) || 0;
-        const result = await registerPaymentAgreement(
-            selectedCredit.id,
-            amount,
-            selectedDates.length > 0 ? selectedDates.map(d => d.toISOString()) : undefined
-        );
-
-        if (result.success) {
-            toast({ title: "Acuerdo Registrado", description: result.success, className: "bg-accent text-accent-foreground border-accent" });
-            setIsAgreementModalOpen(false);
-            fetchRoute();
-        } else {
-            toast({ title: "Error", description: result.error, variant: "destructive" });
-        }
-        setIsSubmitting(false);
-    }
-
 
     const getPaymentAmount = () => {
         if (!selectedCredit) return 0;
@@ -416,88 +354,17 @@ export default function RutaDePagoPage() {
                     </DialogFooter>
                       <Separator />
                       <div className="grid grid-cols-2 gap-2 pt-2">
+                         <Button variant="destructive-outline" onClick={handleRefinanceClick} disabled={isSubmitting || !selectedCredit}>
+                            <Repeat className="mr-2 h-4 w-4" />
+                            Refinanciar Deuda
+                         </Button>
                         <Button variant="secondary" className="bg-amber-400 hover:bg-amber-500 text-amber-900" onClick={handleRenewClick} disabled={isSubmitting || !canRenewCredit(selectedCredit)}>
                             <Star className="mr-2 h-4 w-4" />
                             Renovar
                         </Button>
-                         <Button variant="secondary" onClick={openAgreementModal} disabled={isSubmitting}>
-                            <Handshake className="mr-2 h-4 w-4" />
-                            Realizar Acuerdo
-                        </Button>
                       </div>
                 </DialogContent>
             </Dialog>
-
-            {/* Agreement Modal */}
-            <Dialog open={isAgreementModalOpen} onOpenChange={setIsAgreementModalOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Acuerdo de Pago</DialogTitle>
-                        <DialogDescription>
-                             {agreementStep === 1 ? 'Registra un abono y/o reprograma los pagos.' : 'Selecciona las nuevas fechas de pago.'}
-                        </DialogDescription>
-                    </DialogHeader>
-                    {agreementStep === 1 && (
-                        <div className="py-4 space-y-4">
-                            <Label htmlFor="agreement-amount">Abono al Saldo (Opcional)</Label>
-                            <Input
-                                id="agreement-amount"
-                                value={agreementAmount}
-                                onChange={(e) => setAgreementAmount(formatCurrencyForInput(e.target.value))}
-                                placeholder="0"
-                            />
-                            <p className="text-sm text-muted-foreground">
-                                Si necesitas reprogramar las fechas de las cuotas restantes, haz clic en Siguiente. Si solo quieres registrar el abono, haz clic en Confirmar.
-                            </p>
-                        </div>
-                    )}
-                    {agreementStep === 2 && selectedCredit && (
-                        <div className="py-4 space-y-4">
-                            <div className="rounded-md border flex justify-center">
-                                <Calendar
-                                    mode="multiple"
-                                    selected={selectedDates}
-                                    onSelect={handleDateSelect}
-                                    fromDate={new Date()}
-                                    disabled={(date) => date < startOfDay(new Date())}
-                                    locale={es}
-                                    footer={
-                                        <p className="text-sm text-muted-foreground p-3">
-                                            Selecciona {selectedCredit.cuotas - selectedCredit.paidInstallments} fechas para las cuotas restantes.
-                                        </p>
-                                    }
-                                />
-                            </div>
-                        </div>
-                    )}
-                    <DialogFooter>
-                        {agreementStep === 1 && (
-                            <>
-                                <Button variant="outline" onClick={() => setIsAgreementModalOpen(false)} disabled={isSubmitting}>Cancelar</Button>
-                                <Button onClick={confirmAgreement} disabled={isSubmitting}>
-                                    {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle2 className="mr-2 h-4 w-4"/>}
-                                    Confirmar Abono
-                                </Button>
-                                <Button onClick={() => setAgreementStep(2)} disabled={isSubmitting}>
-                                    Reprogramar Fechas <ArrowLeft className="h-4 w-4 ml-2 rotate-180"/>
-                                </Button>
-                            </>
-                        )}
-                         {agreementStep === 2 && (
-                            <>
-                                <Button variant="outline" onClick={() => setAgreementStep(1)} disabled={isSubmitting}>
-                                    <ArrowLeft className="h-4 w-4 mr-2"/> Volver
-                                </Button>
-                                <Button onClick={confirmAgreement} disabled={isSubmitting}>
-                                    {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle2 className="mr-2 h-4 w-4"/>}
-                                    Confirmar Acuerdo
-                                </Button>
-                            </>
-                        )}
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
 
             {/* Renew Credit Modal */}
             <Dialog open={isRenewModalOpen} onOpenChange={setIsRenewModalOpen}>

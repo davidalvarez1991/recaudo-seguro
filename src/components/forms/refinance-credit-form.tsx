@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, DollarSign, Save, CheckCircle2, BadgeInfo, ShieldCheck, Repeat } from "lucide-react";
+import { Loader2, Save, CheckCircle2, BadgeInfo, ShieldCheck, Repeat } from "lucide-react";
 import { RefinanceCreditSchema } from "@/lib/schemas";
 import { refinanceCredit, savePaymentSchedule, getContractForAcceptance, acceptContract } from "@/lib/actions";
 import { useRouter } from "next/navigation";
