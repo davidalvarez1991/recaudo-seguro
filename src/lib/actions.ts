@@ -879,7 +879,8 @@ export async function registerCobrador(values: z.infer<typeof CobradorRegisterSc
         return { error: "Tu cuenta de proveedor está inactiva. No puedes registrar cobradores." };
     }
 
-    if (await findUserByIdNumber(values.idNumber)) {
+    const existingUser = await findUserByIdNumber(values.idNumber);
+    if (existingUser) {
         return { error: "El número de identificación ya está en uso." };
     }
     
@@ -1555,7 +1556,7 @@ type ContractGenParams = {
 }
 export async function getContractForAcceptance(params: ContractGenParams | string) {
     const { user } = await getAuthenticatedUser();
-    if (!user || !user.providerId) return { error: "No se pudo identificar al proveedor." };
+    if (!user || !user.providerId) return { error: "No se pudo identificar al proveedor.", contractText: null };
     
     const providerSnap = await getDoc(doc(db, "users", user.providerId));
     if (!providerSnap.exists()) return { error: "Proveedor no encontrado", contractText: null };
