@@ -311,58 +311,66 @@ export default function RutaDePagoPage() {
                     </DialogHeader>
                     {selectedCredit && (
                         <div className="py-4 space-y-4">
-                           <RadioGroup value={paymentType} onValueChange={(value: any) => setPaymentType(value)} className="gap-3 pt-4">
-                                <Label htmlFor="payment-cuota" className="flex items-start gap-4 rounded-md border p-4 cursor-pointer hover:bg-muted/50">
+                           <RadioGroup value={paymentType} onValueChange={(value: any) => setPaymentType(value)} className="gap-3 pt-2">
+                                <Label htmlFor="payment-cuota" className="flex items-start gap-4 rounded-md border p-4 cursor-pointer hover:bg-muted/50 has-[:checked]:border-primary has-[:checked]:bg-muted/50">
                                     <RadioGroupItem value="cuota" id="payment-cuota" className="mt-1" />
-                                    <div className="flex justify-between items-center w-full">
-                                        <div className="flex-1">
+                                    <div className="flex-1 grid grid-cols-[1fr_auto] items-center gap-x-4">
+                                        <div>
                                             <p className="font-semibold">Pagar Cuota</p>
                                             <p className="text-xs text-muted-foreground">Registra el pago de la cuota actual, incluyendo mora si aplica.</p>
                                         </div>
-                                        <p className="font-bold ml-4">{formatCurrency(selectedCredit.installmentAmount + selectedCredit.lateFee)}</p>
+                                        <p className="font-bold text-lg text-right">{formatCurrency(selectedCredit.installmentAmount + selectedCredit.lateFee)}</p>
                                     </div>
                                 </Label>
-                                <Label htmlFor="payment-comision" className="flex items-start gap-4 rounded-md border p-4 cursor-pointer hover:bg-muted/50">
+                                <Label htmlFor="payment-comision" className="flex items-start gap-4 rounded-md border p-4 cursor-pointer hover:bg-muted/50 has-[:checked]:border-primary has-[:checked]:bg-muted/50">
                                     <RadioGroupItem value="comision" id="payment-comision" className="mt-1" />
-                                    <div className="flex justify-between items-center w-full">
-                                        <div className="flex-1">
+                                     <div className="flex-1 grid grid-cols-[1fr_auto] items-center gap-x-4">
+                                        <div>
                                             <p className="font-semibold flex items-center gap-1.5"><Percent className="h-4 w-4" /> Pagar Comisión Total</p>
                                             <p className="text-xs text-muted-foreground">Cubre el valor total de la comisión del crédito.</p>
                                         </div>
-                                        <p className="font-bold ml-4">{formatCurrency(selectedCredit.commission)}</p>
+                                        <p className="font-bold text-lg text-right">{formatCurrency(selectedCredit.commission)}</p>
                                     </div>
                                 </Label>
-                                <Label htmlFor="payment-total" className="flex items-start gap-4 rounded-md border p-4 cursor-pointer hover:bg-muted/50">
+                                <Label htmlFor="payment-total" className="flex items-start gap-4 rounded-md border p-4 cursor-pointer hover:bg-muted/50 has-[:checked]:border-primary has-[:checked]:bg-muted/50">
                                     <RadioGroupItem value="total" id="payment-total" className="mt-1" />
-                                    <div className="flex justify-between items-center w-full">
-                                        <div className="flex-1">
+                                     <div className="flex-1 grid grid-cols-[1fr_auto] items-center gap-x-4">
+                                        <div>
                                             <p className="font-semibold">Pagar Saldo Total</p>
                                             <p className="text-xs text-muted-foreground">Liquida completamente la deuda pendiente del cliente.</p>
                                         </div>
-                                        <p className="font-bold ml-4">{formatCurrency(selectedCredit.totalDebt)}</p>
+                                        <p className="font-bold text-lg text-right">{formatCurrency(selectedCredit.totalDebt)}</p>
                                     </div>
                                 </Label>
                             </RadioGroup>
+                            
+                            <Separator className="my-4"/>
+
+                            <div className="space-y-3">
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancelar</Button>
+                                    <Button variant="destructive" onClick={handleMissedPayment} disabled={isSubmitting || !hasInterestOption}><XCircle className="mr-2 h-4 w-4" />No pagó</Button>
+                                </div>
+                                <Button onClick={handleRegisterPayment} disabled={isSubmitting} className="w-full"><HandCoins className="mr-2 h-4 w-4" />{isSubmitting ? 'Registrando...' : 'Confirmar Pago'}</Button>
+                            </div>
+                            
+                            <Separator className="my-4"/>
+
+                            <div>
+                                <h4 className="text-sm font-semibold text-center text-muted-foreground mb-3">Otras Acciones de Crédito</h4>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Button variant="destructive-outline" onClick={handleRefinanceClick} disabled={isSubmitting || !selectedCredit}>
+                                        <Repeat className="mr-2 h-4 w-4" />
+                                        Refinanciar
+                                    </Button>
+                                    <Button variant="secondary" className="bg-amber-400 hover:bg-amber-500 text-amber-900" onClick={handleRenewClick} disabled={isSubmitting || !canRenewCredit(selectedCredit)}>
+                                        <Star className="mr-2 h-4 w-4" />
+                                        Renovar
+                                    </Button>
+                                </div>
+                            </div>
                         </div>
                     )}
-                    <DialogFooter className="flex-col sm:flex-row sm:justify-between gap-2 pt-4">
-                        <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancelar</Button>
-                        <div className="flex flex-col-reverse sm:flex-row gap-2">
-                            <Button variant="destructive" onClick={handleMissedPayment} disabled={isSubmitting || !hasInterestOption}><XCircle className="mr-2 h-4 w-4" />No pagó</Button>
-                            <Button onClick={handleRegisterPayment} disabled={isSubmitting}><HandCoins className="mr-2 h-4 w-4" />{isSubmitting ? 'Registrando...' : 'Confirmar Pago'}</Button>
-                        </div>
-                    </DialogFooter>
-                      <Separator />
-                      <div className="grid grid-cols-2 gap-2 pt-2">
-                         <Button variant="destructive-outline" onClick={handleRefinanceClick} disabled={isSubmitting || !selectedCredit}>
-                            <Repeat className="mr-2 h-4 w-4" />
-                            Refinanciar Deuda
-                         </Button>
-                        <Button variant="secondary" className="bg-amber-400 hover:bg-amber-500 text-amber-900" onClick={handleRenewClick} disabled={isSubmitting || !canRenewCredit(selectedCredit)}>
-                            <Star className="mr-2 h-4 w-4" />
-                            Renovar
-                        </Button>
-                      </div>
                 </DialogContent>
             </Dialog>
 
