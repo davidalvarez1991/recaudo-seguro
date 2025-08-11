@@ -54,7 +54,7 @@ const calculateCommissionAndLateRate = (
     amount: number, 
     tiers: CommissionTier[],
     isMonthly: boolean,
-    months: number,
+    installments: number,
 ): { commission: number; percentage: number, lateRate: number } => {
     if (!tiers || tiers.length === 0) {
         return { commission: amount * 0.20, percentage: 20, lateRate: 2 };
@@ -65,10 +65,12 @@ const calculateCommissionAndLateRate = (
     const percentage = applicableTier?.percentage || 20;
     const lateRate = applicableTier?.lateInterestRate || 0;
     
-    const durationMonths = isMonthly ? Math.max(1, months) : 1;
+    // For the simulator, approximate months based on 30 days per installment.
+    const durationMonths = isMonthly ? Math.ceil(installments / 30) : 1;
+    const finalMonths = Math.max(1, durationMonths);
 
     return { 
-        commission: amount * (percentage / 100) * durationMonths,
+        commission: amount * (percentage / 100) * finalMonths,
         percentage: percentage,
         lateRate: lateRate
     };
@@ -116,10 +118,7 @@ export function CreditSimulator({ commissionTiers, isLateInterestActive }: Credi
       return;
     }
 
-    // A simple approximation for months based on daily installments for simulation purposes
-    const months = Math.ceil(installments / 30);
-
-    const { commission: commissionAmount, percentage: appliedCommission, lateRate: appliedLateRate } = calculateCommissionAndLateRate(amount, providerSettings.tiers, providerSettings.isMonthly, months);
+    const { commission: commissionAmount, percentage: appliedCommission, lateRate: appliedLateRate } = calculateCommissionAndLateRate(amount, providerSettings.tiers, providerSettings.isMonthly, installments);
     const baseTotal = amount + commissionAmount;
     
     let lateFee = 0;
@@ -255,3 +254,5 @@ export function CreditSimulator({ commissionTiers, isLateInterestActive }: Credi
     </Card>
   );
 }
+
+    

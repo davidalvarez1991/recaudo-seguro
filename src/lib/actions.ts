@@ -68,13 +68,17 @@ const calculateCommission = (
     const percentage = applicableTier?.percentage || sortedTiers[0]?.percentage || 20;
     
     let months = 1;
-    if (isMonthly && paymentDates && paymentDates.length > 0) {
+    if (isMonthly && paymentDates && paymentDates.length > 1) {
         const sortedDates = [...paymentDates].sort((a, b) => a.getTime() - b.getTime());
         const firstDate = sortedDates[0];
         const lastDate = sortedDates[sortedDates.length - 1];
-        // Calculate the number of full months spanned by the payment schedule.
-        // Add 1 to count the initial month.
-        months = differenceInMonths(lastDate, firstDate) + 1;
+        
+        // Calculate the duration in days and then find the number of 30-day "calendar months".
+        // Add 1 to include the start day in the calculation.
+        const durationInDays = differenceInDays(lastDate, firstDate) + 1;
+        
+        // Divide by 30 and round up to the nearest whole number to get the number of months.
+        months = Math.ceil(durationInDays / 30);
         months = Math.max(1, months); // Ensure at least one month is counted
     }
     
@@ -2248,3 +2252,5 @@ export async function getProviderCommissionTiers(): Promise<{tiers: CommissionTi
 
     return { tiers, isMonthly };
 }
+
+    
