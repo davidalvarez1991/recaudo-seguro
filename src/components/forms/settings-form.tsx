@@ -79,7 +79,7 @@ const formatCurrencyForInput = (value: number | string | undefined): string => {
 export function SettingsForm({ providerId }: SettingsFormProps) {
   const [baseCapital, setBaseCapital] = useState("");
   const [collectedCommission, setCollectedCommission] = useState(0);
-  const [commissionTiers, setCommissionTiers] = useState<CommissionTier[]>([]);
+  const [commissionTiers, setCommissionTiers] = useState<CommissionTier[] | null>(null);
   const [lateInterestRate, setLateInterestRate] = useState("2");
   const [isLateInterestActive, setIsLateInterestActive] = useState(false);
   const [isContractGenerationActive, setIsContractGenerationActive] = useState(false);
@@ -128,10 +128,11 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
 
   useEffect(() => {
     fetchProviderData();
-  }, [providerId, toast]);
+  }, [providerId]);
   
 
   const handleCommissionTierChange = (index: number, field: keyof CommissionTier, value: string) => {
+    if (!commissionTiers) return;
     const numericValue = parseInt(value.replace(/\D/g, ''), 10);
     
     const newTiers = [...commissionTiers];
@@ -140,6 +141,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
   };
 
   const addCommissionTier = () => {
+    if (!commissionTiers) return;
     if (commissionTiers.length < 4) {
       setCommissionTiers([...commissionTiers, { minAmount: undefined, maxAmount: undefined, percentage: undefined }]);
     } else {
@@ -148,6 +150,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
   };
 
   const removeCommissionTier = (index: number) => {
+    if (!commissionTiers) return;
     if (commissionTiers.length > 1) {
         const newTiers = commissionTiers.filter((_, i) => i !== index);
         setCommissionTiers(newTiers);
@@ -157,6 +160,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
   };
   
   const handleSaveAllSettings = async () => {
+    if (!commissionTiers) return;
     setIsSaving(true);
     try {
         const rate = parseFloat(lateInterestRate);
@@ -324,67 +328,75 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {commissionTiers.map((tier, index) => (
-            <div key={index} className="flex flex-col md:flex-row items-center gap-2 border p-4 rounded-lg relative">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1 w-full">
-                <div className="space-y-2">
-                  <Label htmlFor={`min-amount-${index}`}>Monto Mínimo</Label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id={`min-amount-${index}`}
-                      value={formatCurrencyForInput(tier.minAmount)}
-                      onChange={(e) => handleCommissionTierChange(index, 'minAmount', e.target.value)}
-                      className="pl-8"
-                      placeholder="0"
-                    />
+          {!commissionTiers ? (
+             <div className="flex items-center justify-center h-24">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+             </div>
+          ) : (
+            <>
+                {commissionTiers.map((tier, index) => (
+                <div key={index} className="flex flex-col md:flex-row items-center gap-2 border p-4 rounded-lg relative">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1 w-full">
+                    <div className="space-y-2">
+                      <Label htmlFor={`min-amount-${index}`}>Monto Mínimo</Label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id={`min-amount-${index}`}
+                          value={formatCurrencyForInput(tier.minAmount)}
+                          onChange={(e) => handleCommissionTierChange(index, 'minAmount', e.target.value)}
+                          className="pl-8"
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`max-amount-${index}`}>Monto Máximo</Label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id={`max-amount-${index}`}
+                          value={formatCurrencyForInput(tier.maxAmount)}
+                          onChange={(e) => handleCommissionTierChange(index, 'maxAmount', e.target.value)}
+                          className="pl-8"
+                          placeholder="500.000"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`percentage-${index}`}>Porcentaje</Label>
+                      <div className="relative">
+                        <Input
+                          id={`percentage-${index}`}
+                          type="number"
+                          value={tier.percentage === undefined ? "" : tier.percentage}
+                          onChange={(e) => handleCommissionTierChange(index, 'percentage', e.target.value)}
+                          className="pr-8"
+                          placeholder="20"
+                        />
+                        <Percent className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </div>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeCommissionTier(index)}
+                    className="text-destructive hover:bg-destructive/10 absolute -top-3 -right-3 sm:relative sm:top-auto sm:right-auto"
+                    disabled={commissionTiers.length <= 1}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor={`max-amount-${index}`}>Monto Máximo</Label>
-                  <div className="relative">
-                     <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id={`max-amount-${index}`}
-                      value={formatCurrencyForInput(tier.maxAmount)}
-                      onChange={(e) => handleCommissionTierChange(index, 'maxAmount', e.target.value)}
-                      className="pl-8"
-                      placeholder="500.000"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor={`percentage-${index}`}>Porcentaje</Label>
-                  <div className="relative">
-                    <Input
-                      id={`percentage-${index}`}
-                      type="number"
-                      value={tier.percentage === undefined ? "" : tier.percentage}
-                      onChange={(e) => handleCommissionTierChange(index, 'percentage', e.target.value)}
-                      className="pr-8"
-                      placeholder="20"
-                    />
-                    <Percent className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  </div>
-                </div>
+              ))}
+              <div className="flex flex-col sm:flex-row gap-2 pt-4">
+                <Button onClick={addCommissionTier} variant="outline" className="w-full sm:w-auto" disabled={commissionTiers.length >= 4}>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Añadir Tramo
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => removeCommissionTier(index)}
-                className="text-destructive hover:bg-destructive/10 absolute -top-3 -right-3 sm:relative sm:top-auto sm:right-auto"
-                disabled={commissionTiers.length <= 1}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
-          <div className="flex flex-col sm:flex-row gap-2 pt-4">
-            <Button onClick={addCommissionTier} variant="outline" className="w-full sm:w-auto" disabled={commissionTiers.length >= 4}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Añadir Tramo
-            </Button>
-          </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
