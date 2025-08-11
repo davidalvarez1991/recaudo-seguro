@@ -52,14 +52,15 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [month, setMonth] = useState(new Date());
   const [contractText, setContractText] = useState<string | null>(null);
-  const [commissionTiers, setCommissionTiers] = useState<CommissionTier[]>([]);
+  const [providerSettings, setProviderSettings] = useState<{ tiers: CommissionTier[], isMonthly: boolean }>({ tiers: [], isMonthly: false });
+
 
   const { toast } = useToast();
 
   useEffect(() => {
     const fetchTiers = async () => {
-        const tiers = await getProviderCommissionTiers();
-        setCommissionTiers(tiers);
+        const { tiers, isMonthly } = await getProviderCommissionTiers();
+        setProviderSettings({ tiers, isMonthly });
     };
     fetchTiers();
   }, []);
@@ -189,7 +190,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
         try {
             const fullName = [currentFormData.firstName, currentFormData.secondName, currentFormData.firstLastName, currentFormData.secondLastName].filter(Boolean).join(" ");
             const creditValue = parseFloat(currentFormData.creditAmount?.replace(/\./g, '') || '0');
-            const { commission, percentage } = calculateCommission(creditValue, commissionTiers);
+            const { commission, percentage } = calculateCommission(creditValue, providerSettings.tiers);
 
             const contractDataResponse = await getContractForAcceptance({
                 creditData: {

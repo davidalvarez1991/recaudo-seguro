@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
 import { db } from "./firebase";
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc, increment, orderBy, limit } from "firebase/firestore";
-import { startOfDay, differenceInDays, endOfDay, isWithinInterval, addDays, parseISO, isFuture, isToday, isSameDay, format } from 'date-fns';
+import { startOfDay, differenceInDays, endOfDay, isWithinInterval, addDays, parseISO, isFuture, isToday, isSameDay, format, differenceInMonths, max } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { analyzeClientReputation, ClientReputationInput } from '@/ai/flows/analyze-client-reputation';
 import { getFinancialAdvice, FinancialAdviceInput } from '@/ai/flows/get-financial-advice';
@@ -51,24 +51,35 @@ export const findUserByIdNumber = async (idNumber: string) => {
     return serializableData;
 };
 
-const calculateCommission = (amount: number, tiers: CommissionTier[] | undefined): { commission: number; percentage: number } => {
+const calculateCommission = (
+    amount: number, 
+    providerSettings: { commissionTiers?: CommissionTier[], isMonthlyInterest?: boolean },
+    paymentDates?: Date[]
+): { commission: number; percentage: number } => {
+    const tiers = providerSettings.commissionTiers;
+    const isMonthly = providerSettings.isMonthlyInterest;
+
     if (!tiers || tiers.length === 0) {
-        // Fallback to a default 20% if no tiers are set
         return { commission: amount * 0.20, percentage: 20 };
     }
     
-    // Sort tiers by minAmount to ensure correct matching
     const sortedTiers = [...tiers].sort((a, b) => (a.minAmount || 0) - (b.minAmount || 0));
-    
     const applicableTier = sortedTiers.find(tier => amount >= (tier.minAmount || 0) && amount <= (tier.maxAmount || Infinity));
-
-    if (applicableTier && applicableTier.percentage) {
-        return { commission: amount * (applicableTier.percentage / 100), percentage: applicableTier.percentage };
+    const percentage = applicableTier?.percentage || sortedTiers[0]?.percentage || 20;
+    
+    let months = 1;
+    if (isMonthly && paymentDates && paymentDates.length > 0) {
+        const sortedDates = [...paymentDates].sort((a, b) => a.getTime() - b.getTime());
+        const firstDate = sortedDates[0];
+        const lastDate = sortedDates[sortedDates.length - 1];
+        // Calculate the number of full months spanned by the payment schedule.
+        // Add 1 to count the initial month.
+        months = differenceInMonths(lastDate, firstDate) + 1;
+        months = Math.max(1, months); // Ensure at least one month is counted
     }
-
-    // If no tier matches (e.g., gaps in ranges), fallback to the first tier's percentage or a default
-    const fallbackPercentage = sortedTiers[0]?.percentage || 20;
-    return { commission: amount * (fallbackPercentage / 100), percentage: fallbackPercentage };
+    
+    const commission = amount * (percentage / 100) * months;
+    return { commission, percentage };
 };
 
 const getPaymentFrequencyString = (dates: Date[]): string => {
@@ -1142,7 +1153,7 @@ export async function createClientCreditAndContract(data: { clientData: z.infer<
 
     // 2. Create credit
     const valor = parseFloat(creditAmount.replace(/\./g, ''));
-    const { commission, percentage } = calculateCommission(valor, provider.commissionTiers);
+    const { commission, percentage } = calculateCommission(valor, provider, paymentDates.map(d => new Date(d)));
     const creditRef = doc(collection(db, "credits"));
     const creditDataObject = {
         valor,
@@ -1205,7 +1216,10 @@ export async function createNewCreditForClient(values: z.infer<typeof NewCreditS
     }
 
     const valor = parseFloat(creditAmount.replace(/\./g, '').replace(',', '.'));
-    const { commission, percentage } = calculateCommission(valor, provider.commissionTiers);
+    
+    // We cannot calculate monthly commission here because we don't have the dates yet.
+    // The commission will be calculated and updated when the schedule is saved.
+    const { commission, percentage } = calculateCommission(valor, provider);
 
     const creditDataForContract = {
         valor,
@@ -1265,7 +1279,8 @@ export async function renewCredit(values: z.infer<typeof RenewCreditSchema>) {
     const additionalValue = parseFloat(additionalAmount.replace(/\./g, '').replace(',', '.'));
     const newTotalValue = additionalValue + remainingBalance;
 
-    const { commission, percentage } = calculateCommission(newTotalValue, provider.commissionTiers);
+    // Commission will be calculated later when dates are known
+    const { commission, percentage } = calculateCommission(newTotalValue, provider);
     
     const creditDataForContract = {
         valor: newTotalValue,
@@ -1338,7 +1353,8 @@ export async function refinanceCredit(values: z.infer<typeof RefinanceCreditSche
     const lateFee = calculateLateFee(oldCreditData, provider);
     const totalDebt = remainingBalance + lateFee;
 
-    const { commission, percentage } = calculateCommission(totalDebt, provider.commissionTiers);
+    // Commission will be calculated later when dates are known
+    const { commission, percentage } = calculateCommission(totalDebt, provider);
     
     const creditDataForContract = {
         valor: totalDebt,
@@ -1388,19 +1404,29 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
             return { error: "Crédito no encontrado." };
         }
         const creditData = creditSnap.data();
-
+        
+        const providerSnap = await getDoc(doc(db, "users", creditData.providerId));
+        const provider = providerSnap.data() || {};
+        
         const dateObjects = paymentDates.map(dateStr => new Date(dateStr));
+        
+        // Recalculate commission based on dates if monthly interest is active
+        const { commission } = calculateCommission(creditData.valor, provider, dateObjects);
+
         const timestampDates = dateObjects.map(d => Timestamp.fromDate(d));
         
         await updateDoc(creditRef, {
             paymentDates: timestampDates,
             paymentScheduleSet: true,
+            commission, // Update the commission
             updatedAt: Timestamp.now(),
         });
         
         const clienteData = await findUserByIdNumber(creditData.clienteId);
         if (clienteData) {
-            const contractText = await generateContractText(creditData.providerId, creditData, clienteData, dateObjects);
+            // Pass the newly calculated commission to the contract
+            const creditDataForContract = { ...creditData, commission, cuotas: creditData.cuotas, valor: creditData.valor };
+            const contractText = await generateContractText(creditData.providerId, creditDataForContract, clienteData, dateObjects);
             if (contractText) {
                 const contractRef = doc(collection(db, "contracts"));
                  await setDoc(contractRef, {
@@ -1539,7 +1565,7 @@ export async function registerPaymentAgreement(creditId: string, amount: number,
     return { success: "Acuerdo registrado. El calendario de pagos ha sido actualizado." };
 }
 
-export async function saveProviderSettings(providerId: string, settings: { baseCapital?: number, commissionTiers?: CommissionTier[], isLateInterestActive?: boolean, isContractGenerationActive?: boolean, contractTemplate?: string }) {
+export async function saveProviderSettings(providerId: string, settings: { baseCapital?: number, commissionTiers?: CommissionTier[], isLateInterestActive?: boolean, isContractGenerationActive?: boolean, contractTemplate?: string, isMonthlyInterest?: boolean }) {
   if (!providerId) return { error: "ID de proveedor no válido." };
   
   const providerRef = doc(db, "users", providerId);
@@ -1558,6 +1584,9 @@ export async function saveProviderSettings(providerId: string, settings: { baseC
       }
       if (settings.isLateInterestActive !== undefined) {
         updateData.isLateInterestActive = settings.isLateInterestActive;
+      }
+      if (settings.isMonthlyInterest !== undefined) {
+          updateData.isMonthlyInterest = settings.isMonthlyInterest;
       }
       if (settings.isContractGenerationActive !== undefined) {
         updateData.isContractGenerationActive = settings.isContractGenerationActive;
@@ -2202,17 +2231,20 @@ export async function getFinancialAdviceForProvider() {
     }
 }
 
-export async function getProviderCommissionTiers(): Promise<CommissionTier[]> {
+export async function getProviderCommissionTiers(): Promise<{tiers: CommissionTier[], isMonthly: boolean}> {
     const { user } = await getAuthenticatedUser();
-    if (!user) return [];
+    if (!user) return { tiers: [], isMonthly: false };
     
     const providerId = user.role === 'proveedor' ? user.id : user.providerId;
-    if (!providerId) return [];
+    if (!providerId) return { tiers: [], isMonthly: false };
     
     const provider = await getUserData(providerId);
-    if (!provider || !provider.commissionTiers) {
-        return [{ minAmount: 0, maxAmount: 50000000, percentage: 20, lateInterestRate: 2 }]; // Default
+    if (!provider) {
+        return { tiers: [], isMonthly: false };
     }
-    return provider.commissionTiers;
-}
+    
+    const tiers = provider.commissionTiers || [{ minAmount: 0, maxAmount: 50000000, percentage: 20, lateInterestRate: 2 }];
+    const isMonthly = provider.isMonthlyInterest || false;
 
+    return { tiers, isMonthly };
+}

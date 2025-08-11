@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,9 @@ import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
+import { getProviderCommissionTiers } from '@/lib/actions';
+import { differenceInMonths, addMonths } from 'date-fns';
+
 
 const simulatorSchema = z.object({
   amount: z.string().min(1, 'El valor es requerido.'),
@@ -47,29 +50,42 @@ const formatCurrency = (value: number) => {
     return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 };
 
-const calculateCommissionAndLateRate = (amount: number, tiers: CommissionTier[]): { commission: number; percentage: number, lateRate: number } => {
+const calculateCommissionAndLateRate = (
+    amount: number, 
+    tiers: CommissionTier[],
+    isMonthly: boolean,
+    months: number,
+): { commission: number; percentage: number, lateRate: number } => {
     if (!tiers || tiers.length === 0) {
         return { commission: amount * 0.20, percentage: 20, lateRate: 2 };
     }
     const sortedTiers = [...tiers].sort((a, b) => a.minAmount - b.minAmount);
     const applicableTier = sortedTiers.find(tier => amount >= tier.minAmount && amount <= tier.maxAmount);
 
-    if (applicableTier) {
-        return { 
-            commission: amount * ((applicableTier.percentage || 20) / 100), 
-            percentage: applicableTier.percentage || 20,
-            lateRate: applicableTier.lateInterestRate || 0
-        };
-    }
+    const percentage = applicableTier?.percentage || 20;
+    const lateRate = applicableTier?.lateInterestRate || 0;
     
-    const fallbackPercentage = sortedTiers[0]?.percentage || 20;
-    const fallbackLateRate = sortedTiers[0]?.lateInterestRate || 0;
-    return { commission: amount * (fallbackPercentage / 100), percentage: fallbackPercentage, lateRate: fallbackLateRate };
+    const durationMonths = isMonthly ? Math.max(1, months) : 1;
+
+    return { 
+        commission: amount * (percentage / 100) * durationMonths,
+        percentage: percentage,
+        lateRate: lateRate
+    };
 };
 
 
 export function CreditSimulator({ commissionTiers, isLateInterestActive }: CreditSimulatorProps) {
   const [result, setResult] = useState<SimulationResult | null>(null);
+  const [providerSettings, setProviderSettings] = useState<{ tiers: CommissionTier[], isMonthly: boolean }>({ tiers: [], isMonthly: false });
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+        const settings = await getProviderCommissionTiers();
+        setProviderSettings(settings);
+    };
+    fetchSettings();
+  }, []);
 
   const form = useForm<SimulatorFormValues>({
     resolver: zodResolver(simulatorSchema),
@@ -100,7 +116,10 @@ export function CreditSimulator({ commissionTiers, isLateInterestActive }: Credi
       return;
     }
 
-    const { commission: commissionAmount, percentage: appliedCommission, lateRate: appliedLateRate } = calculateCommissionAndLateRate(amount, commissionTiers);
+    // A simple approximation for months based on daily installments for simulation purposes
+    const months = Math.ceil(installments / 30);
+
+    const { commission: commissionAmount, percentage: appliedCommission, lateRate: appliedLateRate } = calculateCommissionAndLateRate(amount, providerSettings.tiers, providerSettings.isMonthly, months);
     const baseTotal = amount + commissionAmount;
     
     let lateFee = 0;
@@ -226,7 +245,7 @@ export function CreditSimulator({ commissionTiers, isLateInterestActive }: Credi
                 <div className="text-xs text-muted-foreground space-y-1 text-center border-t pt-2 mt-2">
                     <p>Desglose: {formatCurrency(result.baseAmount)} (Capital) + {formatCurrency(result.commissionAmount)} (Comisión) + {formatCurrency(result.lateFee)} (Mora)</p>
                     <p>
-                        Cálculo basado en una comisión del {result.appliedCommission}% y un interés de mora del {result.appliedLateRate}% diario.
+                        Cálculo basado en una comisión del {result.appliedCommission}%{providerSettings.isMonthly ? ' mensual' : ''} y un interés de mora del {result.appliedLateRate}% diario.
                     </p>
                 </div>
             </div>

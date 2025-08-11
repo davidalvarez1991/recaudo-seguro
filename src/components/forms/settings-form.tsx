@@ -82,6 +82,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
   const [collectedCommission, setCollectedCommission] = useState(0);
   const [commissionTiers, setCommissionTiers] = useState<CommissionTier[] | null>(null);
   const [isLateInterestActive, setIsLateInterestActive] = useState(false);
+  const [isMonthlyInterest, setIsMonthlyInterest] = useState(false);
   const [isContractGenerationActive, setIsContractGenerationActive] = useState(false);
   const [contractTemplate, setContractTemplate] = useState(defaultContractTemplate);
   const [isLoading, setIsLoading] = useState(true);
@@ -104,6 +105,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
         if (userData) {
           setBaseCapital(formatCurrencyForInput(userData.baseCapital || 0));
           setIsLateInterestActive(userData.isLateInterestActive || false);
+          setIsMonthlyInterest(userData.isMonthlyInterest || false);
           setIsContractGenerationActive(userData.isContractGenerationActive || false);
           setContractTemplate(userData.contractTemplate || defaultContractTemplate);
           
@@ -193,6 +195,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
             baseCapital: numericBaseCapital,
             commissionTiers: commissionTiers.map(tier => ({...tier, lateInterestRate: isLateInterestActive ? tier.lateInterestRate : 0 })),
             isLateInterestActive,
+            isMonthlyInterest,
             isContractGenerationActive,
             contractTemplate
         };
@@ -334,6 +337,19 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg border p-4 my-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="monthly-interest-switch" className="text-base font-semibold">Activar Interés Mensual</Label>
+                <p className="text-sm text-muted-foreground">
+                  Calcula la comisión por cada mes de duración del crédito.
+                </p>
+              </div>
+              <Switch
+                id="monthly-interest-switch"
+                checked={isMonthlyInterest}
+                onCheckedChange={setIsMonthlyInterest}
+              />
+            </div>
            <div className="flex items-center justify-between rounded-lg border p-4 my-4">
               <div className="space-y-0.5">
                 <Label htmlFor="late-interest-switch" className="text-base font-semibold">Activar Interés por Mora</Label>
