@@ -1,16 +1,16 @@
 {
-  "name": "Recaudo Seguro",
-  "short_name": "Recaudo Seguro",
-  "start_url": ".",
-  "display": "standalone",
-  "background_color": "#F0F4F7",
-  "description": "Gestión de recaudos segura y eficiente.",
-  "theme_color": "#2962FF",
-  "icons": [
-    {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml"
-    }
-  ]
+    "name": "Recaudo Seguro",
+    "short_name": "Recaudo Seguro",
+    "description": "Gestión de recaudos segura y eficiente.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#F0F4F7",
+    "theme_color": "#2962FF",
+    "icons": [
+        {
+            "src": "/icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml"
+        }
+    ]
 }
