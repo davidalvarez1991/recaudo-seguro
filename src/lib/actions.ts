@@ -22,6 +22,7 @@ type CommissionTier = {
   minAmount: number;
   maxAmount: number;
   percentage: number;
+  lateInterestRate?: number;
 };
 
 // --- Utility Functions ---
@@ -50,7 +51,7 @@ export const findUserByIdNumber = async (idNumber: string) => {
     return serializableData;
 };
 
-const calculateCommission = (amount: number, tiers: CommissionTier[] | undefined): { commission: number, percentage: number } => {
+const calculateCommission = (amount: number, tiers: CommissionTier[] | undefined): { commission: number; percentage: number } => {
     if (!tiers || tiers.length === 0) {
         // Fallback to a default 20% if no tiers are set
         return { commission: amount * 0.20, percentage: 20 };
@@ -246,17 +247,26 @@ export async function getCobradoresByProvider() {
     });
 }
 
-const calculateLateFee = (credit: any) => {
-    if (!credit.lateInterestRate || credit.lateInterestRate === 0) {
+const calculateLateFee = (credit: any, providerSettings: any) => {
+    if (!providerSettings.isLateInterestActive) {
         return 0;
     }
+
+    const tiers = providerSettings.commissionTiers || [];
+    const applicableTier = tiers.find((tier: CommissionTier) => credit.valor >= (tier.minAmount || 0) && credit.valor <= (tier.maxAmount || Infinity));
+
+    const lateInterestRate = applicableTier?.lateInterestRate || 0;
+
+    if (lateInterestRate === 0) {
+        return 0;
+    }
+
     const missedDays = credit.missedPaymentDays || 0;
     if (missedDays <= 0) {
         return 0;
     }
     
-    const dailyRate = credit.lateInterestRate / 100;
-    // Simple interest on the base loan amount for each missed day
+    const dailyRate = lateInterestRate / 100;
     const lateFee = credit.valor * dailyRate * missedDays;
     
     return lateFee;
@@ -301,11 +311,8 @@ const getFullCreditDetails = async (creditData: any, providersMap: Map<string, a
             paidInstallments = serializableCreditData.cuotas;
         }
 
-        const providerSettings = providersMap.get(serializableCreditData.providerId) || { isLateInterestActive: false, lateInterestRate: 0 };
-        const lateFee = calculateLateFee({
-            ...serializableCreditData,
-            lateInterestRate: providerSettings.isLateInterestActive ? (providerSettings.lateInterestRate || 0) : 0,
-        });
+        const providerSettings = providersMap.get(serializableCreditData.providerId) || { isLateInterestActive: false, commissionTiers: [] };
+        const lateFee = calculateLateFee(serializableCreditData, providerSettings);
         
         let endDate: string | undefined = undefined;
         if (serializableCreditData.paymentDates && serializableCreditData.paymentDates.length > 0) {
@@ -512,9 +519,7 @@ export async function getCreditsByCobrador() {
 
         serializableData.agreementAmount = creditPayments.filter(p => p.type === 'acuerdo').reduce((sum, p) => sum + p.amount, 0);
         
-        serializableData.lateInterestRate = providerSettings.isLateInterestActive ? (providerSettings.lateInterestRate || 0) : 0;
-
-        const lateFee = calculateLateFee(serializableData);
+        const lateFee = calculateLateFee(serializableData, providerSettings);
         serializableData.lateFee = lateFee;
         serializableData.totalDebt = remainingBalance + lateFee;
         
@@ -1330,8 +1335,7 @@ export async function refinanceCredit(values: z.infer<typeof RefinanceCreditSche
     const totalOldLoanAmount = (oldCreditData.valor || 0) + (oldCreditData.commission || 0);
     const remainingBalance = totalOldLoanAmount - paidCapitalAndCommission;
     
-    const lateInterestRate = provider.isLateInterestActive ? (provider.lateInterestRate || 0) : 0;
-    const lateFee = calculateLateFee({ ...oldCreditData, lateInterestRate });
+    const lateFee = calculateLateFee(oldCreditData, provider);
     const totalDebt = remainingBalance + lateFee;
 
     const { commission, percentage } = calculateCommission(totalDebt, provider.commissionTiers);
@@ -1462,9 +1466,8 @@ export async function registerPayment(creditId: string, amount: number, type: "c
             const providerDocRef = doc(db, "users", freshCreditData.providerId);
             const providerSnap = await getDoc(providerDocRef);
             const providerSettings = providerSnap.exists() ? providerSnap.data() : {};
-            const lateInterestRate = providerSettings.isLateInterestActive ? (providerSettings.lateInterestRate || 0) : 0;
             
-            const lateFee = calculateLateFee({ ...freshCreditData, lateInterestRate });
+            const lateFee = calculateLateFee(freshCreditData, providerSettings);
             const totalDebt = remainingBalance + lateFee;
 
             if (totalDebt <= 1) {
@@ -1536,7 +1539,7 @@ export async function registerPaymentAgreement(creditId: string, amount: number,
     return { success: "Acuerdo registrado. El calendario de pagos ha sido actualizado." };
 }
 
-export async function saveProviderSettings(providerId: string, settings: { baseCapital?: number, commissionTiers?: CommissionTier[], lateInterestRate?: number, isLateInterestActive?: boolean, isContractGenerationActive?: boolean, contractTemplate?: string }) {
+export async function saveProviderSettings(providerId: string, settings: { baseCapital?: number, commissionTiers?: CommissionTier[], isLateInterestActive?: boolean, isContractGenerationActive?: boolean, contractTemplate?: string }) {
   if (!providerId) return { error: "ID de proveedor no válido." };
   
   const providerRef = doc(db, "users", providerId);
@@ -1552,9 +1555,6 @@ export async function saveProviderSettings(providerId: string, settings: { baseC
       }
       if (settings.commissionTiers !== undefined) {
         updateData.commissionTiers = settings.commissionTiers;
-      }
-      if (settings.lateInterestRate !== undefined) {
-        updateData.lateInterestRate = settings.lateInterestRate;
       }
       if (settings.isLateInterestActive !== undefined) {
         updateData.isLateInterestActive = settings.isLateInterestActive;
@@ -2211,7 +2211,7 @@ export async function getProviderCommissionTiers(): Promise<CommissionTier[]> {
     
     const provider = await getUserData(providerId);
     if (!provider || !provider.commissionTiers) {
-        return [{ minAmount: 0, maxAmount: 50000000, percentage: 20 }]; // Default
+        return [{ minAmount: 0, maxAmount: 50000000, percentage: 20, lateInterestRate: 2 }]; // Default
     }
     return provider.commissionTiers;
 }

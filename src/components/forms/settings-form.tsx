@@ -57,6 +57,7 @@ type CommissionTier = {
   minAmount: number | undefined;
   maxAmount: number | undefined;
   percentage: number | undefined;
+  lateInterestRate: number | undefined;
 };
 
 type SettingsFormProps = {
@@ -80,7 +81,6 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
   const [baseCapital, setBaseCapital] = useState("");
   const [collectedCommission, setCollectedCommission] = useState(0);
   const [commissionTiers, setCommissionTiers] = useState<CommissionTier[] | null>(null);
-  const [lateInterestRate, setLateInterestRate] = useState("2");
   const [isLateInterestActive, setIsLateInterestActive] = useState(false);
   const [isContractGenerationActive, setIsContractGenerationActive] = useState(false);
   const [contractTemplate, setContractTemplate] = useState(defaultContractTemplate);
@@ -103,7 +103,6 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
         
         if (userData) {
           setBaseCapital(formatCurrencyForInput(userData.baseCapital || 0));
-          setLateInterestRate((userData.lateInterestRate || 2).toString());
           setIsLateInterestActive(userData.isLateInterestActive || false);
           setIsContractGenerationActive(userData.isContractGenerationActive || false);
           setContractTemplate(userData.contractTemplate || defaultContractTemplate);
@@ -111,7 +110,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
           if (userData.commissionTiers && userData.commissionTiers.length > 0) {
               setCommissionTiers(userData.commissionTiers);
           } else {
-              setCommissionTiers([{ minAmount: undefined, maxAmount: undefined, percentage: undefined }]);
+              setCommissionTiers([{ minAmount: undefined, maxAmount: undefined, percentage: undefined, lateInterestRate: undefined }]);
           }
         }
         
@@ -133,17 +132,27 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
 
   const handleCommissionTierChange = (index: number, field: keyof CommissionTier, value: string) => {
     if (!commissionTiers) return;
-    const numericValue = parseInt(value.replace(/\D/g, ''), 10);
+    const numericValue = parseFloat(value.replace(/,/g, '.').replace(/[^\d.-]/g, ''));
     
     const newTiers = [...commissionTiers];
     newTiers[index] = { ...newTiers[index], [field]: isNaN(numericValue) ? undefined : numericValue };
     setCommissionTiers(newTiers);
   };
 
+  const handleCurrencyTierChange = (index: number, field: 'minAmount' | 'maxAmount', value: string) => {
+    if (!commissionTiers) return;
+    const formattedValue = formatCurrencyForInput(value);
+    const numericValue = parseInt(formattedValue.replace(/\D/g, ''), 10);
+    
+    const newTiers = [...commissionTiers];
+    newTiers[index] = { ...newTiers[index], [field]: isNaN(numericValue) ? undefined : numericValue };
+    setCommissionTiers(newTiers);
+  }
+
   const addCommissionTier = () => {
     if (!commissionTiers) return;
     if (commissionTiers.length < 4) {
-      setCommissionTiers([...commissionTiers, { minAmount: undefined, maxAmount: undefined, percentage: undefined }]);
+      setCommissionTiers([...commissionTiers, { minAmount: undefined, maxAmount: undefined, percentage: undefined, lateInterestRate: undefined }]);
     } else {
       toast({ title: "Límite alcanzado", description: "Puedes configurar un máximo de 4 tramos de comisión.", variant: "destructive" });
     }
@@ -163,19 +172,17 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
     if (!commissionTiers) return;
     setIsSaving(true);
     try {
-        const rate = parseFloat(lateInterestRate);
-        if (isNaN(rate)) {
-            toast({ title: "Error de validación", description: "La tasa de interés debe ser un número.", variant: "destructive" });
-            return;
-        }
-
         for (const tier of commissionTiers) {
             if ((tier.minAmount ?? 0) >= (tier.maxAmount ?? Infinity) && (tier.maxAmount !== 0 && tier.maxAmount !== undefined)) {
                 toast({ title: "Error de validación", description: `En un tramo, el monto mínimo (${formatCurrencyForInput(tier.minAmount)}) debe ser menor que el máximo (${formatCurrencyForInput(tier.maxAmount)}).`, variant: "destructive" });
                 return;
             }
             if (tier.percentage === undefined || tier.percentage <= 0 || tier.percentage > 100) {
-                toast({ title: "Error de validación", description: `El porcentaje (${tier.percentage}%) debe estar entre 1 y 100.`, variant: "destructive" });
+                toast({ title: "Error de validación", description: `El porcentaje de comisión (${tier.percentage}%) debe estar entre 1 y 100.`, variant: "destructive" });
+                return;
+            }
+             if (isLateInterestActive && (tier.lateInterestRate === undefined || tier.lateInterestRate < 0 || tier.lateInterestRate > 100)) {
+                toast({ title: "Error de validación", description: `El interés de mora (${tier.lateInterestRate}%) debe estar entre 0 y 100.`, variant: "destructive" });
                 return;
             }
         }
@@ -184,8 +191,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
     
         const settingsToSave = {
             baseCapital: numericBaseCapital,
-            commissionTiers,
-            lateInterestRate: rate,
+            commissionTiers: commissionTiers.map(tier => ({...tier, lateInterestRate: isLateInterestActive ? tier.lateInterestRate : 0 })),
             isLateInterestActive,
             isContractGenerationActive,
             contractTemplate
@@ -328,15 +334,30 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+           <div className="flex items-center justify-between rounded-lg border p-4 my-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="late-interest-switch" className="text-base font-semibold">Activar Interés por Mora</Label>
+                <p className="text-sm text-muted-foreground">
+                  Habilita o deshabilita el cálculo automático.
+                </p>
+              </div>
+              <Switch
+                id="late-interest-switch"
+                checked={isLateInterestActive}
+                onCheckedChange={setIsLateInterestActive}
+              />
+            </div>
+            
           {!commissionTiers ? (
              <div className="flex items-center justify-center h-24">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <p className="ml-2">Cargando tramos...</p>
              </div>
           ) : (
             <>
                 {commissionTiers.map((tier, index) => (
-                <div key={index} className="flex flex-col md:flex-row items-center gap-2 border p-4 rounded-lg relative">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1 w-full">
+                <div key={index} className="flex flex-col md:flex-row items-center gap-4 border p-4 rounded-lg relative">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 w-full">
                     <div className="space-y-2">
                       <Label htmlFor={`min-amount-${index}`}>Monto Mínimo</Label>
                       <div className="relative">
@@ -344,7 +365,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
                         <Input
                           id={`min-amount-${index}`}
                           value={formatCurrencyForInput(tier.minAmount)}
-                          onChange={(e) => handleCommissionTierChange(index, 'minAmount', e.target.value)}
+                          onChange={(e) => handleCurrencyTierChange(index, 'minAmount', e.target.value)}
                           className="pl-8"
                           placeholder="0"
                         />
@@ -357,14 +378,14 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
                         <Input
                           id={`max-amount-${index}`}
                           value={formatCurrencyForInput(tier.maxAmount)}
-                          onChange={(e) => handleCommissionTierChange(index, 'maxAmount', e.target.value)}
+                          onChange={(e) => handleCurrencyTierChange(index, 'maxAmount', e.target.value)}
                           className="pl-8"
                           placeholder="500.000"
                         />
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor={`percentage-${index}`}>Porcentaje</Label>
+                      <Label htmlFor={`percentage-${index}`}>Comisión (%)</Label>
                       <div className="relative">
                         <Input
                           id={`percentage-${index}`}
@@ -373,6 +394,21 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
                           onChange={(e) => handleCommissionTierChange(index, 'percentage', e.target.value)}
                           className="pr-8"
                           placeholder="20"
+                        />
+                        <Percent className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </div>
+                     <div className="space-y-2">
+                      <Label htmlFor={`late-rate-${index}`}>Interés Mora Diario (%)</Label>
+                      <div className="relative">
+                        <Input
+                          id={`late-rate-${index}`}
+                          type="number"
+                          value={tier.lateInterestRate === undefined ? "" : tier.lateInterestRate}
+                          onChange={(e) => handleCommissionTierChange(index, 'lateInterestRate', e.target.value)}
+                          className="pr-8"
+                          placeholder="2"
+                           disabled={!isLateInterestActive}
                         />
                         <Percent className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       </div>
@@ -399,43 +435,6 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
           )}
         </CardContent>
       </Card>
-
-      <Separator />
-      
-      <div className="space-y-6">
-         <div className="space-y-1">
-            <h3 className="text-lg font-medium">Interés por Día de Mora</h3>
-            <p className="text-sm text-muted-foreground">Aplica un interés diario a los pagos atrasados.</p>
-        </div>
-        <div className="flex items-center justify-between rounded-lg border p-4">
-          <div className="space-y-0.5">
-            <Label htmlFor="late-interest-switch" className="text-base font-semibold">Activar Interés por Mora</Label>
-            <p className="text-sm text-muted-foreground">
-              Habilita o deshabilita el cálculo automático.
-            </p>
-          </div>
-          <Switch
-            id="late-interest-switch"
-            checked={isLateInterestActive}
-            onCheckedChange={setIsLateInterestActive}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="late-interest-rate">Tasa de Interés Diario (%)</Label>
-          <div className="relative">
-            <Input 
-              id="late-interest-rate"
-              placeholder="2"
-              value={lateInterestRate}
-              onChange={(e) => setLateInterestRate(e.target.value)}
-              disabled={!isLateInterestActive}
-              className="pr-8"
-            />
-            <Percent className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          </div>
-        </div>
-      </div>
       
        <Separator />
 

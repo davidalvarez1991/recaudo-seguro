@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState } from 'react';
@@ -24,11 +25,11 @@ type CommissionTier = {
   minAmount: number;
   maxAmount: number;
   percentage: number;
+  lateInterestRate?: number;
 };
 
 type CreditSimulatorProps = {
   commissionTiers: CommissionTier[];
-  lateInterestRate: number;
   isLateInterestActive: boolean;
 };
 
@@ -39,28 +40,35 @@ type SimulationResult = {
     commissionAmount: number;
     lateFee: number;
     appliedCommission: number;
+    appliedLateRate: number;
 };
 
 const formatCurrency = (value: number) => {
     return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 };
 
-const calculateCommission = (amount: number, tiers: CommissionTier[]): { commission: number; percentage: number } => {
+const calculateCommissionAndLateRate = (amount: number, tiers: CommissionTier[]): { commission: number; percentage: number, lateRate: number } => {
     if (!tiers || tiers.length === 0) {
-        return { commission: amount * 0.20, percentage: 20 };
+        return { commission: amount * 0.20, percentage: 20, lateRate: 2 };
     }
     const sortedTiers = [...tiers].sort((a, b) => a.minAmount - b.minAmount);
     const applicableTier = sortedTiers.find(tier => amount >= tier.minAmount && amount <= tier.maxAmount);
 
     if (applicableTier) {
-        return { commission: amount * (applicableTier.percentage / 100), percentage: applicableTier.percentage };
+        return { 
+            commission: amount * ((applicableTier.percentage || 20) / 100), 
+            percentage: applicableTier.percentage || 20,
+            lateRate: applicableTier.lateInterestRate || 0
+        };
     }
+    
     const fallbackPercentage = sortedTiers[0]?.percentage || 20;
-    return { commission: amount * (fallbackPercentage / 100), percentage: fallbackPercentage };
+    const fallbackLateRate = sortedTiers[0]?.lateInterestRate || 0;
+    return { commission: amount * (fallbackPercentage / 100), percentage: fallbackPercentage, lateRate: fallbackLateRate };
 };
 
 
-export function CreditSimulator({ commissionTiers, lateInterestRate, isLateInterestActive }: CreditSimulatorProps) {
+export function CreditSimulator({ commissionTiers, isLateInterestActive }: CreditSimulatorProps) {
   const [result, setResult] = useState<SimulationResult | null>(null);
 
   const form = useForm<SimulatorFormValues>({
@@ -92,13 +100,12 @@ export function CreditSimulator({ commissionTiers, lateInterestRate, isLateInter
       return;
     }
 
-    const { commission: commissionAmount, percentage: appliedCommission } = calculateCommission(amount, commissionTiers);
+    const { commission: commissionAmount, percentage: appliedCommission, lateRate: appliedLateRate } = calculateCommissionAndLateRate(amount, commissionTiers);
     const baseTotal = amount + commissionAmount;
     
     let lateFee = 0;
-    if (isLateInterestActive && lateDays > 0 && lateInterestRate > 0) {
-        const dailyRate = lateInterestRate / 100;
-        // Simplified simulation: interest on the base loan amount for the number of late days.
+    if (isLateInterestActive && lateDays > 0 && appliedLateRate > 0) {
+        const dailyRate = appliedLateRate / 100;
         lateFee = amount * dailyRate * lateDays;
     }
     
@@ -112,6 +119,7 @@ export function CreditSimulator({ commissionTiers, lateInterestRate, isLateInter
       commissionAmount: commissionAmount,
       lateFee: lateFee,
       appliedCommission: appliedCommission,
+      appliedLateRate: appliedLateRate,
     });
   };
 
@@ -218,7 +226,7 @@ export function CreditSimulator({ commissionTiers, lateInterestRate, isLateInter
                 <div className="text-xs text-muted-foreground space-y-1 text-center border-t pt-2 mt-2">
                     <p>Desglose: {formatCurrency(result.baseAmount)} (Capital) + {formatCurrency(result.commissionAmount)} (Comisión) + {formatCurrency(result.lateFee)} (Mora)</p>
                     <p>
-                        Cálculo basado en una comisión del {result.appliedCommission}% y un interés de mora del {lateInterestRate}% diario.
+                        Cálculo basado en una comisión del {result.appliedCommission}% y un interés de mora del {result.appliedLateRate}% diario.
                     </p>
                 </div>
             </div>

@@ -1,4 +1,5 @@
 
+
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { CobradorDashboardClient } from "@/components/dashboard/cobrador-dashboard-client";
 import { CreditSimulator } from "@/components/dashboard/credit-simulator";
@@ -13,6 +14,7 @@ type CommissionTier = {
   minAmount: number;
   maxAmount: number;
   percentage: number;
+  lateInterestRate?: number;
 };
 
 type UserData = {
@@ -23,8 +25,6 @@ type UserData = {
 
 type ProviderData = {
     commissionTiers?: CommissionTier[];
-    commissionPercentage?: number; // Keep for fallback
-    lateInterestRate?: number;
     isLateInterestActive?: boolean;
     [key: string]: any;
 } | null;
@@ -38,8 +38,7 @@ export default async function CobradorDashboard() {
   const { userId } = await getAuthenticatedUser();
   
   let userName = "Cobrador";
-  let commissionTiers: CommissionTier[] = [{ minAmount: 0, maxAmount: 50000000, percentage: 20 }]; // Default tier
-  let lateInterestRate = 0;
+  let commissionTiers: CommissionTier[] = [{ minAmount: 0, maxAmount: 50000000, percentage: 20, lateInterestRate: 2 }]; // Default tier
   let isLateInterestActive = false;
   let dailyGoal = 0;
   let collectedToday = 0;
@@ -55,11 +54,7 @@ export default async function CobradorDashboard() {
             if (providerData) {
                 if (providerData.commissionTiers && providerData.commissionTiers.length > 0) {
                     commissionTiers = providerData.commissionTiers;
-                } else if (providerData.commissionPercentage) {
-                    // Fallback for old single percentage system
-                    commissionTiers = [{ minAmount: 0, maxAmount: 50000000, percentage: providerData.commissionPercentage }];
                 }
-                lateInterestRate = providerData.lateInterestRate || 0;
                 isLateInterestActive = providerData.isLateInterestActive || false;
             }
         }
@@ -140,7 +135,6 @@ export default async function CobradorDashboard() {
 
             <CreditSimulator 
                 commissionTiers={commissionTiers} 
-                lateInterestRate={lateInterestRate}
                 isLateInterestActive={isLateInterestActive}
             />
             
