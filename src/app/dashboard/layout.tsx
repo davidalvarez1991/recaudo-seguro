@@ -1,10 +1,10 @@
 
 import { UserNav } from "@/components/dashboard/user-nav";
 import { SidebarProvider, Sidebar, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
-import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { SidebarContent } from "@/components/dashboard/sidebar-content";
 import { getAuthenticatedUser } from "@/lib/auth";
+import { AppLogo } from "@/components/logo";
 
 export default async function DashboardLayout({
   children,
@@ -25,7 +25,7 @@ export default async function DashboardLayout({
                 href="/dashboard/proveedor"
                 className="flex items-center gap-2 font-semibold text-primary"
               >
-                <ShieldCheck className="h-6 w-6" />
+                <AppLogo className="h-7 w-7" />
                 <span className="text-lg hidden sm:inline-block">Recaudo Seguro</span>
               </Link>
             </div>
