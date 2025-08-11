@@ -1,11 +1,29 @@
+
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users } from "lucide-react";
+import { Users, DollarSign, Users as UsersIcon } from "lucide-react";
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
 import { CollectionCountdown } from "@/components/admin/collection-countdown";
+import { getAllProviders, getAdminSettings } from "@/lib/actions";
 
-export default function AdminDashboard() {
+const formatCurrency = (value: number) => {
+    if (isNaN(value)) return "$0";
+    return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+};
+
+export default async function AdminDashboard() {
+  const [providersData, settingsData] = await Promise.all([
+    getAllProviders(),
+    getAdminSettings(),
+  ]);
+
+  const pricePerClient = settingsData.pricePerClient || 3500;
+
+  const totalProjectedIncome = providersData.reduce((sum, p) => sum + (p.uniqueClientCount * pricePerClient), 0);
+  const totalClients = providersData.reduce((sum, p) => sum + p.uniqueClientCount, 0);
+  const totalProviders = providersData.length;
+
   return (
       <Card>
         <CardHeader>
@@ -17,6 +35,38 @@ export default function AdminDashboard() {
           </div>
         </CardHeader>
         <CardContent className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="bg-green-50 dark:bg-green-900/30 border-green-200">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-green-800 dark:text-green-200">Ingreso Total Proyectado</CardTitle>
+                    <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    </CardHeader>
+                    <CardContent>
+                    <div className="text-3xl font-bold text-green-900 dark:text-green-300">{formatCurrency(totalProjectedIncome)}</div>
+                    </CardContent>
+                </Card>
+                <Card className="bg-blue-50 dark:bg-blue-900/30 border-blue-200">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-blue-800 dark:text-blue-200">Total Proveedores</CardTitle>
+                    <UsersIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    </CardHeader>
+                    <CardContent>
+                    <div className="text-3xl font-bold text-blue-900 dark:text-blue-300">{totalProviders}</div>
+                    </CardContent>
+                </Card>
+                <Card className="bg-purple-50 dark:bg-purple-900/30 border-purple-200">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-purple-800 dark:text-purple-200">Total Clientes</CardTitle>
+                    <UsersIcon className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    </CardHeader>
+                    <CardContent>
+                    <div className="text-3xl font-bold text-purple-900 dark:text-purple-300">{totalClients}</div>
+                    </CardContent>
+                </Card>
+            </div>
+            
+            <Separator />
+            
             <div className="space-y-2">
                 <h3 className="text-lg font-medium">Gestión de Proveedores</h3>
                 <p className="text-sm text-muted-foreground">
