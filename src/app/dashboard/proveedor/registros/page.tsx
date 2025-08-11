@@ -17,6 +17,8 @@ import { Separator } from "@/components/ui/separator";
 import { EditClientForm } from "@/components/forms/edit-client-form";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
 
 type ActivityLogEntry = {
   id: string; // Can be creditId or paymentId
