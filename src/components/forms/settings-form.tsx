@@ -454,7 +454,7 @@ export function SettingsForm({ providerId }: SettingsFormProps) {
                  <Textarea
                     id="contract-template"
                     placeholder="Pega aquí tu plantilla de contrato..."
-                    className="min-h-96 font-mono text-xs"
+                    className="min-h-96 font-mono text-sm"
                     value={contractTemplate}
                     onChange={(e) => setContractTemplate(e.target.value)}
                     disabled={!isContractGenerationActive}
