@@ -225,7 +225,10 @@ export default function AdminProvidersPage() {
                             <div className="grid grid-cols-2 gap-4 text-sm">
                                 <div><p className="text-muted-foreground">Clientes</p><p className="font-medium">{provider.uniqueClientCount}</p></div>
                                 <div><p className="text-muted-foreground">Suscripción</p><p className="font-medium text-primary">{formatCurrency(provider.uniqueClientCount * pricePerClient)}</p></div>
-                                <div><p className="text-muted-foreground">Estado</p><p><Badge variant={provider.isActive ? "secondary" : "destructive"}>{provider.isActive ? "Activo" : "Inactivo"}</Badge></p></div>
+                                <div>
+                                    <p className="text-muted-foreground">Estado</p>
+                                    <div><Badge variant={provider.isActive ? "secondary" : "destructive"}>{provider.isActive ? "Activo" : "Inactivo"}</Badge></div>
+                                </div>
                                 <div><p className="text-muted-foreground">Activación</p><p>{provider.activatedAt ? format(new Date(provider.activatedAt), 'd MMM, yyyy', { locale: es }) : '-'}</p></div>
                             </div>
                              <Button 
