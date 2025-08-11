@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -13,12 +12,15 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { getProviderCommissionTiers } from '@/lib/actions';
-import { differenceInMonths, addMonths } from 'date-fns';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 
 const simulatorSchema = z.object({
   amount: z.string().min(1, 'El valor es requerido.'),
   installments: z.string().min(1, 'El número de cuotas es requerido.'),
+  frequency: z.enum(['daily', 'weekly', 'biweekly', 'monthly'], {
+    required_error: "Debes seleccionar una frecuencia de pago.",
+  }),
   lateDays: z.string().optional(),
 });
 
@@ -55,6 +57,7 @@ const calculateCommissionAndLateRate = (
     tiers: CommissionTier[],
     isMonthly: boolean,
     installments: number,
+    frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly'
 ): { commission: number; percentage: number, lateRate: number } => {
     if (!tiers || tiers.length === 0) {
         return { commission: amount * 0.20, percentage: 20, lateRate: 2 };
@@ -65,8 +68,26 @@ const calculateCommissionAndLateRate = (
     const percentage = applicableTier?.percentage || 20;
     const lateRate = applicableTier?.lateInterestRate || 0;
     
-    // For the simulator, approximate months based on 30 days per installment.
-    const durationMonths = isMonthly ? Math.ceil(installments / 30) : 1;
+    let durationMonths = 1;
+    if (isMonthly) {
+      switch (frequency) {
+        case 'daily':
+          durationMonths = Math.ceil(installments / 30);
+          break;
+        case 'weekly':
+          durationMonths = Math.ceil(installments / 4);
+          break;
+        case 'biweekly':
+          durationMonths = Math.ceil(installments / 2);
+          break;
+        case 'monthly':
+          durationMonths = installments;
+          break;
+        default:
+          durationMonths = 1;
+      }
+    }
+    
     const finalMonths = Math.max(1, durationMonths);
 
     return { 
@@ -94,6 +115,7 @@ export function CreditSimulator({ commissionTiers, isLateInterestActive }: Credi
     defaultValues: {
       amount: '',
       installments: '',
+      frequency: 'daily',
       lateDays: '0',
     },
   });
@@ -118,7 +140,7 @@ export function CreditSimulator({ commissionTiers, isLateInterestActive }: Credi
       return;
     }
 
-    const { commission: commissionAmount, percentage: appliedCommission, lateRate: appliedLateRate } = calculateCommissionAndLateRate(amount, providerSettings.tiers, providerSettings.isMonthly, installments);
+    const { commission: commissionAmount, percentage: appliedCommission, lateRate: appliedLateRate } = calculateCommissionAndLateRate(amount, providerSettings.tiers, providerSettings.isMonthly, installments, data.frequency);
     const baseTotal = amount + commissionAmount;
     
     let lateFee = 0;
@@ -142,7 +164,7 @@ export function CreditSimulator({ commissionTiers, isLateInterestActive }: Credi
   };
 
   const handleReset = () => {
-    form.reset({amount: '', installments: '', lateDays: '0'});
+    form.reset({amount: '', installments: '', frequency: 'daily', lateDays: '0'});
     setResult(null);
   }
 
@@ -189,6 +211,58 @@ export function CreditSimulator({ commissionTiers, isLateInterestActive }: Credi
                         )}
                     />
                 </div>
+
+                 <FormField
+                  control={form.control}
+                  name="frequency"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <Label>Frecuencia de Pago</Label>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          className="grid grid-cols-2 md:grid-cols-4 gap-2"
+                        >
+                          <FormItem>
+                             <Label htmlFor="freq-daily" className="flex items-center gap-2 rounded-md border p-3 cursor-pointer hover:bg-background has-[:checked]:bg-primary has-[:checked]:text-primary-foreground has-[:checked]:border-primary">
+                                <FormControl>
+                                   <RadioGroupItem value="daily" id="freq-daily" className="sr-only" />
+                                </FormControl>
+                                Diario
+                             </Label>
+                          </FormItem>
+                          <FormItem>
+                             <Label htmlFor="freq-weekly" className="flex items-center gap-2 rounded-md border p-3 cursor-pointer hover:bg-background has-[:checked]:bg-primary has-[:checked]:text-primary-foreground has-[:checked]:border-primary">
+                                <FormControl>
+                                   <RadioGroupItem value="weekly" id="freq-weekly" className="sr-only" />
+                                </FormControl>
+                                Semanal
+                             </Label>
+                          </FormItem>
+                          <FormItem>
+                             <Label htmlFor="freq-biweekly" className="flex items-center gap-2 rounded-md border p-3 cursor-pointer hover:bg-background has-[:checked]:bg-primary has-[:checked]:text-primary-foreground has-[:checked]:border-primary">
+                                <FormControl>
+                                   <RadioGroupItem value="biweekly" id="freq-biweekly" className="sr-only" />
+                                </FormControl>
+                                Quincenal
+                             </Label>
+                          </FormItem>
+                          <FormItem>
+                             <Label htmlFor="freq-monthly" className="flex items-center gap-2 rounded-md border p-3 cursor-pointer hover:bg-background has-[:checked]:bg-primary has-[:checked]:text-primary-foreground has-[:checked]:border-primary">
+                                <FormControl>
+                                   <RadioGroupItem value="monthly" id="freq-monthly" className="sr-only" />
+                                </FormControl>
+                                Mensual
+                             </Label>
+                          </FormItem>
+                        </RadioGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                  {isLateInterestActive && (
                     <FormField
                         control={form.control}
