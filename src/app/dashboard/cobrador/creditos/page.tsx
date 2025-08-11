@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ClipboardList, HandCoins, Loader2, Info, RefreshCcw, XCircle, CalendarDays, CheckCircle2, Circle, Star, Search, Handshake, Percent, Sparkles, Filter, X, Repeat } from "lucide-react";
@@ -196,37 +196,74 @@ export default function CreditosPage() {
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
              </div>
           ) : filteredCreditos.length > 0 ? (
-              <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Fecha</TableHead>
-                      <TableHead>Cliente</TableHead>
-                      <TableHead className="text-right">Valor del Crédito</TableHead>
-                      <TableHead className="text-center">Cuotas</TableHead>
-                      <TableHead>Estado</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+            <>
+                {/* Mobile View */}
+                <div className="md:hidden space-y-4">
                     {filteredCreditos.map((credito) => (
-                      <TableRow key={credito.id} onClick={() => handleRowClick(credito)} className={`cursor-pointer ${credito.estado !== 'Activo' && credito.estado !== 'Pagado' ? 'opacity-50 hover:bg-transparent' : ''}`}>
-                        <TableCell>{credito.formattedDate}</TableCell>
-                        <TableCell>
-                          <div className="font-medium">{credito.clienteName || 'Nombre no disponible'}</div>
-                          <div className="text-sm text-muted-foreground">CC: {credito.clienteId}</div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(credito.valor)}
-                        </TableCell>
-                        <TableCell className="text-center">{credito.paidInstallments}/{credito.cuotas}</TableCell>
-                        <TableCell>
-                           <Badge variant={credito.estado === 'Activo' ? 'default' : (credito.estado === 'Pagado' ? 'secondary' : (credito.estado === 'Refinanciado' || credito.estado === 'Renovado' ? 'outline' : 'destructive'))}>
-                            {credito.estado}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
+                        <div key={credito.id} onClick={() => handleRowClick(credito)} className={`p-4 border rounded-lg space-y-3 cursor-pointer ${credito.estado !== 'Activo' && credito.estado !== 'Pagado' ? 'opacity-60 bg-muted/50' : 'bg-card'}`}>
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <p className="font-semibold">{credito.clienteName}</p>
+                                    <p className="text-sm text-muted-foreground">CC: {credito.clienteId}</p>
+                                </div>
+                                <Badge variant={credito.estado === 'Activo' ? 'default' : (credito.estado === 'Pagado' ? 'secondary' : (credito.estado === 'Refinanciado' || credito.estado === 'Renovado' ? 'outline' : 'destructive'))}>
+                                    {credito.estado}
+                                </Badge>
+                            </div>
+                            <Separator />
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <p className="text-muted-foreground">Fecha:</p>
+                                    <p>{credito.formattedDate}</p>
+                                </div>
+                                <div>
+                                    <p className="text-muted-foreground">Valor:</p>
+                                    <p className="font-medium">{formatCurrency(credito.valor)}</p>
+                                </div>
+                                <div className="col-span-2">
+                                    <p className="text-muted-foreground">Cuotas Pagadas:</p>
+                                    <p className="font-medium">{credito.paidInstallments}/{credito.cuotas}</p>
+                                </div>
+                            </div>
+                        </div>
                     ))}
-                  </TableBody>
-                </Table>
+                </div>
+
+                {/* Desktop View */}
+                <div className="hidden md:block">
+                  <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fecha</TableHead>
+                          <TableHead>Cliente</TableHead>
+                          <TableHead className="text-right">Valor del Crédito</TableHead>
+                          <TableHead className="text-center">Cuotas</TableHead>
+                          <TableHead>Estado</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredCreditos.map((credito) => (
+                          <TableRow key={credito.id} onClick={() => handleRowClick(credito)} className={`cursor-pointer ${credito.estado !== 'Activo' && credito.estado !== 'Pagado' ? 'opacity-50 hover:bg-transparent' : ''}`}>
+                            <TableCell>{credito.formattedDate}</TableCell>
+                            <TableCell>
+                              <div className="font-medium">{credito.clienteName || 'Nombre no disponible'}</div>
+                              <div className="text-sm text-muted-foreground">CC: {credito.clienteId}</div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {formatCurrency(credito.valor)}
+                            </TableCell>
+                            <TableCell className="text-center">{credito.paidInstallments}/{credito.cuotas}</TableCell>
+                            <TableCell>
+                               <Badge variant={credito.estado === 'Activo' ? 'default' : (credito.estado === 'Pagado' ? 'secondary' : (credito.estado === 'Refinanciado' || credito.estado === 'Renovado' ? 'outline' : 'destructive'))}>
+                                {credito.estado}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                </div>
+            </>
           ) : (
             <div className="text-center text-muted-foreground py-8">
                 <ClipboardList className="w-16 h-16 mx-auto mb-4 text-gray-300" />
