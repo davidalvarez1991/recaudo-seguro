@@ -200,8 +200,12 @@ export default function AdminProvidersPage() {
                                      <Avatar>
                                         <AvatarFallback>{getAvatarFallback(provider.companyName)}</AvatarFallback>
                                     </Avatar>
-                                    <div>
+                                    <div className="space-y-0.5">
                                         <p className="font-semibold">{provider.companyName}</p>
+                                        <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                                            <User className="h-3 w-3" />
+                                            {provider.idNumber}
+                                        </p>
                                         <p className="text-sm text-muted-foreground flex items-center gap-1.5">
                                             <Phone className="h-3 w-3" />
                                             {provider.whatsappNumber}
