@@ -79,6 +79,7 @@ export default function SoportesIngresosPage() {
 
     const totalProjectedIncome = providers.reduce((sum, p) => sum + (p.uniqueClientCount * pricePerClient), 0);
     const totalClients = providers.reduce((sum, p) => sum + p.uniqueClientCount, 0);
+    const totalProviders = providers.length;
 
   return (
       <Card>
@@ -115,7 +116,7 @@ export default function SoportesIngresosPage() {
                 </div>
             ) : (
                 <>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                         <Card className="bg-green-50 dark:bg-green-900/30 border-green-200">
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
                             <CardTitle className="text-sm font-medium text-green-800 dark:text-green-200">Ingreso Total Proyectado</CardTitle>
@@ -127,11 +128,20 @@ export default function SoportesIngresosPage() {
                         </Card>
                         <Card className="bg-blue-50 dark:bg-blue-900/30 border-blue-200">
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-blue-800 dark:text-blue-200">Total Clientes en Plataforma</CardTitle>
+                            <CardTitle className="text-sm font-medium text-blue-800 dark:text-blue-200">Total Proveedores</CardTitle>
                             <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                             </CardHeader>
                             <CardContent>
-                            <div className="text-3xl font-bold text-blue-900 dark:text-blue-300">{totalClients}</div>
+                            <div className="text-3xl font-bold text-blue-900 dark:text-blue-300">{totalProviders}</div>
+                            </CardContent>
+                        </Card>
+                        <Card className="bg-indigo-50 dark:bg-indigo-900/30 border-indigo-200">
+                            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="text-sm font-medium text-indigo-800 dark:text-indigo-200">Total Clientes en Plataforma</CardTitle>
+                            <Users className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                            </CardHeader>
+                            <CardContent>
+                            <div className="text-3xl font-bold text-indigo-900 dark:text-indigo-300">{totalClients}</div>
                             </CardContent>
                         </Card>
                         <Card className="bg-purple-50 dark:bg-purple-900/30 border-purple-200">

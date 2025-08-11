@@ -84,6 +84,17 @@ export default function AdminProvidersPage() {
   useEffect(() => {
     fetchProviders();
   }, []);
+  
+    const totalProjectedIncome = useMemo(() => {
+        return providers.reduce((sum, p) => sum + (p.uniqueClientCount * pricePerClient), 0);
+    }, [providers, pricePerClient]);
+
+    const totalClients = useMemo(() => {
+        return providers.reduce((sum, p) => sum + p.uniqueClientCount, 0);
+    }, [providers]);
+    
+    const totalProviders = providers.length;
+
 
   const handleEdit = (provider: Provider) => {
     setSelectedProvider(provider);
@@ -172,6 +183,36 @@ export default function AdminProvidersPage() {
                 </Button>
             </div>
           </div>
+          <Separator className="my-6" />
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <Card className="bg-green-50 dark:bg-green-900/30 border-green-200">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-green-800 dark:text-green-200">Ingreso Total Proyectado</CardTitle>
+                    <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    </CardHeader>
+                    <CardContent>
+                    <div className="text-3xl font-bold text-green-900 dark:text-green-300">{formatCurrency(totalProjectedIncome)}</div>
+                    </CardContent>
+                </Card>
+                <Card className="bg-blue-50 dark:bg-blue-900/30 border-blue-200">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-blue-800 dark:text-blue-200">Total Proveedores</CardTitle>
+                    <UsersIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    </CardHeader>
+                    <CardContent>
+                    <div className="text-3xl font-bold text-blue-900 dark:text-blue-300">{totalProviders}</div>
+                    </CardContent>
+                </Card>
+                <Card className="bg-purple-50 dark:bg-purple-900/30 border-purple-200">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-purple-800 dark:text-purple-200">Total Clientes</CardTitle>
+                    <UsersIcon className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    </CardHeader>
+                    <CardContent>
+                    <div className="text-3xl font-bold text-purple-900 dark:text-purple-300">{totalClients}</div>
+                    </CardContent>
+                </Card>
+            </div>
           <div className="pt-4">
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -227,13 +268,22 @@ export default function AdminProvidersPage() {
                             </div>
                             <Separator />
                             <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div><p className="text-muted-foreground">Clientes</p><p className="font-medium">{provider.uniqueClientCount}</p></div>
-                                <div><p className="text-muted-foreground">Suscripción</p><p className="font-medium text-primary">{formatCurrency(provider.uniqueClientCount * pricePerClient)}</p></div>
+                                <div>
+                                  <p className="text-muted-foreground">Clientes</p>
+                                  <p className="font-medium">{provider.uniqueClientCount}</p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground">Suscripción</p>
+                                  <p className="font-medium text-primary">{formatCurrency(provider.uniqueClientCount * pricePerClient)}</p>
+                                </div>
                                 <div>
                                     <p className="text-muted-foreground">Estado</p>
                                     <div><Badge variant={provider.isActive ? "secondary" : "destructive"}>{provider.isActive ? "Activo" : "Inactivo"}</Badge></div>
                                 </div>
-                                <div><p className="text-muted-foreground">Activación</p><p>{provider.activatedAt ? format(new Date(provider.activatedAt), 'd MMM, yyyy', { locale: es }) : '-'}</p></div>
+                                <div>
+                                  <p className="text-muted-foreground">Activación</p>
+                                  <p>{provider.activatedAt ? format(new Date(provider.activatedAt), 'd MMM, yyyy', { locale: es }) : '-'}</p>
+                                </div>
                             </div>
                              <Button 
                                 size="sm" 
