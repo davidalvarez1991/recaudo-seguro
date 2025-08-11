@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 export const metadata: Metadata = {
   title: 'Recaudo Seguro',
   description: 'Gestión de recaudos segura y eficiente.',
+  manifest: '/manifest.json',
 };
 
 export default async function RootLayout({
