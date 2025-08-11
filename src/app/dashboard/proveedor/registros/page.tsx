@@ -3,9 +3,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, MoreHorizontal, Trash2, Eye, Pencil, RefreshCcw, Loader2, Search, HandCoins, FilePlus, Filter, X } from "lucide-react";
+import { ArrowLeft, ClipboardList, MoreHorizontal, Trash2, Eye, Pencil, RefreshCcw, Loader2, Search, HandCoins, FilePlus, Filter, X, Calendar, User, DollarSign } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { getProviderActivityLog, deleteClientAndCredits } from "@/lib/actions";
@@ -18,13 +17,6 @@ import { Separator } from "@/components/ui/separator";
 import { EditClientForm } from "@/components/forms/edit-client-form";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { DateRange } from "react-day-picker";
-import { format, isWithinInterval } from "date-fns";
-import { es } from "date-fns/locale";
-import { Label } from "@/components/ui/label";
-
 
 type ActivityLogEntry = {
   id: string; // Can be creditId or paymentId
@@ -210,7 +202,7 @@ export default function RegistrosPage() {
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                     type="search"
-                    placeholder="Buscar por cliente, cédula o tipo (Ej: Pago, Crédito)..."
+                    placeholder="Buscar por cliente, cédula o tipo..."
                     className="w-full pl-8"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -225,57 +217,94 @@ export default function RegistrosPage() {
                 <p className="ml-4 text-muted-foreground">Cargando registros...</p>
              </div>
           ) : paginatedLog.length > 0 ? (
-            <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Tipo de Registro</TableHead>
-                    <TableHead className="text-right">Monto</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedLog.map((entry) => (
-                    <TableRow key={entry.id} onClick={() => handleViewDetails(entry)} className="cursor-pointer">
-                      <TableCell>{entry.formattedDate}</TableCell>
-                      <TableCell>
-                          <div className="font-medium">{entry.clienteName || 'Nombre no disponible'}</div>
-                          <div className="text-sm text-muted-foreground">CC: {entry.clienteId}</div>
-                      </TableCell>
-                       <TableCell>
-                        {getEntryTypeBadge(entry)}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold text-primary">
-                        {formatCurrency(entry.amount)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                         <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
-                                    <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                                <DropdownMenuItem onClick={() => handleViewDetails(entry)}>
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    Ver Detalles del Crédito
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleEdit(entry)}>
-                                  <Pencil className="mr-2 h-4 w-4" />
-                                  Editar Cliente
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleDelete(entry)} className="text-destructive focus:text-destructive">
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Eliminar Cliente
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+            <>
+            {/* Mobile View */}
+            <div className="md:hidden space-y-4">
+              {paginatedLog.map((entry) => (
+                <div key={entry.id} className="bg-card border rounded-lg p-4 space-y-3 cursor-pointer" onClick={() => handleViewDetails(entry)}>
+                  <div className="flex justify-between items-start">
+                    <div className="font-semibold">{entry.clienteName}</div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 -mt-2" onClick={(e) => e.stopPropagation()}>
+                              <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenuItem onClick={() => handleViewDetails(entry)}><Eye className="mr-2 h-4 w-4" />Ver Detalles</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEdit(entry)}><Pencil className="mr-2 h-4 w-4" />Editar Cliente</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDelete(entry)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Eliminar Cliente</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <div className="text-sm text-muted-foreground">CC: {entry.clienteId}</div>
+                  <Separator />
+                  <div className="flex justify-between items-center text-sm">
+                    <div className="flex items-center gap-2 text-muted-foreground"><Calendar className="h-4 w-4" /><span>{entry.formattedDate}</span></div>
+                    <div className="font-bold text-lg text-primary">{formatCurrency(entry.amount)}</div>
+                  </div>
+                  <div className="flex justify-start pt-2">
+                    {getEntryTypeBadge(entry)}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop View */}
+            <div className="hidden md:block">
+              <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Tipo de Registro</TableHead>
+                      <TableHead className="text-right">Monto</TableHead>
+                      <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedLog.map((entry) => (
+                      <TableRow key={entry.id} onClick={() => handleViewDetails(entry)} className="cursor-pointer">
+                        <TableCell>{entry.formattedDate}</TableCell>
+                        <TableCell>
+                            <div className="font-medium">{entry.clienteName || 'Nombre no disponible'}</div>
+                            <div className="text-sm text-muted-foreground">CC: {entry.clienteId}</div>
+                        </TableCell>
+                         <TableCell>
+                          {getEntryTypeBadge(entry)}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-primary">
+                          {formatCurrency(entry.amount)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                           <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+                                      <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                  <DropdownMenuItem onClick={() => handleViewDetails(entry)}>
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      Ver Detalles del Crédito
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleEdit(entry)}>
+                                    <Pencil className="mr-2 h-4 w-4" />
+                                    Editar Cliente
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleDelete(entry)} className="text-destructive focus:text-destructive">
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Eliminar Cliente
+                                  </DropdownMenuItem>
+                              </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+            </div>
+            </>
           ) : (
               <div className="text-center text-muted-foreground py-8">
                   <ClipboardList className="w-16 h-16 mx-auto mb-4 text-gray-300" />
