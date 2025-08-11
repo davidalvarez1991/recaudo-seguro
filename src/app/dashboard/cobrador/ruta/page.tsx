@@ -304,7 +304,7 @@ export default function RutaDePagoPage() {
 
              {/* Payment Modal */}
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogContent className="sm:max-w-md">
+                <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Registrar Acción de Pago</DialogTitle>
                         <DialogDescription>Para el cliente <span className="font-semibold">{selectedCredit?.clienteName}</span>.</DialogDescription>
@@ -312,27 +312,24 @@ export default function RutaDePagoPage() {
                     {selectedCredit && (
                         <div className="py-4 space-y-4">
                            <RadioGroup value={paymentType} onValueChange={(value: any) => setPaymentType(value)} className="gap-3 pt-2">
-                                <Label htmlFor="payment-cuota" className="flex items-start gap-3 rounded-lg border p-4 cursor-pointer hover:bg-muted/50 has-[:checked]:border-primary has-[:checked]:bg-muted/50">
+                                <Label htmlFor="payment-cuota" className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50 has-[:checked]:border-primary has-[:checked]:bg-muted/50">
                                     <RadioGroupItem value="cuota" id="payment-cuota" className="mt-1" />
                                     <div className="grid gap-1.5 flex-1">
                                         <p className="font-semibold">Pagar Cuota</p>
-                                        <p className="text-xs text-muted-foreground">Registra el pago de la cuota actual, incluyendo mora si aplica.</p>
                                         <p className="font-bold text-lg text-primary mt-1">{formatCurrency(selectedCredit.installmentAmount + selectedCredit.lateFee)}</p>
                                     </div>
                                 </Label>
-                                <Label htmlFor="payment-comision" className="flex items-start gap-3 rounded-lg border p-4 cursor-pointer hover:bg-muted/50 has-[:checked]:border-primary has-[:checked]:bg-muted/50">
+                                <Label htmlFor="payment-comision" className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50 has-[:checked]:border-primary has-[:checked]:bg-muted/50">
                                     <RadioGroupItem value="comision" id="payment-comision" className="mt-1" />
                                     <div className="grid gap-1.5 flex-1">
                                         <p className="font-semibold flex items-center gap-1.5"><Percent className="h-4 w-4" /> Pagar Comisión Total</p>
-                                        <p className="text-xs text-muted-foreground">Cubre el valor total de la comisión del crédito.</p>
                                         <p className="font-bold text-lg text-primary mt-1">{formatCurrency(selectedCredit.commission)}</p>
                                     </div>
                                 </Label>
-                                <Label htmlFor="payment-total" className="flex items-start gap-3 rounded-lg border p-4 cursor-pointer hover:bg-muted/50 has-[:checked]:border-primary has-[:checked]:bg-muted/50">
+                                <Label htmlFor="payment-total" className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/50 has-[:checked]:border-primary has-[:checked]:bg-muted/50">
                                     <RadioGroupItem value="total" id="payment-total" className="mt-1" />
                                      <div className="grid gap-1.5 flex-1">
                                         <p className="font-semibold">Pagar Saldo Total</p>
-                                        <p className="text-xs text-muted-foreground">Liquida completamente la deuda pendiente del cliente.</p>
                                         <p className="font-bold text-lg text-primary mt-1">{formatCurrency(selectedCredit.totalDebt)}</p>
                                     </div>
                                 </Label>
@@ -401,4 +398,3 @@ export default function RutaDePagoPage() {
         </Card>
     );
 }
-
