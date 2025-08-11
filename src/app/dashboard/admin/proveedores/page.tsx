@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { Separator } from "@/components/ui/separator";
 
 type Provider = {
   id: string;
@@ -188,89 +189,147 @@ export default function AdminProvidersPage() {
              <div className="flex justify-center items-center h-40">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
              </div>
-          ) : (
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Proveedor</TableHead>
-                        <TableHead className="text-center">Clientes</TableHead>
-                        <TableHead className="text-center">Suscripción</TableHead>
-                        <TableHead className="text-center">Estado</TableHead>
-                        <TableHead className="text-center">Fecha de Activación</TableHead>
-                        <TableHead className="text-right">Acciones</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                 {filteredProviders.length > 0 ? (
-                    filteredProviders.map((provider) => (
-                        <TableRow key={provider.id}>
-                            <TableCell>
+          ) : filteredProviders.length > 0 ? (
+            <>
+                {/* Mobile View */}
+                <div className="md:hidden space-y-4">
+                    {filteredProviders.map((provider) => (
+                        <Card key={provider.id} className="p-4 space-y-4 bg-muted/30">
+                            <div className="flex items-start justify-between">
                                 <div className="flex items-center gap-3">
-                                    <Avatar>
+                                     <Avatar>
                                         <AvatarFallback>{getAvatarFallback(provider.companyName)}</AvatarFallback>
                                     </Avatar>
                                     <div>
-                                        <p className="font-medium">{provider.companyName}</p>
+                                        <p className="font-semibold">{provider.companyName}</p>
                                         <p className="text-sm text-muted-foreground flex items-center gap-1.5">
                                             <Phone className="h-3 w-3" />
                                             {provider.whatsappNumber}
                                         </p>
                                     </div>
                                 </div>
-                            </TableCell>
-                            <TableCell className="text-center font-medium">{provider.uniqueClientCount}</TableCell>
-                            <TableCell className="text-center font-semibold text-primary">{formatCurrency(provider.uniqueClientCount * pricePerClient)}</TableCell>
-                            <TableCell className="text-center">
-                                <Badge variant={provider.isActive ? "secondary" : "destructive"}>
-                                    {provider.isActive ? "Activo" : "Inactivo"}
-                                </Badge>
-                            </TableCell>
-                            <TableCell className="text-center text-sm text-muted-foreground">
-                                {provider.activatedAt ? format(new Date(provider.activatedAt), 'd MMM, yyyy', { locale: es }) : '-'}
-                            </TableCell>
-                            <TableCell className="text-right">
-                                <div className="flex justify-end items-center gap-2">
-                                     <Button 
-                                        size="sm" 
-                                        variant={provider.isActive ? "destructive" : "default"}
-                                        onClick={() => handleToggleStatus(provider)}
-                                        disabled={isPending}
-                                        className="w-28"
-                                    >
-                                        {isPending && selectedProvider?.id === provider.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : (provider.isActive ? <Ban className="mr-2 h-4 w-4"/> : <CheckCircle className="mr-2 h-4 w-4"/>)}
-                                        {provider.isActive ? 'Desactivar' : 'Activar'}
-                                    </Button>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                                                <MoreHorizontal className="h-4 w-4" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuItem onClick={() => handleEdit(provider)}>
-                                                <Pencil className="mr-2 h-4 w-4" />
-                                                Editar
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => handleDelete(provider)} className="text-destructive focus:text-destructive">
-                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                Eliminar Proveedor
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </div>
-                            </TableCell>
-                        </TableRow>
-                    ))
-                 ) : (
-                    <TableRow>
-                        <TableCell colSpan={6} className="h-24 text-center">
-                            No se encontraron proveedores {searchTerm ? `con el término "${searchTerm}"` : "registrados."}
-                        </TableCell>
-                    </TableRow>
-                 )}
-                </TableBody>
-            </Table>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 -mt-2">
+                                            <MoreHorizontal className="h-4 w-4" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => handleEdit(provider)}><Pencil className="mr-2 h-4 w-4" />Editar</DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => handleDelete(provider)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Eliminar</DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
+                            <Separator />
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div><p className="text-muted-foreground">Clientes</p><p className="font-medium">{provider.uniqueClientCount}</p></div>
+                                <div><p className="text-muted-foreground">Suscripción</p><p className="font-medium text-primary">{formatCurrency(provider.uniqueClientCount * pricePerClient)}</p></div>
+                                <div><p className="text-muted-foreground">Estado</p><p><Badge variant={provider.isActive ? "secondary" : "destructive"}>{provider.isActive ? "Activo" : "Inactivo"}</Badge></p></div>
+                                <div><p className="text-muted-foreground">Activación</p><p>{provider.activatedAt ? format(new Date(provider.activatedAt), 'd MMM, yyyy', { locale: es }) : '-'}</p></div>
+                            </div>
+                             <Button 
+                                size="sm" 
+                                variant={provider.isActive ? "destructive" : "default"}
+                                onClick={() => handleToggleStatus(provider)}
+                                disabled={isPending}
+                                className="w-full"
+                            >
+                                {isPending && selectedProvider?.id === provider.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : (provider.isActive ? <Ban className="mr-2 h-4 w-4"/> : <CheckCircle className="mr-2 h-4 w-4"/>)}
+                                {provider.isActive ? 'Desactivar' : 'Activar'}
+                            </Button>
+                        </Card>
+                    ))}
+                </div>
+
+                {/* Desktop View */}
+                <div className="hidden md:block">
+                  <Table>
+                      <TableHeader>
+                          <TableRow>
+                              <TableHead>Proveedor</TableHead>
+                              <TableHead className="text-center">Clientes</TableHead>
+                              <TableHead className="text-center">Suscripción</TableHead>
+                              <TableHead className="text-center">Estado</TableHead>
+                              <TableHead className="text-center">Fecha de Activación</TableHead>
+                              <TableHead className="text-right">Acciones</TableHead>
+                          </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                      {filteredProviders.map((provider) => (
+                          <TableRow key={provider.id}>
+                              <TableCell>
+                                  <div className="flex items-center gap-3">
+                                      <Avatar>
+                                          <AvatarFallback>{getAvatarFallback(provider.companyName)}</AvatarFallback>
+                                      </Avatar>
+                                      <div>
+                                          <p className="font-medium">{provider.companyName}</p>
+                                          <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                                              <Phone className="h-3 w-3" />
+                                              {provider.whatsappNumber}
+                                          </p>
+                                      </div>
+                                  </div>
+                              </TableCell>
+                              <TableCell className="text-center font-medium">{provider.uniqueClientCount}</TableCell>
+                              <TableCell className="text-center font-semibold text-primary">{formatCurrency(provider.uniqueClientCount * pricePerClient)}</TableCell>
+                              <TableCell className="text-center">
+                                  <Badge variant={provider.isActive ? "secondary" : "destructive"}>
+                                      {provider.isActive ? "Activo" : "Inactivo"}
+                                  </Badge>
+                              </TableCell>
+                              <TableCell className="text-center text-sm text-muted-foreground">
+                                  {provider.activatedAt ? format(new Date(provider.activatedAt), 'd MMM, yyyy', { locale: es }) : '-'}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                  <div className="flex justify-end items-center gap-2">
+                                      <Button 
+                                          size="sm" 
+                                          variant={provider.isActive ? "destructive" : "default"}
+                                          onClick={() => handleToggleStatus(provider)}
+                                          disabled={isPending}
+                                          className="w-28"
+                                      >
+                                          {isPending && selectedProvider?.id === provider.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : (provider.isActive ? <Ban className="mr-2 h-4 w-4"/> : <CheckCircle className="mr-2 h-4 w-4"/>)}
+                                          {provider.isActive ? 'Desactivar' : 'Activar'}
+                                      </Button>
+                                      <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                  <MoreHorizontal className="h-4 w-4" />
+                                              </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end">
+                                              <DropdownMenuItem onClick={() => handleEdit(provider)}>
+                                                  <Pencil className="mr-2 h-4 w-4" />
+                                                  Editar
+                                              </DropdownMenuItem>
+                                              <DropdownMenuSeparator />
+                                              <DropdownMenuItem onClick={() => handleDelete(provider)} className="text-destructive focus:text-destructive">
+                                                  <Trash2 className="mr-2 h-4 w-4" />
+                                                  Eliminar Proveedor
+                                              </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                      </DropdownMenu>
+                                  </div>
+                              </TableCell>
+                          </TableRow>
+                      ))}
+                      </TableBody>
+                  </Table>
+                </div>
+            </>
+          ) : (
+             <div className="text-center py-16 text-muted-foreground">
+                <UsersIcon className="mx-auto h-12 w-12" />
+                <h3 className="mt-4 text-lg font-semibold">
+                    No se encontraron proveedores
+                </h3>
+                <p className="mt-2 text-sm">
+                    {searchTerm ? `No se encontraron resultados para "${searchTerm}".` : "Actualmente no hay proveedores registrados en la plataforma."}
+                </p>
+             </div>
           )}
         </CardContent>
       </Card>
