@@ -1,12 +1,11 @@
-
 {
   "name": "Recaudo Seguro",
-  "short_name": "Recaudo",
+  "short_name": "Recaudo Seguro",
+  "description": "Gestión de recaudos segura y eficiente.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F0F4F7",
   "theme_color": "#2962FF",
-  "description": "Gestión de recaudos segura y eficiente.",
   "icons": [
     {
       "src": "https://placehold.co/192x192.png",
