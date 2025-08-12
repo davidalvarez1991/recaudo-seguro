@@ -773,8 +773,9 @@ export async function getPaymentRoute() {
     }
     
     let dailyGoal = 0;
-    
-    // First, calculate the daily goal correctly.
+    const todayStart = startOfDay(toZonedTime(new Date(), timeZone));
+    const todayEnd = endOfDay(toZonedTime(new Date(), timeZone));
+
     for (const credit of activeCredits) {
         if (!Array.isArray(credit.paymentDates) || credit.paymentDates.length === 0) continue;
 
@@ -785,9 +786,6 @@ export async function getPaymentRoute() {
         const nextPaymentDate = sortedDates[paidInstallmentsCount];
         if (!nextPaymentDate) continue;
 
-        const todayStart = startOfDay(toZonedTime(new Date(), timeZone));
-        const todayEnd = endOfDay(toZonedTime(new Date(), timeZone));
-
         const isPaidToday = allPayments.some(p => {
             if (p.creditId !== credit.id || !p.date?.toDate) return false;
             const paymentDateInTimeZone = toZonedTime(p.date.toDate(), timeZone);
@@ -795,9 +793,10 @@ export async function getPaymentRoute() {
         });
 
         const nextPaymentZoned = toZonedTime(nextPaymentDate, timeZone);
+        
         if (isToday(nextPaymentZoned) && !isPaidToday) {
             const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
-            const installmentAmount = totalLoanAmount / credit.cuotas;
+            const installmentAmount = credit.cuotas > 0 ? totalLoanAmount / credit.cuotas : 0;
             dailyGoal += installmentAmount + (credit.lateFee || 0);
         }
     }
@@ -811,9 +810,6 @@ export async function getPaymentRoute() {
 
         const nextPaymentDate = sortedDates[paidInstallmentsCount];
         if (!nextPaymentDate) return null;
-
-        const todayStart = startOfDay(toZonedTime(new Date(), timeZone));
-        const todayEnd = endOfDay(toZonedTime(new Date(), timeZone));
 
         const isPaidToday = allPayments.some(p => {
             if (p.creditId !== credit.id || !p.date?.toDate) return false;
@@ -2271,3 +2267,4 @@ export async function getProviderCommissionTiers(): Promise<{tiers: CommissionTi
 }
 
     
+
