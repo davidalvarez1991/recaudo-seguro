@@ -11,14 +11,14 @@ export const AppLogo = ({ className }: { className?: string }) => {
         >
             <path
                 d="M12 2L4 5v6c0 5.55 3.58 10.42 8 11.92 4.42-1.5 8-6.37 8-11.92V5l-8-3z"
-                stroke="#38B6FF"
+                stroke="#2962FF"
                 strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
             />
             <path
                 d="M12 22C16.42 20.5 20 15.63 20 11V5l-8-3-8 3v6c0 5.55 3.58 10.42 8 11.92z"
-                fill="#38B6FF"
+                fill="#2962FF"
                 fillOpacity="0.1"
             />
             <path
