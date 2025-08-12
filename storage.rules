@@ -1,11 +1,12 @@
 rules_version = '2';
+
 service firebase.storage {
   match /b/{bucket}/o {
-    // Allows read and write access to all files.
-    // This is safe in this context because the upload function is only
-    // accessible to authenticated providers within the application.
-    match /{allPaths=**} {
-      allow read, write: if true;
+    // Allow read/write access for authenticated users to their own folders.
+    // This rule assumes that you will store user files in a directory named after their UID.
+    // For example: /users/{userId}/profile.jpg
+    match /users/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
