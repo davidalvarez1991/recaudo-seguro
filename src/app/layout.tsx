@@ -3,6 +3,7 @@ import type {Metadata} from 'next';
 import { Toaster } from "@/components/ui/toaster"
 import './globals.css';
 import { cn } from '@/lib/utils';
+import { InstallPWA } from '@/components/install-pwa';
 
 
 export const metadata: Metadata = {
@@ -31,6 +32,7 @@ export default async function RootLayout({
       <body className={cn("font-body antialiased bg-background")}>
         {children}
         <Toaster />
+        <InstallPWA />
       </body>
     </html>
   );
