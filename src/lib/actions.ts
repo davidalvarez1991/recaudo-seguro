@@ -763,8 +763,6 @@ export async function getPaymentRoute() {
     const activeCredits = allCredits.filter(c => c.estado === 'Activo');
     const timeZone = 'America/Bogota';
     
-    let dailyGoal = 0;
-    
     const activeCreditIds = activeCredits.map(c => c.id);
     let allPayments: any[] = [];
     if (activeCreditIds.length > 0) {
@@ -774,40 +772,58 @@ export async function getPaymentRoute() {
         allPayments = paymentsSnapshot.docs.map(p => p.data());
     }
     
-    const routeEntriesPromises = activeCredits.map(async (credit) => {
-        if (!Array.isArray(credit.paymentDates) || credit.paymentDates.length === 0) return null;
-        
-        const sortedDates = credit.paymentDates
-            .map(d => parseISO(d))
-            .sort((a, b) => a.getTime() - b.getTime());
+    let dailyGoal = 0;
+    
+    // First, calculate the daily goal correctly.
+    for (const credit of activeCredits) {
+        if (!Array.isArray(credit.paymentDates) || credit.paymentDates.length === 0) continue;
 
+        const sortedDates = credit.paymentDates.map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
         const paidInstallmentsCount = credit.paidInstallments || 0;
-
-        if (paidInstallmentsCount >= sortedDates.length) return null; // Credit is fully paid
+        if (paidInstallmentsCount >= sortedDates.length) continue;
 
         const nextPaymentDate = sortedDates[paidInstallmentsCount];
-        
-        if (!nextPaymentDate) return null;
-        
+        if (!nextPaymentDate) continue;
+
         const todayStart = startOfDay(toZonedTime(new Date(), timeZone));
         const todayEnd = endOfDay(toZonedTime(new Date(), timeZone));
 
-        const creditPaymentsToday = allPayments.filter(p => {
-            if (!p.date?.toDate) return false;
+        const isPaidToday = allPayments.some(p => {
+            if (p.creditId !== credit.id || !p.date?.toDate) return false;
             const paymentDateInTimeZone = toZonedTime(p.date.toDate(), timeZone);
-            return p.creditId === credit.id && isWithinInterval(paymentDateInTimeZone, { start: todayStart, end: todayEnd });
+            return isWithinInterval(paymentDateInTimeZone, { start: todayStart, end: todayEnd });
         });
-        
-        const isPaidToday = creditPaymentsToday.length > 0;
-        
+
+        const nextPaymentZoned = toZonedTime(nextPaymentDate, timeZone);
+        if (isToday(nextPaymentZoned) && !isPaidToday) {
+            const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
+            const installmentAmount = totalLoanAmount / credit.cuotas;
+            dailyGoal += installmentAmount + (credit.lateFee || 0);
+        }
+    }
+
+    const routeEntriesPromises = activeCredits.map(async (credit) => {
+        if (!Array.isArray(credit.paymentDates) || credit.paymentDates.length === 0) return null;
+
+        const sortedDates = credit.paymentDates.map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
+        const paidInstallmentsCount = credit.paidInstallments || 0;
+        if (paidInstallmentsCount >= sortedDates.length) return null;
+
+        const nextPaymentDate = sortedDates[paidInstallmentsCount];
+        if (!nextPaymentDate) return null;
+
+        const todayStart = startOfDay(toZonedTime(new Date(), timeZone));
+        const todayEnd = endOfDay(toZonedTime(new Date(), timeZone));
+
+        const isPaidToday = allPayments.some(p => {
+            if (p.creditId !== credit.id || !p.date?.toDate) return false;
+            const paymentDateInTimeZone = toZonedTime(p.date.toDate(), timeZone);
+            return isWithinInterval(paymentDateInTimeZone, { start: todayStart, end: todayEnd });
+        });
+
         const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
         const installmentAmount = totalLoanAmount / credit.cuotas;
-        const nextPaymentZoned = toZonedTime(nextPaymentDate, timeZone);
         
-        if (isToday(nextPaymentZoned) && !isPaidToday) {
-            dailyGoal += installmentAmount + credit.lateFee;
-        }
-
         const clienteData = await findUserByIdNumber(credit.clienteId);
 
         const serializableCredit = Object.fromEntries(
@@ -853,6 +869,7 @@ export async function getPaymentRoute() {
 
     return { routes: sortedRoutes, dailyGoal, collectedToday };
 }
+
 
 async function getCreditsByProvider() {
     const { userId, role } = await getAuthenticatedUser();
