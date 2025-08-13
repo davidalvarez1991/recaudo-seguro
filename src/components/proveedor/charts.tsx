@@ -106,15 +106,15 @@ export function Charts({ capitalData, portfolioData, hasPortfolioData }: ChartPr
                 <CardContent>
                     {hasPortfolioData ? (
                         <ResponsiveContainer width="100%" height={400}>
-                            <PieChart margin={{ top: 40, right: 80, bottom: 80, left: 80 }}>
+                            <PieChart margin={{ top: 40, right: 40, bottom: 80, left: 40 }}>
                                 <Pie
                                     activeIndex={activeIndex}
                                     activeShape={renderActiveShape}
                                     data={portfolioData}
                                     cx="50%"
                                     cy="50%"
-                                    innerRadius={80}
-                                    outerRadius={120}
+                                    innerRadius={60}
+                                    outerRadius={80}
                                     fill="#8884d8"
                                     dataKey="value"
                                     onMouseEnter={onPieEnter}
