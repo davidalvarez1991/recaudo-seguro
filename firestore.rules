@@ -1,120 +1,12 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Helper functions to check user roles and ownership.
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isUser(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-    
-    function getRole() {
-        return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-    }
-
-    function isAdmin() {
-      return isSignedIn() && getRole() == 'admin';
-    }
-    
-    function isProveedor() {
-      return isSignedIn() && getRole() == 'proveedor';
-    }
-
-    function isCobrador() {
-      return isSignedIn() && getRole() == 'cobrador';
-    }
-    
-    function isCliente() {
-        return isSignedIn() && getRole() == 'cliente';
-    }
-
-    // --- Rules for 'users' collection ---
-    match /users/{userId} {
-      // Allow anyone to create a user (register).
-      allow create: if true;
-      
-      // Allow read access if:
-      // 1. The user is reading their own data.
-      // 2. The user is an admin.
-      // 3. The user is a provider reading one of their cobradores or clients.
-      allow read: if isUser(userId) || isAdmin() || 
-                  (isProveedor() && resource.data.providerId == request.auth.uid) ||
-                  (isCobrador() && resource.data.providerId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.providerId);
-
-      // Allow update access if:
-      // 1. The user is updating their own data.
-      // 2. The user is an admin.
-      allow update: if isUser(userId) || isAdmin();
-
-      // Allow delete access if the user is an admin.
-      allow delete: if isAdmin();
-    }
-
-    // --- Rules for 'credits' collection ---
-    match /credits/{creditId} {
-      // Allow create access if the user is a cobrador.
-      allow create: if isCobrador();
-
-      // Allow read access if:
-      // 1. The user is an admin.
-      // 2. The user is a provider reading their own credits.
-      // 3. The user is a cobrador reading credits they manage.
-      // 4. The user is a client reading their own credit.
-      allow read: if isAdmin() || 
-                  (isProveedor() && resource.data.providerId == request.auth.uid) ||
-                  (isCobrador() && resource.data.cobradorId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.idNumber) ||
-                  (isCliente() && resource.data.clienteId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.idNumber);
-                  
-      // Allow update access if the user is a cobrador or an admin.
-      allow update: if isCobrador() || isAdmin();
-      
-      // Allow delete access if the user is an admin or a provider deleting their own credit.
-      allow delete: if isAdmin() || (isProveedor() && resource.data.providerId == request.auth.uid);
-    }
-    
-    // --- Rules for 'payments' collection ---
-    match /payments/{paymentId} {
-        // Allow create if the user is a cobrador
-        allow create: if isCobrador();
-        
-        // Allow read access if involved in the transaction or an admin
-        allow read: if isAdmin() ||
-                    (isProveedor() && resource.data.providerId == request.auth.uid) ||
-                    (isCobrador() && resource.data.cobradorId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.idNumber) ||
-                    (isCliente() && resource.data.clienteId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.idNumber);
-        
-        // Generally, payments should be immutable. Allow updates only by admin for corrections.
-        allow update: if isAdmin();
-
-        // Allow delete access if admin.
-        allow delete: if isAdmin();
-    }
-
-    // --- Rules for 'contracts' collection ---
-    match /contracts/{contractId} {
-        // Created by cobrador (server-side action)
-        allow create: if isCobrador();
-
-        // Read by client, provider, or admin.
-        allow read: if isCliente() && resource.data.clienteId == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.idNumber ||
-                    (isProveedor() && resource.data.providerId == request.auth.uid) ||
-                    isAdmin();
-        
-        // Updated by cobrador (server-side action for acceptance)
-        allow update: if isCobrador();
-
-        // Allow delete access if admin or provider.
-        allow delete: if isAdmin() || (isProveedor() && resource.data.providerId == request.auth.uid);
-    }
-
-    // --- Rules for 'settings' collection ---
-    match /settings/{settingId} {
-      // Only admins can read/write global settings.
-      allow read, write: if isAdmin();
+    // Regla global: Permite leer y escribir en cualquier documento
+    // a cualquier usuario que haya iniciado sesión.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
     }
   }
 }
