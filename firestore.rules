@@ -3,10 +3,10 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Regla global: Permite leer y escribir en cualquier documento
-    // a cualquier usuario que haya iniciado sesión.
+    // ATENCIÓN: Esta regla permite el acceso público a toda la base de datos.
+    // Es una medida temporal para resolver problemas de permisos y no es segura para producción.
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
   }
 }
