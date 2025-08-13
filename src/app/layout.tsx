@@ -4,11 +4,13 @@ import { Toaster } from "@/components/ui/toaster"
 import './globals.css';
 import { cn } from '@/lib/utils';
 import { InstallPWA } from '@/components/install-pwa';
+import { SubscriptionHandler } from '@/components/notifications/subscription-handler';
 
 
 export const metadata: Metadata = {
   title: 'Recaudo Seguro',
   description: 'Gestión de recaudos segura y eficiente.',
+   manifest: "/manifest.json",
 };
 
 export default async function RootLayout({
@@ -21,7 +23,6 @@ export default async function RootLayout({
     <html lang="es">
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#2962FF" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -33,6 +34,7 @@ export default async function RootLayout({
         {children}
         <Toaster />
         <InstallPWA />
+        <SubscriptionHandler />
       </body>
     </html>
   );

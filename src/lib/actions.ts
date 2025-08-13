@@ -2265,3 +2265,21 @@ export async function getProviderCommissionTiers(): Promise<{tiers: CommissionTi
 
     return { tiers, isMonthly };
 }
+
+export async function savePushSubscription(subscription: PushSubscription) {
+  const { userId } = await getAuthenticatedUser();
+  if (!userId) {
+    console.error("User not authenticated. Cannot save push subscription.");
+    return;
+  }
+
+  try {
+    const userRef = doc(db, 'users', userId);
+    await updateDoc(userRef, {
+      pushSubscription: JSON.parse(JSON.stringify(subscription)), // Ensure subscription is serializable
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Error saving push subscription to Firestore:', error);
+  }
+}
