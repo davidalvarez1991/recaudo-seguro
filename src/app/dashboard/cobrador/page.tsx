@@ -3,10 +3,10 @@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { CobradorDashboardClient } from "@/components/dashboard/cobrador-dashboard-client";
 import { CreditSimulator } from "@/components/dashboard/credit-simulator";
-import { getUserData, getPaymentRoute, getCobradorSelfDailySummary } from "@/lib/actions";
+import { getUserData, getPaymentRoute, getCobradorSelfDailySummary, getCreditsByCobrador } from "@/lib/actions";
 import { Separator } from "@/components/ui/separator";
 import { ClientReputationSearch } from "@/components/dashboard/client-reputation-search";
-import { Target, TrendingUp, CheckCircle, Star, AlertTriangle, RefreshCw } from "lucide-react";
+import { Target, TrendingUp, CheckCircle, Star, AlertTriangle, RefreshCw, Users } from "lucide-react";
 import { DailyStats } from "@/components/dashboard/daily-stats";
 import { getAuthenticatedUser } from "@/lib/auth";
 
@@ -42,6 +42,7 @@ export default async function CobradorDashboard() {
   let isLateInterestActive = false;
   let dailyGoal = 0;
   let collectedToday = 0;
+  let totalClients = 0;
   
   const dailySummary = await getCobradorSelfDailySummary();
 
@@ -59,9 +60,16 @@ export default async function CobradorDashboard() {
             }
         }
         
-        const paymentRouteData = await getPaymentRoute();
+        const [paymentRouteData, creditsData] = await Promise.all([
+          getPaymentRoute(),
+          getCreditsByCobrador()
+        ]);
+        
         dailyGoal = paymentRouteData.dailyGoal;
         collectedToday = paymentRouteData.collectedToday;
+        
+        const clientIds = new Set(creditsData.map(c => c.clienteId));
+        totalClients = clientIds.size;
     }
   }
   
@@ -99,6 +107,17 @@ export default async function CobradorDashboard() {
                         <div>
                         <p className="text-sm font-medium text-primary-foreground/90">Recaudado Hoy</p>
                         <p className="text-3xl font-bold">{formatCurrency(collectedToday)}</p>
+                        </div>
+                    </div>
+                    </CardContent>
+                </Card>
+                 <Card className="bg-purple-600 text-primary-foreground shadow-lg">
+                    <CardContent className="p-4">
+                    <div className="flex items-center gap-4">
+                        <Users className="h-10 w-10 text-primary-foreground/80"/>
+                        <div>
+                        <p className="text-sm font-medium text-primary-foreground/90">Total Clientes Asignados</p>
+                        <p className="text-3xl font-bold">{totalClients}</p>
                         </div>
                     </div>
                     </CardContent>

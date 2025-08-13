@@ -1,4 +1,5 @@
 
+
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, DollarSign, Users as UsersIcon } from "lucide-react";
@@ -18,7 +19,7 @@ export default async function AdminDashboard() {
     getAdminSettings(),
   ]);
 
-  const pricePerClient = settingsData.pricePerClient || 3500;
+  const pricePerClient = settingsData?.pricePerClient || 3500;
 
   const totalProjectedIncome = providersData.reduce((sum, p) => sum + (p.uniqueClientCount * pricePerClient), 0);
   const totalClients = providersData.reduce((sum, p) => sum + p.uniqueClientCount, 0);
