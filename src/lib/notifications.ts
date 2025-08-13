@@ -44,9 +44,12 @@ export async function registerAndSubscribe() {
       });
     }
 
-    await savePushSubscription(subscription);
+    // Convert the subscription to a plain JSON object before sending
+    await savePushSubscription(subscription.toJSON());
     console.log('Push subscription saved successfully.');
   } catch (error) {
     console.error('Failed to register service worker or subscribe to push notifications:', error);
   }
 }
+
+    

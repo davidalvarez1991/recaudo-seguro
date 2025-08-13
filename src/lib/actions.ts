@@ -2266,7 +2266,7 @@ export async function getProviderCommissionTiers(): Promise<{tiers: CommissionTi
     return { tiers, isMonthly };
 }
 
-export async function savePushSubscription(subscription: PushSubscription) {
+export async function savePushSubscription(subscriptionJSON: object) {
   const { userId } = await getAuthenticatedUser();
   if (!userId) {
     console.error("User not authenticated. Cannot save push subscription.");
@@ -2276,10 +2276,12 @@ export async function savePushSubscription(subscription: PushSubscription) {
   try {
     const userRef = doc(db, 'users', userId);
     await updateDoc(userRef, {
-      pushSubscription: JSON.parse(JSON.stringify(subscription)), // Ensure subscription is serializable
+      pushSubscription: subscriptionJSON,
       updatedAt: Timestamp.now(),
     });
   } catch (error) {
     console.error('Error saving push subscription to Firestore:', error);
   }
 }
+
+    
