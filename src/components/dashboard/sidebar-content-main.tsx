@@ -1,3 +1,4 @@
+
 "use client";
 
 import {
@@ -7,7 +8,7 @@ import {
   SidebarMenuButton,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Home, Settings, ClipboardList, Users, HandCoins, LayoutDashboard, Download, History, Map, FileText } from "lucide-react";
+import { Home, Settings, ClipboardList, Users, HandCoins, LayoutDashboard, Download, History, Map, FileText, BarChartHorizontal } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -73,6 +74,20 @@ export function SidebarContentMain({ role }: SidebarContentMainProps) {
             </SidebarMenuButton>
           </SidebarMenuItem>
           
+           <SidebarMenuItem>
+             <SidebarMenuButton 
+              asChild 
+              isActive={isActive('/dashboard/proveedor/audita')} 
+              tooltip="Audita tu Negocio"
+              onClick={handleLinkClick}
+              >
+              <Link href="/dashboard/proveedor/audita">
+                <BarChartHorizontal />
+                <span>Audita tu Negocio</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+
           <SidebarMenuItem>
              <SidebarMenuButton 
               asChild 
