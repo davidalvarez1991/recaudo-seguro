@@ -18,7 +18,7 @@ export function ViewportSetter() {
             viewport.setAttribute('name', 'viewport');
             document.getElementsByTagName('head')[0].appendChild(viewport);
         }
-        viewport.setAttribute('content', 'width=1024');
+        viewport.setAttribute('content', 'width=900');
     }
 
     // Revert on component unmount
