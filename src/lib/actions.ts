@@ -804,18 +804,8 @@ export async function getPaymentRoute() {
         
         if (paidInstallmentsCount >= sortedDates.length) return null;
 
-        let nextPaymentDate = sortedDates[paidInstallmentsCount];
-
-        // If the next payment date is in the past, and it's not today, it's a missed payment.
-        // In this case, we should keep showing it in the route.
-        const missedPaymentDate = sortedDates.find((date, index) => {
-            const isMissed = isPast(date) && !isToday(date);
-            return isMissed && index >= paidInstallmentsCount;
-        });
-
-        if (missedPaymentDate) {
-            nextPaymentDate = missedPaymentDate;
-        }
+        // Find the first unpaid date. It could be in the past.
+        const nextPaymentDate = sortedDates[paidInstallmentsCount];
         
         if (!nextPaymentDate) return null;
 
@@ -2351,5 +2341,7 @@ export async function savePushSubscription(subscriptionJSON: object) {
     
 
 
+
+    
 
     
