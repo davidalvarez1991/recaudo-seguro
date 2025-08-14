@@ -336,7 +336,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                           <FormItem>
                             <FormLabel>Primer Apellido</FormLabel>
                             <FormControl>
-                              <Input {...field} placeholder="Doe" disabled={isPending} />
+                              <Input {...field} placeholder="Cárdenas" disabled={isPending} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
