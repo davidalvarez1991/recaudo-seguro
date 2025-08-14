@@ -189,7 +189,6 @@ export default function RutaDePagoPage() {
         setIsRefinanceModalOpen(true);
     }
     
-    const hasInterestOption = (selectedCredit?.lateInterestRate ?? 0) > 0;
     const sortedGroupKeys = Object.keys(groupedRoutes).sort((a,b) => new Date(a).getTime() - new Date(b).getTime());
 
     const defaultOpenValue = useMemo(() => {
@@ -344,7 +343,7 @@ export default function RutaDePagoPage() {
                             <div className="space-y-3">
                                 <div className="grid grid-cols-2 gap-2">
                                     <Button variant="outline" onClick={() => setIsModalOpen(false)} disabled={isSubmitting}>Cancelar</Button>
-                                    <Button variant="destructive" onClick={handleMissedPayment} disabled={isSubmitting || !hasInterestOption}><XCircle className="mr-2 h-4 w-4" />No pagó</Button>
+                                    <Button variant="destructive" onClick={handleMissedPayment} disabled={isSubmitting}><XCircle className="mr-2 h-4 w-4" />No pagó</Button>
                                 </div>
                                 <Button onClick={handleRegisterPayment} disabled={isSubmitting} className="w-full"><HandCoins className="mr-2 h-4 w-4" />{isSubmitting ? 'Registrando...' : 'Confirmar Pago'}</Button>
                             </div>
@@ -402,3 +401,5 @@ export default function RutaDePagoPage() {
         </Card>
     );
 }
+
+    
