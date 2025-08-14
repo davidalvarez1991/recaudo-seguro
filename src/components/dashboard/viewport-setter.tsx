@@ -5,26 +5,42 @@ import { useEffect } from 'react';
 
 export function ViewportSetter() {
   useEffect(() => {
-    const originalViewport = document.querySelector("meta[name=viewport]");
-    
-    // Save the original content if we want to restore it later
-    const originalContent = originalViewport ? originalViewport.getAttribute('content') : 'width=device-width, initial-scale=1.0';
+    const viewport = document.querySelector("meta[name=viewport]");
+    const desiredContent = 'width=650';
 
-    if (originalViewport) {
-      originalViewport.setAttribute('content', 'width=650');
+    if (viewport) {
+      viewport.setAttribute('content', desiredContent);
     } else {
       const newViewport = document.createElement('meta');
       newViewport.name = "viewport";
-      newViewport.content = "width=650";
+      newViewport.content = desiredContent;
       document.head.appendChild(newViewport);
     }
 
-    // Cleanup function to restore the original viewport when the component unmounts
-    return () => {
-      const viewportToRestore = document.querySelector("meta[name=viewport]");
-      if (viewportToRestore && originalContent) {
-        viewportToRestore.setAttribute('content', originalContent);
+    // This observer will re-apply our desired viewport if Next.js tries to change it during client-side navigation.
+    const observer = new MutationObserver((mutationsList) => {
+      for (const mutation of mutationsList) {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'content') {
+          const target = mutation.target as HTMLMetaElement;
+          if (target.name === 'viewport' && target.content !== desiredContent) {
+            target.setAttribute('content', desiredContent);
+          }
+        }
       }
+    });
+
+    const headElement = document.querySelector('head');
+    if (headElement) {
+        observer.observe(headElement, { 
+            attributes: true, 
+            childList: true, 
+            subtree: true 
+        });
+    }
+
+    return () => {
+      // Disconnect the observer when the component unmounts
+      observer.disconnect();
     };
   }, []);
 
