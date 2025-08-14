@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { UserPlus, Eye, TrendingUp, Landmark, Users, DollarSign, ShieldAlert, PiggyBank } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
-import { getCobradoresByProvider, getUserData, getProviderFinancialSummary, getAdminSettings } from "@/lib/actions";
+import { getCobradoresByProvider, getUserData, getProviderFinancialSummary, getAdminSettings, getLatestAnnouncement } from "@/lib/actions";
 import { CobradorRegistrationModal } from "@/components/proveedor/cobrador-registration-modal";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { DailySummaryContainer } from "@/components/proveedor/daily-summary-container";
@@ -13,6 +13,7 @@ import { ClientReputationSearch } from "@/components/dashboard/client-reputation
 import { getAuthenticatedUser } from "@/lib/auth";
 import { RenewalCountdown } from "@/components/proveedor/renewal-countdown";
 import { FinancialAdvisor } from "@/components/proveedor/financial-advisor";
+import { AnnouncementCard } from "@/components/proveedor/announcement-card";
 
 
 type UserData = {
@@ -66,6 +67,7 @@ export default async function ProveedorDashboard() {
   let financialSummary = { activeCapital: 0, collectedCommission: 0, uniqueClientCount: 0, myCapital: 0 };
   let adminSettings = { pricePerClient: 3500 };
   let subscriptionCost = 0;
+  let announcement = null;
 
   if (userId) {
     const userData: UserData = await getUserData(userId);
@@ -76,13 +78,15 @@ export default async function ProveedorDashboard() {
     }
     
     if (isActive) {
-      const [summary, settings] = await Promise.all([
+      const [summary, settings, latestAnnouncement] = await Promise.all([
         getProviderFinancialSummary(),
-        getAdminSettings()
+        getAdminSettings(),
+        getLatestAnnouncement()
       ]);
       financialSummary = summary;
       adminSettings = settings;
       subscriptionCost = financialSummary.uniqueClientCount * adminSettings.pricePerClient;
+      announcement = latestAnnouncement;
     }
   }
 
@@ -138,6 +142,8 @@ export default async function ProveedorDashboard() {
             </div>
         </CardHeader>
         <CardContent className="space-y-8">
+          {announcement && <AnnouncementCard announcement={announcement} />}
+
           <RenewalCountdown />
 
           <Separator />

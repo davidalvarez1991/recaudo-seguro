@@ -2,7 +2,7 @@
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, DollarSign, Users as UsersIcon } from "lucide-react";
+import { Users, DollarSign, Users as UsersIcon, Megaphone } from "lucide-react";
 import Link from "next/link";
 import { Separator } from "@/components/ui/separator";
 import { CollectionCountdown } from "@/components/admin/collection-countdown";
@@ -78,6 +78,21 @@ export default async function AdminDashboard() {
                 <Link href="/dashboard/admin/proveedores">
                     <Users className="mr-2 h-4 w-4" />
                     Gestionar Proveedores
+                </Link>
+            </Button>
+            
+            <Separator />
+
+            <div className="space-y-2">
+                <h3 className="text-lg font-medium">Comunicados a Proveedores</h3>
+                <p className="text-sm text-muted-foreground">
+                   Envía notificaciones y anuncios importantes que serán visibles para todos tus proveedores.
+                </p>
+            </div>
+             <Button asChild variant="outline">
+                <Link href="/dashboard/admin/anuncios">
+                    <Megaphone className="mr-2 h-4 w-4" />
+                    Enviar Anuncio
                 </Link>
             </Button>
             

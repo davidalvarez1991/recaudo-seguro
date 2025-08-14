@@ -780,21 +780,28 @@ export async function getPaymentRoute() {
     for (const credit of activeCredits) {
         if (!Array.isArray(credit.paymentDates) || credit.paymentDates.length === 0) continue;
 
-        // Check all payment dates, not just the next one
-        for (const dateStr of credit.paymentDates) {
-            const paymentDate = parseISO(dateStr);
-            const paymentZoned = toZonedTime(paymentDate, timeZone);
+        const creditPaymentsForToday = allPayments.some(p => {
+            if (p.creditId !== credit.id || !p.date?.toDate) return false;
+            const paymentDateInTimeZone = toZonedTime(p.date.toDate(), timeZone);
+            return isWithinInterval(paymentDateInTimeZone, { start: todayStart, end: todayEnd });
+        });
 
-            if (isSameDay(today, paymentZoned)) {
-                const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
-                const installmentAmount = credit.cuotas > 0 ? totalLoanAmount / credit.cuotas : 0;
-                dailyGoal += installmentAmount;
+        // Only add to goal if not paid today
+        if (!creditPaymentsForToday) {
+            for (const dateStr of credit.paymentDates) {
+                const paymentDate = parseISO(dateStr);
+                const paymentZoned = toZonedTime(paymentDate, timeZone);
 
-                // Add late fee only if the due date is today AND there are missed days
-                if (credit.missedPaymentDays > 0) {
-                    dailyGoal += credit.lateFee || 0;
+                if (isSameDay(today, paymentZoned)) {
+                    const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
+                    const installmentAmount = credit.cuotas > 0 ? totalLoanAmount / credit.cuotas : 0;
+                    dailyGoal += installmentAmount;
+
+                    if (credit.missedPaymentDays > 0) {
+                        dailyGoal += credit.lateFee || 0;
+                    }
+                    break;
                 }
-                break; // Stop after finding one match for today for this credit
             }
         }
     }
@@ -2227,6 +2234,54 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
     }
 }
 
+export async function sendAnnouncementToProviders(message: string) {
+    const { role } = await getAuthenticatedUser();
+    if (role !== 'admin') {
+        return { error: "Acción no autorizada." };
+    }
+    if (!message || message.trim().length < 10) {
+        return { error: "El mensaje es demasiado corto." };
+    }
+    try {
+        await addDoc(collection(db, "announcements"), {
+            message: message.trim(),
+            createdAt: Timestamp.now(),
+        });
+        return { success: true };
+    } catch (error) {
+        console.error("Error sending announcement:", error);
+        return { error: "No se pudo enviar el anuncio." };
+    }
+}
+
+export async function getLatestAnnouncement() {
+    const { role } = await getAuthenticatedUser();
+    if (role !== 'proveedor') {
+        return null;
+    }
+    try {
+        const announcementsRef = collection(db, "announcements");
+        const q = query(announcementsRef, orderBy("createdAt", "desc"), limit(1));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            return null;
+        }
+
+        const docData = querySnapshot.docs[0].data();
+        return {
+            id: querySnapshot.docs[0].id,
+            message: docData.message,
+            createdAt: (docData.createdAt as Timestamp).toDate().toISOString(),
+        };
+    } catch (error) {
+        console.error("Error fetching latest announcement:", error);
+        return null;
+    }
+}
+
+
+
 export async function getFinancialAdviceForProvider() {
     try {
         const summary = await getProviderFinancialSummary();
@@ -2284,3 +2339,4 @@ export async function savePushSubscription(subscriptionJSON: object) {
     
 
     
+
