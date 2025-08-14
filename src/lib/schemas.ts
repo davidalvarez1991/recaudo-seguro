@@ -191,4 +191,9 @@ export const AnnouncementSchema = z.object({
     }),
   }),
 });
-    
+
+
+const formatCurrency = (value: number) => {
+    if (isNaN(value)) return "$0";
+    return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+};

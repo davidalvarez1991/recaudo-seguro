@@ -14,7 +14,7 @@ import { analyzeClientReputation, ClientReputationInput } from '@/ai/flows/analy
 import { getFinancialAdvice, FinancialAdviceInput } from '@/ai/flows/get-financial-advice';
 import { es } from 'date-fns/locale';
 import { getAuthenticatedUser } from "./auth";
-import { sendNotificationToProvider } from "./notifications";
+import webpush from 'web-push';
 
 
 const ADMIN_ID = "admin_0703091991";
@@ -25,6 +25,33 @@ type CommissionTier = {
   percentage: number;
   lateInterestRate?: number;
 };
+
+// --- Notification Sending Logic (Server-Side) ---
+async function sendNotificationToProvider(providerId: string, payload: { title: string; body: string; }) {
+  if (!process.env.VAPID_PRIVATE_KEY || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+    console.log('VAPID keys not set on server. Skipping push notification.');
+    return;
+  }
+  
+  webpush.setVapidDetails(
+    'mailto:recaudo.seguro.servicio.cliente@gmail.com',
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+
+  try {
+    const provider = await getUserData(providerId);
+    if (provider && provider.pushSubscription) {
+      const subscription = provider.pushSubscription;
+      const notificationPayload = JSON.stringify(payload);
+      
+      await webpush.sendNotification(subscription, notificationPayload);
+      console.log(`Push notification sent to provider ${providerId}`);
+    }
+  } catch (error) {
+    console.error(`Failed to send push notification to provider ${providerId}:`, error);
+  }
+}
 
 // --- Utility Functions ---
 export const findUserByIdNumber = async (idNumber: string) => {
@@ -1562,7 +1589,7 @@ export async function registerPayment(creditId: string, amount: number, type: "c
     const clientData = await findUserByIdNumber(creditData.clienteId);
     await sendNotificationToProvider(creditData.providerId, {
         title: '✅ Pago Registrado',
-        body: `${cobradorData.name} registró un pago de ${format(amount, 'es-CO')} para ${clientData?.name}.`,
+        body: `${cobradorData.name} registró un pago de ${formatCurrency(amount)} para ${clientData?.name}.`,
     });
 
     return { success: `Pago de ${amount.toLocaleString('es-CO')} registrado.` };
@@ -2415,5 +2442,6 @@ export async function savePushSubscription(subscriptionJSON: object) {
     
 
     
+
 
 
