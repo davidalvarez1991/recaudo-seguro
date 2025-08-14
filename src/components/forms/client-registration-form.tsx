@@ -149,14 +149,15 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                     variant: "destructive",
                     duration: 8000,
                 });
-                setIsPending(false); // <<< THIS WAS THE FIX
-                return;
+            } else {
+                setFormData(form.getValues());
+                setStep(2);
             }
+        } else {
+            setFormData(form.getValues());
+            setStep(2);
         }
         
-        setFormData(form.getValues());
-        setStep(2);
-
       } catch (error) {
         toast({ title: "Error de Validación", description: "No se pudo verificar la existencia del cliente.", variant: "destructive" });
       } finally {
