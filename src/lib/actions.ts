@@ -773,8 +773,9 @@ export async function getPaymentRoute() {
     }
     
     let dailyGoal = 0;
-    const todayStart = startOfDay(toZonedTime(new Date(), timeZone));
-    const todayEnd = endOfDay(toZonedTime(new Date(), timeZone));
+    const today = toZonedTime(new Date(), timeZone);
+    const todayStart = startOfDay(today);
+    const todayEnd = endOfDay(today);
 
     for (const credit of activeCredits) {
         if (!Array.isArray(credit.paymentDates) || credit.paymentDates.length === 0) continue;
@@ -786,15 +787,9 @@ export async function getPaymentRoute() {
         const nextPaymentDate = sortedDates[paidInstallmentsCount];
         if (!nextPaymentDate) continue;
 
-        const isPaidToday = allPayments.some(p => {
-            if (p.creditId !== credit.id || !p.date?.toDate) return false;
-            const paymentDateInTimeZone = toZonedTime(p.date.toDate(), timeZone);
-            return isWithinInterval(paymentDateInTimeZone, { start: todayStart, end: todayEnd });
-        });
-
         const nextPaymentZoned = toZonedTime(nextPaymentDate, timeZone);
         
-        if (isToday(nextPaymentZoned) && !isPaidToday) {
+        if (isToday(nextPaymentZoned)) {
             const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
             const installmentAmount = credit.cuotas > 0 ? totalLoanAmount / credit.cuotas : 0;
             dailyGoal += installmentAmount + (credit.lateFee || 0);
@@ -848,7 +843,6 @@ export async function getPaymentRoute() {
     const sortedRoutes = (routeEntries as any[]).sort((a, b) => new Date(a.nextPaymentDate).getTime() - new Date(b.nextPaymentDate).getTime());
 
     const paymentsRef = collection(db, "payments");
-    const today = toZonedTime(new Date(), timeZone);
     const paymentsQuery = query(paymentsRef, where("cobradorId", "==", cobradorData.idNumber));
     const paymentsSnapshot = await getDocs(paymentsQuery);
     
@@ -2283,5 +2277,7 @@ export async function savePushSubscription(subscriptionJSON: object) {
     console.error('Error saving push subscription to Firestore:', error);
   }
 }
+
+    
 
     
