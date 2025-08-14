@@ -5,7 +5,6 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieC
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useState, useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { cn } from '@/lib/utils';
 
 type ChartProps = {
     capitalData: { name: string, value: number, fill: string }[];
@@ -79,7 +78,6 @@ export function Charts({ capitalData, portfolioData, hasPortfolioData }: ChartPr
         setIsClient(true);
     }, []);
 
-
     const onPieEnter = (_: any, index: number) => {
         setActiveIndex(index);
     };
@@ -87,11 +85,11 @@ export function Charts({ capitalData, portfolioData, hasPortfolioData }: ChartPr
     const CustomLegend = (props: any) => {
       const { payload } = props;
       return (
-        <ul className="flex justify-center items-center gap-4 mt-4">
+        <ul className="flex justify-center items-center gap-4 mt-4 flex-wrap">
           {payload.map((entry: any, index: number) => (
             <li key={`item-${index}`} className="flex items-center gap-2 text-sm">
               <span className="h-3 w-3 rounded-full" style={{ backgroundColor: entry.color }} />
-              <span style={{ color: entry.color }}>{entry.payload.name} ({entry.payload.value})</span>
+              <span className="text-foreground">{entry.payload.name} ({entry.payload.value})</span>
             </li>
           ))}
         </ul>
@@ -109,12 +107,12 @@ export function Charts({ capitalData, portfolioData, hasPortfolioData }: ChartPr
                     <CardTitle>Distribución de Capital</CardTitle>
                     <CardDescription>Comparativo de tu capital total, el dinero activo en la calle y la ganancia que has recaudado.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
+                <CardContent className="overflow-x-auto">
+                    <ResponsiveContainer width={isMobile ? 500 : "100%"} height={300}>
                         <BarChart data={capitalData} layout="vertical" margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                             <XAxis type="number" stroke="#888888" fontSize={12} tickFormatter={formatCurrency} />
                             <YAxis type="category" dataKey="name" stroke="#888888" fontSize={12} width={120} />
-                            <Tooltip formatter={formatCurrency} cursor={{ fill: 'rgba(240, 240, 240, 0.5)' }} />
+                            <Tooltip formatter={(value: number) => formatCurrency(value)} cursor={{ fill: 'rgba(240, 240, 240, 0.5)' }} />
                             <Bar dataKey="value" barSize={35}>
                                 {capitalData.map((entry, index) => (
                                     <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -130,29 +128,30 @@ export function Charts({ capitalData, portfolioData, hasPortfolioData }: ChartPr
                     <CardTitle>Salud de la Cartera de Clientes</CardTitle>
                     <CardDescription>Proporción de clientes activos que están al día con sus pagos frente a los que presentan morosidad.</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="overflow-x-auto">
                     {hasPortfolioData ? (
-                        <ResponsiveContainer width="100%" height={isMobile ? 300 : 400}>
+                        <ResponsiveContainer width={isMobile ? 400 : "100%"} height={350}>
                            <PieChart>
                                 <Pie
                                     activeIndex={isMobile ? undefined : activeIndex}
                                     activeShape={isMobile ? undefined : renderActiveShape}
                                     data={portfolioData}
                                     cx="50%"
-                                    cy={isMobile ? "50%" : "40%"}
+                                    cy="50%"
                                     innerRadius={isMobile ? 50 : 60}
-                                    outerRadius={isMobile ? 70 : 80}
+                                    outerRadius={isMobile ? 80 : 90}
                                     fill="#8884d8"
                                     dataKey="value"
                                     onMouseEnter={isMobile ? undefined : onPieEnter}
                                     labelLine={isMobile}
-                                    label={isMobile ? (p) => `${(p.percent * 100).toFixed(0)}%` : undefined}
+                                    label={isMobile ? (p) => `${p.name} - ${(p.percent * 100).toFixed(0)}%` : undefined}
                                 >
                                     {portfolioData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={entry.fill} />
                                     ))}
                                 </Pie>
-                                {isMobile && <Legend content={<CustomLegend />} />}
+                                {!isMobile && <Legend />}
+                                {isMobile && <Legend content={<CustomLegend />} layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{paddingTop: '20px'}} />}
                            </PieChart>
                         </ResponsiveContainer>
                     ) : (
