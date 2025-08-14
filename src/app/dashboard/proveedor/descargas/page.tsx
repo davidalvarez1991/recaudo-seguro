@@ -22,6 +22,8 @@ type Registro = {
   cobradorName?: string;
   clienteId: string;
   clienteName?: string;
+  clienteAddress?: string;
+  clientePhone?: string;
   estado: string; 
   valor: number;
   commission: number;
@@ -29,19 +31,25 @@ type Registro = {
   cuotas: number;
   lateFee: number;
   endDate?: string;
-  dailyCollectedAmount?: number;
+  paidAmount: number;
+  remainingBalance: number;
   agreementAmount?: number;
+  guarantor?: {
+      name: string;
+      idNumber: string;
+      address: string;
+      phone: string;
+  };
+  references?: {
+      familiar: { name: string; phone: string; address: string; };
+      personal: { name: string; phone: string; address: string; };
+  }
 };
 
 export default function DescargasPage() {
     const [dateRange, setDateRange] = useState<DateRange | undefined>();
     const [loading, setLoading] = useState(false);
     const { toast } = useToast();
-
-    const formatCurrency = (value: number) => {
-        if (isNaN(value)) return "$0";
-        return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-    };
 
     const handleDownload = async () => {
         if (!dateRange || !dateRange.from) {
@@ -76,24 +84,39 @@ export default function DescargasPage() {
             }
 
             const dataToExport = filteredRecords.map(r => ({
+                "ID Crédito": r.id,
+                "Fecha Crédito": format(new Date(r.fecha), "dd/MM/yyyy HH:mm"),
+                "Fecha Fin Crédito": r.endDate ? format(new Date(r.endDate), "dd/MM/yyyy") : 'N/A',
+                "Estado Crédito": r.estado,
                 "Nombre Cliente": r.clienteName,
                 "Cédula Cliente": r.clienteId,
-                "Fecha Crédito": format(new Date(r.fecha), "dd/MM/yyyy HH:mm"),
-                "Fecha Fin de Crédito": r.endDate ? format(new Date(r.endDate), "dd/MM/yyyy") : 'N/A',
-                "Cuotas": r.cuotas,
+                "Dirección Cliente": r.clienteAddress,
+                "Teléfono Cliente": r.clientePhone,
                 "Valor Crédito": r.valor,
                 "Ganancia (Comisión)": r.commission,
-                "Recaudo del Día": r.dailyCollectedAmount || 0,
+                "Total Pagado": r.paidAmount,
+                "Saldo Pendiente": r.remainingBalance,
                 "Valor Acuerdos": r.agreementAmount || 0,
                 "Valor Mora": r.lateFee,
+                "Cuotas": r.cuotas,
                 "Nombre Cobrador": r.cobradorName,
                 "Cédula Cobrador": r.cobradorId,
+                "Nombre Fiador": r.guarantor?.name || 'N/A',
+                "Cédula Fiador": r.guarantor?.idNumber || 'N/A',
+                "Dirección Fiador": r.guarantor?.address || 'N/A',
+                "Teléfono Fiador": r.guarantor?.phone || 'N/A',
+                "Ref. Familiar Nombre": r.references?.familiar.name || 'N/A',
+                "Ref. Familiar Teléfono": r.references?.familiar.phone || 'N/A',
+                "Ref. Familiar Dirección": r.references?.familiar.address || 'N/A',
+                "Ref. Personal Nombre": r.references?.personal.name || 'N/A',
+                "Ref. Personal Teléfono": r.references?.personal.phone || 'N/A',
+                "Ref. Personal Dirección": r.references?.personal.address || 'N/A',
             }));
 
             const worksheet = XLSX.utils.json_to_sheet(dataToExport);
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Registros");
-            XLSX.writeFile(workbook, `Reporte_RecaudoSeguro_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+            XLSX.writeFile(workbook, `Reporte_Detallado_RecaudoSeguro_${format(new Date(), "yyyy-MM-dd")}.xlsx`);
 
             toast({
                 title: "Descarga Exitosa",
@@ -185,3 +208,4 @@ export default function DescargasPage() {
     </Card>
   );
 }
+
