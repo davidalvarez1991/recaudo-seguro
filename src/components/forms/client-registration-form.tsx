@@ -710,7 +710,7 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                 <p className="text-muted-foreground">
                     Listo, tu cliente está a un botón para ser cargado en la plataforma.
                 </p>
-                <div className="flex gap-2 pt-4">
+                <div className="flex flex-col sm:flex-row gap-2 pt-4">
                      <Button type="button" variant="outline" onClick={() => setStep(contractText ? 3 : 2)} className="w-full" disabled={isPending}>
                         Volver a Revisar
                     </Button>
