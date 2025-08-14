@@ -9,6 +9,7 @@ export const LoginSchema = z.object({
   password: z.string().min(1, {
     message: "La contraseña es obligatoria.",
   }),
+  rememberMe: z.boolean().optional().default(false),
 });
 
 export const RegisterSchema = z.object({

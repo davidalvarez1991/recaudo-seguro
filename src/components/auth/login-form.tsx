@@ -20,6 +20,7 @@ import { useTransition } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Checkbox } from "../ui/checkbox";
 
 export function LoginForm() {
   const [isPending, startTransition] = useTransition();
@@ -31,6 +32,7 @@ export function LoginForm() {
     defaultValues: {
       idNumber: "",
       password: "",
+      rememberMe: false,
     },
   });
 
@@ -92,6 +94,26 @@ export function LoginForm() {
                 />
               </FormControl>
               <FormMessage />
+            </FormItem>
+          )}
+        />
+         <FormField
+          control={form.control}
+          name="rememberMe"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+              <FormControl>
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                  disabled={isPending}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel>
+                  Recordar mi sesión
+                </FormLabel>
+              </div>
             </FormItem>
           )}
         />

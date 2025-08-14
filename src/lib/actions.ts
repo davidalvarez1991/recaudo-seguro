@@ -144,12 +144,23 @@ export async function login(values: z.infer<typeof LoginSchema>) {
       return { error: "Campos inválidos." };
     }
 
-    const { idNumber, password } = validatedFields.data;
+    const { idNumber, password, rememberMe } = validatedFields.data;
+
+    const cookieOptions: any = {
+      httpOnly: true,
+      path: '/',
+    };
+
+    if (rememberMe) {
+      // Set cookie to expire in 30 days
+      cookieOptions.maxAge = 30 * 24 * 60 * 60;
+    }
+    // If not rememberMe, it will be a session cookie by default (no maxAge)
     
     // Check for a hardcoded admin user first
     if (idNumber === "0703091991" && password === "19913030") {
-         await cookies().set('loggedInUser', ADMIN_ID, { httpOnly: true, path: '/' });
-         await cookies().set('userRole', 'admin', { httpOnly: true, path: '/' });
+         await cookies().set('loggedInUser', ADMIN_ID, cookieOptions);
+         await cookies().set('userRole', 'admin', cookieOptions);
          return { successUrl: `/dashboard/admin` };
     }
     
@@ -168,8 +179,8 @@ export async function login(values: z.infer<typeof LoginSchema>) {
       return { error: "Cédula o contraseña incorrecta." };
     }
     
-    await cookies().set('loggedInUser', user.id, { httpOnly: true, path: '/' });
-    await cookies().set('userRole', user.role, { httpOnly: true, path: '/' });
+    await cookies().set('loggedInUser', user.id, cookieOptions);
+    await cookies().set('userRole', user.role, cookieOptions);
 
     return { successUrl: `/dashboard/${user.role}` };
 
@@ -2442,6 +2453,7 @@ export async function savePushSubscription(subscriptionJSON: object) {
     
 
     
+
 
 
 
