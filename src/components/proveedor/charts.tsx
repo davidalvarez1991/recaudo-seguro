@@ -3,7 +3,7 @@
 
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, Sector } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
@@ -73,6 +73,12 @@ const renderActiveShape = (props: any) => {
 export function Charts({ capitalData, portfolioData, hasPortfolioData }: ChartProps) {
     const [activeIndex, setActiveIndex] = useState(0);
     const isMobile = useIsMobile();
+    const [isClient, setIsClient] = useState(false);
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
+
 
     const onPieEnter = (_: any, index: number) => {
         setActiveIndex(index);
@@ -91,6 +97,10 @@ export function Charts({ capitalData, portfolioData, hasPortfolioData }: ChartPr
         </ul>
       );
     };
+    
+    if (!isClient) {
+        return null;
+    }
 
     return (
         <div className="space-y-8">
