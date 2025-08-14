@@ -10,7 +10,7 @@ import { getPaymentRoute, registerPayment, registerMissedPayment, registerPaymen
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { format, isToday, isTomorrow, isPast, parseISO, startOfDay } from 'date-fns';
+import { format, isToday, isTomorrow, isPast, parseISO, startOfDay, isSameDay } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 import { RenewCreditForm } from "@/components/forms/renew-credit-form";
