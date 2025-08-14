@@ -804,15 +804,23 @@ export async function getPaymentRoute() {
         
         if (paidInstallmentsCount >= sortedDates.length) return null;
 
-        const nextPaymentDate = sortedDates[paidInstallmentsCount];
+        let nextPaymentDate = sortedDates[paidInstallmentsCount];
+
+        // If the next payment date is in the past, and it's not today, it's a missed payment.
+        // In this case, we should keep showing it in the route.
+        const missedPaymentDate = sortedDates.find((date, index) => {
+            const isMissed = isPast(date) && !isToday(date);
+            return isMissed && index >= paidInstallmentsCount;
+        });
+
+        if (missedPaymentDate) {
+            nextPaymentDate = missedPaymentDate;
+        }
+        
         if (!nextPaymentDate) return null;
 
         const todayStart = startOfDay(today);
         const todayEnd = endOfDay(today);
-        
-        // If the next payment date is in the past, and it's not today, it's a missed payment.
-        // In this case, we should keep showing it in the route.
-        const isMissed = isPast(nextPaymentDate) && !isToday(nextPaymentDate);
         
         const isPaidToday = allPayments.some(p => {
             if (p.creditId !== credit.id || !p.date?.toDate) return false;
@@ -1139,38 +1147,42 @@ export async function createClientCreditAndContract(data: { clientData: z.infer<
         return { error: "Datos del formulario inválidos." };
     }
     
-    const { idNumber } = validatedFields.data;
+    const { idNumber, firstName, firstLastName } = validatedFields.data;
 
     const existingClient = await findUserByIdNumber(idNumber);
-    if (existingClient) {
-        return { error: "Ya existe un cliente con esta cédula. Utilice la opción de renovar o crear un nuevo crédito desde el historial del cliente." };
-    }
-    
+
     const batch = writeBatch(db);
     const now = Timestamp.now();
-
-    // 1. Create client
-    const { firstName, secondName, firstLastName, secondLastName, address, contactPhone, creditAmount, installments, guarantor, references } = validatedFields.data;
+    const { secondName, secondLastName, address, contactPhone, creditAmount, installments, guarantor, references } = validatedFields.data;
     const fullName = [firstName, secondName, firstLastName, secondLastName].filter(Boolean).join(" ");
-    const hashedPassword = await bcrypt.hash(idNumber, 10);
-    const newUserRef = doc(collection(db, "users"));
-    batch.set(newUserRef, {
-        idNumber,
-        name: fullName,
-        firstName,
-        secondName,
-        firstLastName,
-        secondLastName,
-        password: hashedPassword,
-        role: 'cliente',
-        providerId,
-        address,
-        contactPhone,
-        createdAt: now,
-        city: provider.city || 'N/A'
-    });
 
-    // 2. Create credit
+    if (existingClient) {
+        const nameMatches = existingClient.firstName?.toLowerCase() === firstName.toLowerCase() && existingClient.firstLastName?.toLowerCase() === firstLastName.toLowerCase();
+        if (!nameMatches) {
+            return { error: `La cédula ${idNumber} ya está registrada a nombre de ${existingClient.name}. Verifique los datos.` };
+        }
+        // Client exists and name matches, just create the credit
+    } else {
+        // Client does not exist, create new user
+        const hashedPassword = await bcrypt.hash(idNumber, 10);
+        const newUserRef = doc(collection(db, "users"));
+        batch.set(newUserRef, {
+            idNumber,
+            name: fullName,
+            firstName,
+            secondName,
+            firstLastName,
+            secondLastName,
+            password: hashedPassword,
+            role: 'cliente',
+            address,
+            contactPhone,
+            createdAt: now,
+            city: provider.city || 'N/A'
+        });
+    }
+
+    // Create credit
     const valor = parseFloat(creditAmount.replace(/\./g, ''));
     const { commission, percentage } = calculateCommission(valor, provider, paymentDates.map(d => new Date(d)));
     const creditRef = doc(collection(db, "credits"));
@@ -1192,7 +1204,7 @@ export async function createClientCreditAndContract(data: { clientData: z.infer<
     };
     batch.set(creditRef, creditDataObject);
 
-    // 3. Create Contract (if applicable and text is provided)
+    // Create Contract (if applicable and text is provided)
     if (provider.isContractGenerationActive && contractText) {
         const contractRef = doc(collection(db, "contracts"));
         batch.set(contractRef, {
