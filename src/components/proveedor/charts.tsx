@@ -4,6 +4,8 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, Sector } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useState } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 
 type ChartProps = {
     capitalData: { name: string, value: number, fill: string }[];
@@ -28,9 +30,9 @@ const renderActiveShape = (props: any) => {
   const cos = Math.cos(-RADIAN * midAngle);
   const sx = cx + (outerRadius + 10) * cos;
   const sy = cy + (outerRadius + 10) * sin;
-  const mx = cx + (outerRadius + 15) * cos;
-  const my = cy + (outerRadius + 15) * sin;
-  const ex = mx + (cos >= 0 ? 1 : -1) * 12;
+  const mx = cx + (outerRadius + 30) * cos;
+  const my = cy + (outerRadius + 30) * sin;
+  const ex = mx + (cos >= 0 ? 1 : -1) * 22;
   const ey = my;
   const textAnchor = cos >= 0 ? 'start' : 'end';
 
@@ -59,8 +61,8 @@ const renderActiveShape = (props: any) => {
       />
       <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
       <circle cx={ex} cy={ey} r={2} fill={fill} stroke="none" />
-      <text x={ex + (cos >= 0 ? 1 : -1) * 8} y={ey} textAnchor={textAnchor} fill="#333" fontSize={12}>{`${value} Cliente(s)`}</text>
-      <text x={ex + (cos >= 0 ? 1 : -1) * 8} y={ey} dy={16} textAnchor={textAnchor} fill="#999" fontSize={11}>
+      <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} textAnchor={textAnchor} fill="#333" fontSize={12}>{`${value} Cliente(s)`}</text>
+      <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} dy={18} textAnchor={textAnchor} fill="#999" fontSize={11}>
         {`(${(percent * 100).toFixed(1)}%)`}
       </text>
     </g>
@@ -70,9 +72,24 @@ const renderActiveShape = (props: any) => {
 
 export function Charts({ capitalData, portfolioData, hasPortfolioData }: ChartProps) {
     const [activeIndex, setActiveIndex] = useState(0);
+    const isMobile = useIsMobile();
 
     const onPieEnter = (_: any, index: number) => {
         setActiveIndex(index);
+    };
+    
+    const CustomLegend = (props: any) => {
+      const { payload } = props;
+      return (
+        <ul className="flex justify-center items-center gap-4 mt-4">
+          {payload.map((entry: any, index: number) => (
+            <li key={`item-${index}`} className="flex items-center gap-2 text-sm">
+              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: entry.color }} />
+              <span style={{ color: entry.color }}>{entry.payload.name} ({entry.payload.value})</span>
+            </li>
+          ))}
+        </ul>
+      );
     };
 
     return (
@@ -105,25 +122,28 @@ export function Charts({ capitalData, portfolioData, hasPortfolioData }: ChartPr
                 </CardHeader>
                 <CardContent>
                     {hasPortfolioData ? (
-                        <ResponsiveContainer width="100%" height={400}>
-                            <PieChart margin={{ top: 20, right: 20, bottom: 40, left: 20 }}>
+                        <ResponsiveContainer width="100%" height={isMobile ? 300 : 400}>
+                           <PieChart>
                                 <Pie
-                                    activeIndex={activeIndex}
-                                    activeShape={renderActiveShape}
+                                    activeIndex={isMobile ? undefined : activeIndex}
+                                    activeShape={isMobile ? undefined : renderActiveShape}
                                     data={portfolioData}
                                     cx="50%"
-                                    cy="50%"
-                                    innerRadius={60}
-                                    outerRadius={80}
+                                    cy={isMobile ? "50%" : "40%"}
+                                    innerRadius={isMobile ? 50 : 60}
+                                    outerRadius={isMobile ? 70 : 80}
                                     fill="#8884d8"
                                     dataKey="value"
-                                    onMouseEnter={onPieEnter}
+                                    onMouseEnter={isMobile ? undefined : onPieEnter}
+                                    labelLine={isMobile}
+                                    label={isMobile ? (p) => `${(p.percent * 100).toFixed(0)}%` : undefined}
                                 >
                                     {portfolioData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={entry.fill} />
                                     ))}
                                 </Pie>
-                            </PieChart>
+                                {isMobile && <Legend content={<CustomLegend />} />}
+                           </PieChart>
                         </ResponsiveContainer>
                     ) : (
                         <div className="flex justify-center items-center h-48 text-muted-foreground">
