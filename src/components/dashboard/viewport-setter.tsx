@@ -11,11 +11,11 @@ export function ViewportSetter() {
     const originalContent = originalViewport ? originalViewport.getAttribute('content') : 'width=device-width, initial-scale=1.0';
 
     if (originalViewport) {
-      originalViewport.setAttribute('content', 'width=800');
+      originalViewport.setAttribute('content', 'width=650');
     } else {
       const newViewport = document.createElement('meta');
       newViewport.name = "viewport";
-      newViewport.content = "width=800";
+      newViewport.content = "width=650";
       document.head.appendChild(newViewport);
     }
 
