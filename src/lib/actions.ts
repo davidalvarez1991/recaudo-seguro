@@ -1,14 +1,15 @@
 
 
+
 "use server";
 
 import { z } from "zod";
-import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, SavePaymentScheduleSchema, RenewCreditSchema, RefinanceCreditSchema, EditClientSchema, NewCreditSchema, EditProviderSchema } from "./schemas";
+import { LoginSchema, RegisterSchema, CobradorRegisterSchema, EditCobradorSchema, ClientCreditSchema, SavePaymentScheduleSchema, RenewCreditSchema, RefinanceCreditSchema, EditClientSchema, NewCreditSchema, EditProviderSchema, AnnouncementSchema } from "./schemas";
 import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
 import { db } from "./firebase";
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc, increment, orderBy, limit } from "firebase/firestore";
-import { startOfDay, differenceInDays, endOfDay, isWithinInterval, addDays, parseISO, isFuture, isToday, isSameDay, format, differenceInMonths, max, isPast } from 'date-fns';
+import { startOfDay, endOfDay, isWithinInterval, addDays, parseISO, isFuture, isToday, isSameDay, format, differenceInMonths, max, isPast, differenceInDays } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { analyzeClientReputation, ClientReputationInput } from '@/ai/flows/analyze-client-reputation';
 import { getFinancialAdvice, FinancialAdviceInput } from '@/ai/flows/get-financial-advice';
@@ -2242,17 +2243,24 @@ export async function saveAdminSettings(settings: { pricePerClient: number }) {
     }
 }
 
-export async function sendAnnouncementToProviders(message: string) {
+export async function sendAnnouncementToProviders(values: z.infer<typeof AnnouncementSchema>) {
     const { role } = await getAuthenticatedUser();
     if (role !== 'admin') {
         return { error: "Acción no autorizada." };
     }
-    if (!message || message.trim().length < 10) {
-        return { error: "El mensaje es demasiado corto." };
+
+    const validatedFields = AnnouncementSchema.safeParse(values);
+    if (!validatedFields.success) {
+        return { error: "Datos inválidos." };
     }
+
+    const { message, dateRange } = validatedFields.data;
+
     try {
         await addDoc(collection(db, "announcements"), {
             message: message.trim(),
+            startDate: Timestamp.fromDate(dateRange.from),
+            endDate: Timestamp.fromDate(dateRange.to),
             createdAt: Timestamp.now(),
         });
         return { success: true };
@@ -2269,16 +2277,31 @@ export async function getLatestAnnouncement() {
     }
     try {
         const announcementsRef = collection(db, "announcements");
-        const q = query(announcementsRef, orderBy("createdAt", "desc"), limit(1));
+        const now = Timestamp.now();
+        
+        const q = query(
+            announcementsRef,
+            where("startDate", "<=", now),
+            orderBy("startDate", "desc")
+        );
         const querySnapshot = await getDocs(q);
 
-        if (querySnapshot.empty) {
+        const activeAnnouncements = querySnapshot.docs.filter(doc => {
+            const data = doc.data();
+            const endDate = data.endDate as Timestamp;
+            // The announcement is active if its end date is in the future or today
+            return endDate.toMillis() >= startOfDay(new Date()).getTime();
+        });
+
+        if (activeAnnouncements.length === 0) {
             return null;
         }
 
-        const docData = querySnapshot.docs[0].data();
+        const latestActiveDoc = activeAnnouncements[0]; // The first one is the latest due to ordering
+        const docData = latestActiveDoc.data();
+
         return {
-            id: querySnapshot.docs[0].id,
+            id: latestActiveDoc.id,
             message: docData.message,
             createdAt: (docData.createdAt as Timestamp).toDate().toISOString(),
         };
@@ -2353,3 +2376,4 @@ export async function savePushSubscription(subscriptionJSON: object) {
     
 
     
+

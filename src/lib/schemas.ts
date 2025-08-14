@@ -178,4 +178,17 @@ export const NewCreditSchema = z.object({
   installments: z.string().min(1, "El número de cuotas es obligatorio."),
 });
 
+export const AnnouncementSchema = z.object({
+  message: z.string().min(10, {
+    message: "El anuncio debe tener al menos 10 caracteres.",
+  }),
+  dateRange: z.object({
+    from: z.date({
+      required_error: "La fecha de inicio es requerida.",
+    }),
+    to: z.date({
+      required_error: "La fecha de finalización es requerida.",
+    }),
+  }),
+});
     
