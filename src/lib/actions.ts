@@ -1139,21 +1139,26 @@ export async function createClientCreditAndContract(data: { clientData: z.infer<
     
     const { idNumber, firstName, firstLastName } = validatedFields.data;
 
+    // --- START: New validation logic ---
     const existingClient = await findUserByIdNumber(idNumber);
+
+    if (existingClient) {
+        // Client exists, check if name matches
+        const nameMatches = existingClient.firstName?.toLowerCase() === firstName.toLowerCase() && existingClient.firstLastName?.toLowerCase() === firstLastName.toLowerCase();
+        if (!nameMatches) {
+            return { error: `La cédula ${idNumber} ya está registrada a nombre de ${existingClient.name}. Por favor, verifique los datos.` };
+        }
+        // Name matches, proceed to create credit for existing client
+    }
+    // --- END: New validation logic ---
 
     const batch = writeBatch(db);
     const now = Timestamp.now();
     const { secondName, secondLastName, address, contactPhone, creditAmount, installments, guarantor, references } = validatedFields.data;
     const fullName = [firstName, secondName, firstLastName, secondLastName].filter(Boolean).join(" ");
-
-    if (existingClient) {
-        const nameMatches = existingClient.firstName?.toLowerCase() === firstName.toLowerCase() && existingClient.firstLastName?.toLowerCase() === firstLastName.toLowerCase();
-        if (!nameMatches) {
-            return { error: `La cédula ${idNumber} ya está registrada a nombre de ${existingClient.name}. Verifique los datos.` };
-        }
-        // Client exists and name matches, just create the credit
-    } else {
-        // Client does not exist, create new user
+    
+    // Only create a new user if one doesn't exist
+    if (!existingClient) {
         const hashedPassword = await bcrypt.hash(idNumber, 10);
         const newUserRef = doc(collection(db, "users"));
         batch.set(newUserRef, {
