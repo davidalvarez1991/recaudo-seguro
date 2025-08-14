@@ -17,7 +17,7 @@ export default async function DashboardLayout({
 
   return (
       <SidebarProvider defaultOpen={true}>
-        <div className="flex min-h-screen w-full flex-col bg-background">
+        <div className="flex min-h-screen w-full flex-col bg-background min-w-[1024px]">
           <header className="sticky top-0 flex h-16 items-center gap-4 border-b bg-card px-4 md:px-6 z-50">
              <div className="flex items-center gap-2">
               <SidebarTrigger />
