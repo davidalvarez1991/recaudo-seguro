@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, HandCoins, Loader2, Map, Star, Handshake, Percent, XCircle, Calendar as CalendarIcon, X, CheckCircle2, Circle, Home, Phone, Search, Repeat, NotebookText } from "lucide-react";
+import { ArrowLeft, ClipboardList, HandCoins, Loader2, Map, Star, Handshake, Percent, XCircle, Calendar as CalendarIcon, X, CheckCircle2, Circle, Home, Phone, Search, Repeat, NotebookText, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { getPaymentRoute, registerPayment, registerMissedPayment, registerPaymentAgreement } from "@/lib/actions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -65,8 +65,11 @@ const formatDateGroup = (dateStr: string) => {
     const date = parseISO(dateStr);
     const timeZone = 'America/Bogota';
     const zonedDate = toZonedTime(date, timeZone);
+    const today = toZonedTime(new Date(), timeZone);
+    
     if (isToday(zonedDate)) return `Hoy, ${format(zonedDate, "d 'de' MMMM", { locale: es })}`;
     if (isTomorrow(zonedDate)) return `Mañana, ${format(zonedDate, "d 'de' MMMM", { locale: es })}`;
+    if (isPast(date) && !isSameDay(date, today)) return `Vencido, ${format(zonedDate, "d 'de' MMMM", { locale: es })}`;
     return format(zonedDate, "EEEE, d 'de' MMMM", { locale: es });
 };
 
@@ -235,11 +238,13 @@ export default function RutaDePagoPage() {
                     </div>
                 ) : sortedGroupKeys.length > 0 ? (
                     <Accordion type="multiple" defaultValue={defaultOpenValue} className="w-full space-y-4">
-                        {sortedGroupKeys.map(dateKey => (
+                        {sortedGroupKeys.map(dateKey => {
+                            const isDateInPast = isPast(parseISO(dateKey)) && !isToday(parseISO(dateKey));
+                            return (
                             <AccordionItem key={dateKey} value={`group-${dateKey}`} className="border rounded-lg bg-card">
                                 <AccordionTrigger className="px-4 py-3 hover:no-underline">
                                     <div className="flex items-center gap-4">
-                                        <Badge variant={isPast(toZonedTime(parseISO(dateKey), 'America/Bogota')) && !isToday(toZonedTime(parseISO(dateKey), 'America/Bogota')) ? "destructive" : "secondary"}>
+                                        <Badge variant={isDateInPast ? "destructive" : "secondary"}>
                                             {formatDateGroup(dateKey)}
                                         </Badge>
                                         <span className="text-muted-foreground text-sm">{groupedRoutes[dateKey].length} cliente(s)</span>
@@ -259,6 +264,7 @@ export default function RutaDePagoPage() {
                                                 <div className="flex-1 space-y-1.5">
                                                     <p className={cn("font-semibold flex items-center gap-2", route.isPaidToday && "text-muted-foreground")}>
                                                       {route.isPaidToday && <CheckCircle2 className="h-5 w-5 text-green-600" />}
+                                                      {route.missedPaymentDays > 0 && <AlertTriangle className="h-5 w-5 text-destructive" />}
                                                       {route.clienteName}
                                                     </p>
                                                     <p className={cn("text-sm text-muted-foreground", route.isPaidToday && "line-through")}>CC: {route.clienteId}</p>
@@ -294,7 +300,7 @@ export default function RutaDePagoPage() {
                                     </div>
                                 </AccordionContent>
                             </AccordionItem>
-                        ))}
+                        )})}
                     </Accordion>
                 ) : (
                     <div className="text-center text-muted-foreground py-16">
@@ -401,5 +407,7 @@ export default function RutaDePagoPage() {
         </Card>
     );
 }
+
+    
 
     

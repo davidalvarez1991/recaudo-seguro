@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 import bcrypt from 'bcryptjs';
 import { db } from "./firebase";
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc, increment, orderBy, limit } from "firebase/firestore";
-import { startOfDay, differenceInDays, endOfDay, isWithinInterval, addDays, parseISO, isFuture, isToday, isSameDay, format, differenceInMonths, max } from 'date-fns';
+import { startOfDay, differenceInDays, endOfDay, isWithinInterval, addDays, parseISO, isFuture, isToday, isSameDay, format, differenceInMonths, max, isPast } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { analyzeClientReputation, ClientReputationInput } from '@/ai/flows/analyze-client-reputation';
 import { getFinancialAdvice, FinancialAdviceInput } from '@/ai/flows/get-financial-advice';
@@ -774,33 +774,23 @@ export async function getPaymentRoute() {
     
     let dailyGoal = 0;
     const today = toZonedTime(new Date(), timeZone);
-    const todayStart = startOfDay(today);
-    const todayEnd = endOfDay(today);
 
-    for (const credit of activeCredits) {
+    for (const credit of allCredits) {
         if (!Array.isArray(credit.paymentDates) || credit.paymentDates.length === 0) continue;
+        
+        // Iterate through all payment dates to sum up today's goal
+        for (const dateStr of credit.paymentDates) {
+            const paymentDate = parseISO(dateStr);
+            const paymentZoned = toZonedTime(paymentDate, timeZone);
 
-        const creditPaymentsForToday = allPayments.some(p => {
-            if (p.creditId !== credit.id || !p.date?.toDate) return false;
-            const paymentDateInTimeZone = toZonedTime(p.date.toDate(), timeZone);
-            return isWithinInterval(paymentDateInTimeZone, { start: todayStart, end: todayEnd });
-        });
+            if (isSameDay(today, paymentZoned)) {
+                const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
+                const installmentAmount = credit.cuotas > 0 ? totalLoanAmount / credit.cuotas : 0;
+                dailyGoal += installmentAmount;
 
-        // Only add to goal if not paid today
-        if (!creditPaymentsForToday) {
-            for (const dateStr of credit.paymentDates) {
-                const paymentDate = parseISO(dateStr);
-                const paymentZoned = toZonedTime(paymentDate, timeZone);
-
-                if (isSameDay(today, paymentZoned)) {
-                    const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
-                    const installmentAmount = credit.cuotas > 0 ? totalLoanAmount / credit.cuotas : 0;
-                    dailyGoal += installmentAmount;
-
-                    if (credit.missedPaymentDays > 0) {
-                        dailyGoal += credit.lateFee || 0;
-                    }
-                    break;
+                // Add late fee only if it's a missed payment from a previous day
+                 if (credit.missedPaymentDays > 0) {
+                    dailyGoal += credit.lateFee || 0;
                 }
             }
         }
@@ -811,11 +801,19 @@ export async function getPaymentRoute() {
 
         const sortedDates = credit.paymentDates.map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
         const paidInstallmentsCount = credit.paidInstallments || 0;
+        
         if (paidInstallmentsCount >= sortedDates.length) return null;
 
         const nextPaymentDate = sortedDates[paidInstallmentsCount];
         if (!nextPaymentDate) return null;
 
+        const todayStart = startOfDay(today);
+        const todayEnd = endOfDay(today);
+        
+        // If the next payment date is in the past, and it's not today, it's a missed payment.
+        // In this case, we should keep showing it in the route.
+        const isMissed = isPast(nextPaymentDate) && !isToday(nextPaymentDate);
+        
         const isPaidToday = allPayments.some(p => {
             if (p.creditId !== credit.id || !p.date?.toDate) return false;
             const paymentDateInTimeZone = toZonedTime(p.date.toDate(), timeZone);
@@ -2340,3 +2338,6 @@ export async function savePushSubscription(subscriptionJSON: object) {
 
     
 
+
+
+    
