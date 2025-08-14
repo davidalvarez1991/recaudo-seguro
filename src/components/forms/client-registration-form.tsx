@@ -133,29 +133,35 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
       
       setIsPending(true);
 
-      const { idNumber, firstName, firstLastName } = form.getValues();
-      const existingClient = await checkClientExistence(idNumber);
-      
-      if (existingClient.exists) {
-          const nameMatches = 
-              existingClient.firstName?.toLowerCase() === firstName.toLowerCase() &&
-              existingClient.firstLastName?.toLowerCase() === firstLastName.toLowerCase();
+      try {
+        const { idNumber, firstName, firstLastName } = form.getValues();
+        const existingClient = await checkClientExistence(idNumber);
+        
+        if (existingClient.exists) {
+            const nameMatches = 
+                existingClient.firstName?.toLowerCase() === firstName.toLowerCase() &&
+                existingClient.firstLastName?.toLowerCase() === firstLastName.toLowerCase();
 
-          if (!nameMatches) {
-              toast({
-                  title: "Error de Validación",
-                  description: `La cédula ${idNumber} ya está registrada a nombre de ${existingClient.firstName} ${existingClient.firstLastName}. Por favor, verifica los datos.`,
-                  variant: "destructive",
-                  duration: 8000,
-              });
-              setIsPending(false);
-              return;
-          }
+            if (!nameMatches) {
+                toast({
+                    title: "Error de Validación",
+                    description: `La cédula ${idNumber} ya está registrada a nombre de ${existingClient.firstName} ${existingClient.firstLastName}. Por favor, verifica los datos.`,
+                    variant: "destructive",
+                    duration: 8000,
+                });
+                setIsPending(false); // <<< THIS WAS THE FIX
+                return;
+            }
+        }
+        
+        setFormData(form.getValues());
+        setStep(2);
+
+      } catch (error) {
+        toast({ title: "Error de Validación", description: "No se pudo verificar la existencia del cliente.", variant: "destructive" });
+      } finally {
+        setIsPending(false);
       }
-
-      setIsPending(false);
-      setFormData(form.getValues());
-      setStep(2);
   };
 
 
