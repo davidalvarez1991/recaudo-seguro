@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ClipboardList, HandCoins, Loader2, Map, Star, Handshake, Percent, XCircle, Calendar as CalendarIcon, X, CheckCircle2, Circle, Home, Phone, Search, Repeat } from "lucide-react";
+import { ArrowLeft, ClipboardList, HandCoins, Loader2, Map, Star, Handshake, Percent, XCircle, Calendar as CalendarIcon, X, CheckCircle2, Circle, Home, Phone, Search, Repeat, NotebookText } from "lucide-react";
 import Link from "next/link";
 import { getPaymentRoute, registerPayment, registerMissedPayment, registerPaymentAgreement } from "@/lib/actions";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -263,6 +263,10 @@ export default function RutaDePagoPage() {
                                                       {route.clienteName}
                                                     </p>
                                                     <p className={cn("text-sm text-muted-foreground", route.isPaidToday && "line-through")}>CC: {route.clienteId}</p>
+                                                    <div className={cn("flex items-center gap-2 text-sm", route.isPaidToday ? "text-muted-foreground/80" : "text-muted-foreground")}>
+                                                        <NotebookText className="h-4 w-4" />
+                                                        <span className="font-medium">Cuota {route.paidInstallments + 1} / {route.cuotas}</span>
+                                                    </div>
                                                      <div className={cn("flex items-center gap-2 text-sm", route.isPaidToday ? "text-muted-foreground/80" : "text-muted-foreground")}>
                                                         <Home className="h-4 w-4" />
                                                         <span>{route.clienteAddress || 'Sin dirección'}</span>
