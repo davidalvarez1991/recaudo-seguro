@@ -780,19 +780,22 @@ export async function getPaymentRoute() {
     for (const credit of activeCredits) {
         if (!Array.isArray(credit.paymentDates) || credit.paymentDates.length === 0) continue;
 
-        const sortedDates = credit.paymentDates.map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
-        const paidInstallmentsCount = credit.paidInstallments || 0;
-        if (paidInstallmentsCount >= sortedDates.length) continue;
+        // Check all payment dates, not just the next one
+        for (const dateStr of credit.paymentDates) {
+            const paymentDate = parseISO(dateStr);
+            const paymentZoned = toZonedTime(paymentDate, timeZone);
 
-        const nextPaymentDate = sortedDates[paidInstallmentsCount];
-        if (!nextPaymentDate) continue;
+            if (isSameDay(today, paymentZoned)) {
+                const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
+                const installmentAmount = credit.cuotas > 0 ? totalLoanAmount / credit.cuotas : 0;
+                dailyGoal += installmentAmount;
 
-        const nextPaymentZoned = toZonedTime(nextPaymentDate, timeZone);
-        
-        if (isToday(nextPaymentZoned)) {
-            const totalLoanAmount = (credit.valor || 0) + (credit.commission || 0);
-            const installmentAmount = credit.cuotas > 0 ? totalLoanAmount / credit.cuotas : 0;
-            dailyGoal += installmentAmount + (credit.lateFee || 0);
+                // Add late fee only if the due date is today AND there are missed days
+                if (credit.missedPaymentDays > 0) {
+                    dailyGoal += credit.lateFee || 0;
+                }
+                break; // Stop after finding one match for today for this credit
+            }
         }
     }
 
