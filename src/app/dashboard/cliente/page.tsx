@@ -109,7 +109,12 @@ export default function ClienteDashboard() {
         } else {
            toast({ title: "No se puede compartir", description: "Tu navegador no soporta la función de compartir archivos.", variant: "destructive" });
         }
-    } catch (e) {
+    } catch (e: any) {
+        // Don't show an error toast if the user simply canceled the share action.
+        if (e.name === 'AbortError' || e.message?.includes('Share canceled')) {
+            console.log("Share action was canceled by the user.");
+            return;
+        }
         console.error("Error al compartir:", e);
         toast({ title: "Error", description: "Ocurrió un error al intentar compartir la imagen.", variant: "destructive" });
     }
