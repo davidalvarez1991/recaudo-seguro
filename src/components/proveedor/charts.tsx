@@ -28,15 +28,15 @@ const renderActiveShape = (props: any) => {
   const cos = Math.cos(-RADIAN * midAngle);
   const sx = cx + (outerRadius + 10) * cos;
   const sy = cy + (outerRadius + 10) * sin;
-  const mx = cx + (outerRadius + 30) * cos;
-  const my = cy + (outerRadius + 30) * sin;
-  const ex = mx + (cos >= 0 ? 1 : -1) * 22;
+  const mx = cx + (outerRadius + 15) * cos;
+  const my = cy + (outerRadius + 15) * sin;
+  const ex = mx + (cos >= 0 ? 1 : -1) * 12;
   const ey = my;
   const textAnchor = cos >= 0 ? 'start' : 'end';
 
   return (
     <g>
-      <text x={cx} y={cy} dy={8} textAnchor="middle" fill={fill}>
+      <text x={cx} y={cy} dy={8} textAnchor="middle" fill={fill} fontSize={14}>
         {payload.name}
       </text>
       <Sector
@@ -59,9 +59,9 @@ const renderActiveShape = (props: any) => {
       />
       <path d={`M${sx},${sy}L${mx},${my}L${ex},${ey}`} stroke={fill} fill="none" />
       <circle cx={ex} cy={ey} r={2} fill={fill} stroke="none" />
-      <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} textAnchor={textAnchor} fill="#333">{`${value} Clientes`}</text>
-      <text x={ex + (cos >= 0 ? 1 : -1) * 12} y={ey} dy={18} textAnchor={textAnchor} fill="#999">
-        {`(${(percent * 100).toFixed(2)}%)`}
+      <text x={ex + (cos >= 0 ? 1 : -1) * 8} y={ey} textAnchor={textAnchor} fill="#333" fontSize={12}>{`${value} Cliente(s)`}</text>
+      <text x={ex + (cos >= 0 ? 1 : -1) * 8} y={ey} dy={16} textAnchor={textAnchor} fill="#999" fontSize={11}>
+        {`(${(percent * 100).toFixed(1)}%)`}
       </text>
     </g>
   );
@@ -106,7 +106,7 @@ export function Charts({ capitalData, portfolioData, hasPortfolioData }: ChartPr
                 <CardContent>
                     {hasPortfolioData ? (
                         <ResponsiveContainer width="100%" height={400}>
-                            <PieChart margin={{ top: 40, right: 40, bottom: 80, left: 40 }}>
+                            <PieChart margin={{ top: 20, right: 20, bottom: 40, left: 20 }}>
                                 <Pie
                                     activeIndex={activeIndex}
                                     activeShape={renderActiveShape}
