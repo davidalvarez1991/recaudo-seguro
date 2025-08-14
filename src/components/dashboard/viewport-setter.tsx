@@ -8,11 +8,10 @@ export function ViewportSetter() {
 
   const setViewport = () => {
     const viewport = document.querySelector("meta[name=viewport]");
-    const desiredContent = 'width=650';
+    const desiredContent = 'width=750';
     if (viewport && viewport.getAttribute('content') !== desiredContent) {
       viewport.setAttribute('content', desiredContent);
     } else if (!viewport) {
-      // If viewport doesn't exist, create it.
       const newViewport = document.createElement('meta');
       newViewport.name = 'viewport';
       newViewport.content = desiredContent;

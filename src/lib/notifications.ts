@@ -1,8 +1,23 @@
 'use client';
 
 import { savePushSubscription } from './actions';
+import webpush from 'web-push';
+import { getUserData } from './actions';
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+
+if (typeof window === 'undefined') {
+  // Server-side configuration
+  if (!process.env.VAPID_PRIVATE_KEY || !VAPID_PUBLIC_KEY) {
+    console.warn('VAPID keys are not configured. Push notifications will be disabled.');
+  } else {
+    webpush.setVapidDetails(
+      'mailto:recaudo.seguro.servicio.cliente@gmail.com',
+      VAPID_PUBLIC_KEY,
+      process.env.VAPID_PRIVATE_KEY
+    );
+  }
+}
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -44,7 +59,6 @@ export async function registerAndSubscribe() {
       });
     }
 
-    // Convert the subscription to a plain JSON object before sending
     await savePushSubscription(subscription.toJSON());
     console.log('Push subscription saved successfully.');
   } catch (error) {
@@ -52,4 +66,21 @@ export async function registerAndSubscribe() {
   }
 }
 
-    
+export async function sendNotificationToProvider(providerId: string, payload: { title: string; body: string; }) {
+  if (!process.env.VAPID_PRIVATE_KEY || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+    console.log('VAPID keys not set on server. Skipping push notification.');
+    return;
+  }
+  try {
+    const provider = await getUserData(providerId);
+    if (provider && provider.pushSubscription) {
+      const subscription = provider.pushSubscription;
+      const notificationPayload = JSON.stringify(payload);
+      
+      await webpush.sendNotification(subscription, notificationPayload);
+      console.log(`Push notification sent to provider ${providerId}`);
+    }
+  } catch (error) {
+    console.error(`Failed to send push notification to provider ${providerId}:`, error);
+  }
+}

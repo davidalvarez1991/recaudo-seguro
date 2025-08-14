@@ -1,6 +1,5 @@
 
 
-
 "use server";
 
 import { z } from "zod";
@@ -15,6 +14,7 @@ import { analyzeClientReputation, ClientReputationInput } from '@/ai/flows/analy
 import { getFinancialAdvice, FinancialAdviceInput } from '@/ai/flows/get-financial-advice';
 import { es } from 'date-fns/locale';
 import { getAuthenticatedUser } from "./auth";
+import { sendNotificationToProvider } from "./notifications";
 
 
 const ADMIN_ID = "admin_0703091991";
@@ -1218,6 +1218,11 @@ export async function createClientCreditAndContract(data: { clientData: z.infer<
 
     await batch.commit();
 
+    await sendNotificationToProvider(providerId, {
+        title: '💰 Nuevo Crédito Creado',
+        body: `${cobrador.name} creó un crédito de ${creditAmount} para ${fullName}.`,
+    });
+
     return { success: true };
 }
 
@@ -1420,6 +1425,7 @@ export async function refinanceCredit(values: z.infer<typeof RefinanceCreditSche
 }
 
 export async function savePaymentSchedule(values: z.infer<typeof SavePaymentScheduleSchema>) {
+    const { user: cobrador } = await getAuthenticatedUser();
     const validatedFields = SavePaymentScheduleSchema.safeParse(values);
     if (!validatedFields.success) {
         return { error: "Datos del calendario inválidos." };
@@ -1466,6 +1472,12 @@ export async function savePaymentSchedule(values: z.infer<typeof SavePaymentSche
                     contractText: contractText,
                     createdAt: Timestamp.now(),
                     acceptedAt: null,
+                });
+            }
+             if (cobrador) {
+                await sendNotificationToProvider(creditData.providerId, {
+                    title: '🗓️ Calendario Guardado',
+                    body: `${cobrador.name} guardó el calendario para el cliente ${clienteData.name}.`,
                 });
             }
         }
@@ -1546,6 +1558,12 @@ export async function registerPayment(creditId: string, amount: number, type: "c
     } else {
         await updateDoc(creditRef, { updatedAt: Timestamp.now() });
     }
+    
+    const clientData = await findUserByIdNumber(creditData.clienteId);
+    await sendNotificationToProvider(creditData.providerId, {
+        title: '✅ Pago Registrado',
+        body: `${cobradorData.name} registró un pago de ${format(amount, 'es-CO')} para ${clientData?.name}.`,
+    });
 
     return { success: `Pago de ${amount.toLocaleString('es-CO')} registrado.` };
 }
@@ -1649,6 +1667,17 @@ export async function registerMissedPayment(creditId: string) {
       missedPaymentDays: increment(1),
       updatedAt: Timestamp.now()
     });
+    
+    const creditSnap = await getDoc(creditRef);
+    if(creditSnap.exists() && user.role === 'cobrador') {
+        const creditData = creditSnap.data();
+        const clientData = await findUserByIdNumber(creditData.clienteId);
+        await sendNotificationToProvider(creditData.providerId, {
+            title: '🔴 Pago Omitido',
+            body: `${user.name} registró un día de mora para el cliente ${clientData?.name}.`,
+        });
+    }
+
     return { success: true };
   } catch (error) {
     console.error("Error registering missed payment:", error);
@@ -1717,6 +1746,16 @@ export async function acceptContract(creditId: string) {
 
     const contractRef = snapshot.docs[0].ref;
     try {
+        const { user: cobrador } = await getAuthenticatedUser();
+        const creditSnap = await getDoc(doc(db, "credits", creditId));
+        if (creditSnap.exists() && cobrador) {
+            const creditData = creditSnap.data();
+            const clientData = await findUserByIdNumber(creditData.clienteId);
+            await sendNotificationToProvider(creditData.providerId, {
+                title: '✍️ Contrato Aceptado',
+                body: `El contrato para el cliente ${clientData?.name} fue aceptado.`,
+            });
+        }
         await updateDoc(contractRef, {
             acceptedAt: Timestamp.now()
         });
@@ -2376,4 +2415,5 @@ export async function savePushSubscription(subscriptionJSON: object) {
     
 
     
+
 
