@@ -1112,6 +1112,17 @@ const generateContractText = async (providerId: string, creditData: any, cliente
     return contractText;
 };
 
+export async function checkClientExistence(idNumber: string): Promise<{ exists: boolean; firstName?: string; firstLastName?: string; }> {
+    const client = await findUserByIdNumber(idNumber);
+    if (!client) {
+        return { exists: false };
+    }
+    return {
+        exists: true,
+        firstName: client.firstName,
+        firstLastName: client.firstLastName,
+    };
+}
 
 export async function createClientCreditAndContract(data: { clientData: z.infer<typeof ClientCreditSchema>, paymentDates: string[], contractText: string | null }) {
     const { user: cobrador } = await getAuthenticatedUser();
@@ -1139,25 +1150,19 @@ export async function createClientCreditAndContract(data: { clientData: z.infer<
     
     const { idNumber, firstName, firstLastName } = validatedFields.data;
 
-    // --- START: New validation logic ---
     const existingClient = await findUserByIdNumber(idNumber);
-
     if (existingClient) {
-        // Client exists, check if name matches
         const nameMatches = existingClient.firstName?.toLowerCase() === firstName.toLowerCase() && existingClient.firstLastName?.toLowerCase() === firstLastName.toLowerCase();
         if (!nameMatches) {
             return { error: `La cédula ${idNumber} ya está registrada a nombre de ${existingClient.name}. Por favor, verifique los datos.` };
         }
-        // Name matches, proceed to create credit for existing client
     }
-    // --- END: New validation logic ---
 
     const batch = writeBatch(db);
     const now = Timestamp.now();
     const { secondName, secondLastName, address, contactPhone, creditAmount, installments, guarantor, references } = validatedFields.data;
     const fullName = [firstName, secondName, firstLastName, secondLastName].filter(Boolean).join(" ");
     
-    // Only create a new user if one doesn't exist
     if (!existingClient) {
         const hashedPassword = await bcrypt.hash(idNumber, 10);
         const newUserRef = doc(collection(db, "users"));
@@ -1177,7 +1182,6 @@ export async function createClientCreditAndContract(data: { clientData: z.infer<
         });
     }
 
-    // Create credit
     const valor = parseFloat(creditAmount.replace(/\./g, ''));
     const { commission, percentage } = calculateCommission(valor, provider, paymentDates.map(d => new Date(d)));
     const creditRef = doc(collection(db, "credits"));
@@ -1199,7 +1203,6 @@ export async function createClientCreditAndContract(data: { clientData: z.infer<
     };
     batch.set(creditRef, creditDataObject);
 
-    // Create Contract (if applicable and text is provided)
     if (provider.isContractGenerationActive && contractText) {
         const contractRef = doc(collection(db, "contracts"));
         batch.set(contractRef, {

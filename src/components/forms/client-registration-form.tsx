@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, DollarSign, Save, StepForward, CheckCircle2, ShieldCheck } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ClientCreditSchema } from "@/lib/schemas";
-import { createClientCreditAndContract, getContractForAcceptance, getProviderCommissionTiers } from "@/lib/actions";
+import { createClientCreditAndContract, getContractForAcceptance, getProviderCommissionTiers, checkClientExistence } from "@/lib/actions";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -109,31 +109,55 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
     form.setValue('creditAmount', formattedValue);
   };
   
-  const handleNextStep = async (currentStep: number, nextStep: number) => {
-    const fieldsToValidate: (keyof FormData | `guarantor.${keyof NonNullable<FormData['guarantor']>}` | `references.${'familiar'|'personal'}.${keyof NonNullable<NonNullable<FormData['references']>['familiar'] | NonNullable<FormData['references']>['personal'] >}`)[] = [
-        "idNumber", "firstName", "firstLastName", "address", "contactPhone", "creditAmount", "installments",
-    ];
+  const handleNextStep = async () => {
+      const fieldsToValidate: (keyof FormData | `guarantor.${keyof NonNullable<FormData['guarantor']>}` | `references.${'familiar'|'personal'}.${keyof NonNullable<NonNullable<FormData['references']>['familiar'] | NonNullable<FormData['references']>['personal'] >}`)[] = [
+          "idNumber", "firstName", "firstLastName", "address", "contactPhone", "creditAmount", "installments",
+      ];
 
-    if (form.getValues('requiresGuarantor')) {
-        fieldsToValidate.push("guarantor.name", "guarantor.idNumber", "guarantor.address", "guarantor.phone");
-    }
-    if (form.getValues('requiresReferences')) {
-        fieldsToValidate.push(
-            "references.familiar.name", "references.familiar.phone", "references.familiar.address",
-            "references.personal.name", "references.personal.phone", "references.personal.address"
-        );
-    }
-    
-    const isValid = await form.trigger(fieldsToValidate as any);
-    
-    if (!isValid) {
-        toast({ title: "Campos Incompletos", description: "Por favor, revisa los campos marcados en rojo.", variant: "destructive" });
-        return;
-    }
-    
-    setFormData(form.getValues());
-    setStep(nextStep);
+      if (form.getValues('requiresGuarantor')) {
+          fieldsToValidate.push("guarantor.name", "guarantor.idNumber", "guarantor.address", "guarantor.phone");
+      }
+      if (form.getValues('requiresReferences')) {
+          fieldsToValidate.push(
+              "references.familiar.name", "references.familiar.phone", "references.familiar.address",
+              "references.personal.name", "references.personal.phone", "references.personal.address"
+          );
+      }
+      
+      const isValid = await form.trigger(fieldsToValidate as any);
+      
+      if (!isValid) {
+          toast({ title: "Campos Incompletos", description: "Por favor, revisa los campos marcados en rojo.", variant: "destructive" });
+          return;
+      }
+      
+      setIsPending(true);
+
+      const { idNumber, firstName, firstLastName } = form.getValues();
+      const existingClient = await checkClientExistence(idNumber);
+      
+      if (existingClient.exists) {
+          const nameMatches = 
+              existingClient.firstName?.toLowerCase() === firstName.toLowerCase() &&
+              existingClient.firstLastName?.toLowerCase() === firstLastName.toLowerCase();
+
+          if (!nameMatches) {
+              toast({
+                  title: "Error de Validación",
+                  description: `La cédula ${idNumber} ya está registrada a nombre de ${existingClient.firstName} ${existingClient.firstLastName}. Por favor, verifica los datos.`,
+                  variant: "destructive",
+                  duration: 8000,
+              });
+              setIsPending(false);
+              return;
+          }
+      }
+
+      setIsPending(false);
+      setFormData(form.getValues());
+      setStep(2);
   };
+
 
     const handleDateSelect = (dates: Date[] | undefined) => {
         if (!dates) return;
@@ -581,9 +605,9 @@ export function ClientRegistrationForm({ onFormSubmit }: ClientRegistrationFormP
                   />
               </div>
             </ScrollArea>
-            <Button type="button" onClick={() => handleNextStep(1, 2)} className="w-full mt-4" disabled={isPending}>
+            <Button type="button" onClick={handleNextStep} className="w-full mt-4" disabled={isPending}>
               {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              {isPending ? "Guardando..." : "Siguiente"}
+              {isPending ? "Validando..." : "Siguiente"}
             </Button>
           </>
         );
