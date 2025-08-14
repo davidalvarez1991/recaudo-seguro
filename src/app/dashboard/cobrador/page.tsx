@@ -6,7 +6,7 @@ import { CreditSimulator } from "@/components/dashboard/credit-simulator";
 import { getUserData, getPaymentRoute, getCobradorSelfDailySummary, getCreditsByCobrador } from "@/lib/actions";
 import { Separator } from "@/components/ui/separator";
 import { ClientReputationSearch } from "@/components/dashboard/client-reputation-search";
-import { Target, TrendingUp, CheckCircle, Star, AlertTriangle, RefreshCw, Users } from "lucide-react";
+import { Target, TrendingUp, CheckCircle, Star, AlertTriangle, RefreshCw, Users, Building } from "lucide-react";
 import { DailyStats } from "@/components/dashboard/daily-stats";
 import { getAuthenticatedUser } from "@/lib/auth";
 
@@ -26,6 +26,7 @@ type UserData = {
 type ProviderData = {
     commissionTiers?: CommissionTier[];
     isLateInterestActive?: boolean;
+    companyName?: string;
     [key: string]: any;
 } | null;
 
@@ -38,6 +39,7 @@ export default async function CobradorDashboard() {
   const { userId } = await getAuthenticatedUser();
   
   let userName = "Cobrador";
+  let companyName = "Empresa";
   let commissionTiers: CommissionTier[] = [{ minAmount: 0, maxAmount: 50000000, percentage: 20, lateInterestRate: 2 }]; // Default tier
   let isLateInterestActive = false;
   let dailyGoal = 0;
@@ -53,6 +55,7 @@ export default async function CobradorDashboard() {
         if (userData.providerId) {
             const providerData: ProviderData = await getUserData(userData.providerId);
             if (providerData) {
+                companyName = providerData.companyName || 'Empresa';
                 if (providerData.commissionTiers && providerData.commissionTiers.length > 0) {
                     commissionTiers = providerData.commissionTiers;
                 }
@@ -86,7 +89,10 @@ export default async function CobradorDashboard() {
           <div className="flex flex-col md:flex-row items-start justify-between gap-6">
               <div className="space-y-1 flex-1">
                   <CardTitle className="text-3xl">Bienvenido, {userName}</CardTitle>
-                  <CardDescription>Este es tu panel de gestión de clientes y créditos.</CardDescription>
+                  <CardDescription className="flex items-center gap-2 pt-1">
+                    <Building className="h-4 w-4 text-muted-foreground" />
+                    {companyName}
+                  </CardDescription>
               </div>
               <div className="w-full md:w-auto md:min-w-[280px] space-y-2">
                 <Card className="bg-primary text-primary-foreground shadow-lg">
