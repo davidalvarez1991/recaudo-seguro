@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Megaphone, X } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, toZonedTime } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 import { Button } from '../ui/button';
 
@@ -24,6 +24,11 @@ export function AnnouncementCard({ announcement }: AnnouncementCardProps) {
     if (!isVisible) {
         return null;
     }
+    
+    // Convert UTC date string to a specific timezone before formatting
+    const zonedDate = toZonedTime(new Date(announcement.createdAt), 'America/Bogota');
+    const formattedDate = format(zonedDate, "d 'de' MMMM, yyyy 'a las' HH:mm", { locale: es });
+
 
     return (
         <Card className="bg-primary/10 border-primary/20 relative">
@@ -36,7 +41,7 @@ export function AnnouncementCard({ announcement }: AnnouncementCardProps) {
                         <h4 className="font-bold text-lg text-primary">Anuncio Importante</h4>
                         <p className="text-sm text-primary/90 whitespace-pre-wrap">{announcement.message}</p>
                         <p className="text-xs text-muted-foreground pt-1">
-                            Publicado el: {format(new Date(announcement.createdAt), "d 'de' MMMM, yyyy 'a las' HH:mm", { locale: es })}
+                            Publicado el: {formattedDate}
                         </p>
                     </div>
                 </div>
