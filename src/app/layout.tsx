@@ -30,7 +30,7 @@ export default async function RootLayout({
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/icon.svg" />
       </head>
-      <body className={cn("font-body antialiased bg-background")}>
+      <body className={cn("font-body antialiased bg-background min-w-[1024px]")}>
         {children}
         <Toaster />
         <InstallPWA />
