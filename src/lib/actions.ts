@@ -157,13 +157,6 @@ export async function login(values: z.infer<typeof LoginSchema>) {
     }
     // If not rememberMe, it will be a session cookie by default (no maxAge)
     
-    // Check for a hardcoded admin user first
-    if (idNumber === "0703091991" && password === "19913030") {
-         await cookies().set('loggedInUser', ADMIN_ID, cookieOptions);
-         await cookies().set('userRole', 'admin', cookieOptions);
-         return { successUrl: `/dashboard/admin` };
-    }
-    
     const user = await findUserByIdNumber(idNumber);
 
     if (!user || !user.password) {
@@ -1258,7 +1251,7 @@ export async function createClientCreditAndContract(data: { clientData: z.infer<
 
     await sendNotificationToProvider(providerId, {
         title: '💰 Nuevo Crédito Creado',
-        body: `${cobrador.name} creó un crédito de ${creditAmount} para ${fullName}.`,
+        body: `${cobrador.name} creó un crédito de ${formatCurrency(valor)} para ${fullName}.`,
     });
 
     return { success: true };
@@ -2453,6 +2446,7 @@ export async function savePushSubscription(subscriptionJSON: object) {
     
 
     
+
 
 
 

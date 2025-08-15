@@ -24,7 +24,7 @@ export function TermsDialog() {
         <DialogHeader>
           <DialogTitle>🛡️ TÉRMINOS Y CONDICIONES DE USO – RECAUDO SEGURO</DialogTitle>
           <DialogDescription>
-            Última actualización: 28 de julio de 2025
+            Última actualización: 14 de agosto de 2024
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="h-96 w-full rounded-md border p-4">
