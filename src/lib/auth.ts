@@ -3,7 +3,7 @@ import 'server-only'
 import { cookies } from 'next/headers'
 import { getUserData } from './actions'
 
-const ADMIN_ID = "admin_0703091991";
+const ADMIN_ID = "0703091991";
 
 type User = {
     [key: string]: any;

@@ -1,5 +1,4 @@
 
-
 "use server";
 
 import { z } from "zod";
@@ -17,7 +16,7 @@ import { getAuthenticatedUser } from "./auth";
 import webpush from 'web-push';
 
 
-const ADMIN_ID = "admin_0703091991";
+const ADMIN_ID = "0703091991";
 
 type CommissionTier = {
   minAmount: number;
@@ -695,7 +694,7 @@ export async function getHistoricalCreditsByCliente() {
     });
 
     const allCredits = await Promise.all(creditsPromises);
-    return allCredits.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+    return allCredits.sort((a, b) => new Date(b.fecha).getTime() - new Date(b.fecha).getTime());
 }
 
 export async function getPaymentsByCreditId(creditId: string) {
@@ -831,7 +830,7 @@ export async function getPaymentRoute() {
     const routeEntriesPromises = activeCredits.map(async (credit) => {
         if (!Array.isArray(credit.paymentDates) || credit.paymentDates.length === 0) return null;
 
-        const sortedDates = credit.paymentDates.map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
+        const sortedDates = credit.paymentDates.map((d: string) => parseISO(d)).sort((a: Date, b: Date) => a.getTime() - b.getTime());
         const paidInstallmentsCount = credit.paidInstallments || 0;
         
         if (paidInstallmentsCount >= sortedDates.length) return null;
@@ -2446,6 +2445,7 @@ export async function savePushSubscription(subscriptionJSON: object) {
     
 
     
+
 
 
 
