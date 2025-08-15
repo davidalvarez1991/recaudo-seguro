@@ -9,8 +9,8 @@ import { db } from "./firebase";
 import { collection, query, where, getDocs, addDoc, doc, getDoc, updateDoc, writeBatch, deleteDoc, Timestamp, setDoc, increment, orderBy, limit } from "firebase/firestore";
 import { startOfDay, endOfDay, isWithinInterval, addDays, parseISO, isFuture, isToday, isSameDay, format, differenceInMonths, max, isPast, differenceInDays } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
-import { analyzeClientReputation, ClientReputationInput } from '@/ai/flows/analyze-client-reputation';
-import { getFinancialAdvice, FinancialAdviceInput } from '@/ai/flows/get-financial-advice';
+import { analyzeClientReputation, ClientReputationInput, ClientReputationOutput } from '@/ai/flows/analyze-client-reputation';
+import { getFinancialAdvice, FinancialAdviceInput, FinancialAdviceOutput } from '@/ai/flows/get-financial-advice';
 import { es } from 'date-fns/locale';
 import { getAuthenticatedUser } from "./auth";
 import webpush from 'web-push';
@@ -1841,7 +1841,7 @@ export async function getClientContracts() {
 
 // --- AI Actions ---
 
-export async function getClientReputationData(clienteId: string) {
+export async function getClientReputationData(clienteId: string): Promise<{ analysis?: ClientReputationOutput, clientName?: string, error?: string }> {
     try {
         const client = await findUserByIdNumber(clienteId);
         if (!client || client.role !== 'cliente') {
@@ -2381,8 +2381,7 @@ export async function getLatestAnnouncement() {
 }
 
 
-
-export async function getFinancialAdviceForProvider() {
+export async function getFinancialAdviceForProvider(): Promise<{ advice?: FinancialAdviceOutput, error?: string }> {
     try {
         const summary = await getProviderFinancialSummary();
         const input: FinancialAdviceInput = {
@@ -2445,6 +2444,7 @@ export async function savePushSubscription(subscriptionJSON: object) {
     
 
     
+
 
 
 

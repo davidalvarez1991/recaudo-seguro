@@ -6,12 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { getFinancialAdviceForProvider } from '@/lib/actions';
 import { Lightbulb, AlertTriangle, BadgePercent, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-type Advice = {
-    type: "warning" | "suggestion" | "info";
-    title: string;
-    message: string;
-} | null;
+import { type FinancialAdviceOutput } from '@/ai/flows/get-financial-advice';
 
 const adviceConfig = {
     warning: {
@@ -29,7 +24,7 @@ const adviceConfig = {
 };
 
 export function FinancialAdvisor() {
-    const [advice, setAdvice] = useState<Advice>(null);
+    const [advice, setAdvice] = useState<FinancialAdviceOutput | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
