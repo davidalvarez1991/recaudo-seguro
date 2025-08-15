@@ -72,7 +72,38 @@ const ReferencesSchema = z.object({
 });
 
 export const ClientCreditSchema = z.object({
-  idNumber: z.string().min(6, "La cédula debe tener al menos 6 caracteres."),
+  idNumber: z.string().min(6, "La cédula debe tener al menos 6 caracteres.")
+    .refine(id => {
+      // Rule 1: Disallow sequential numbers
+      for (let i = 0; i <= id.length - 3; i++) {
+        const first = parseInt(id[i]);
+        const second = parseInt(id[i+1]);
+        const third = parseInt(id[i+2]);
+        if (!isNaN(first) && !isNaN(second) && !isNaN(third)) {
+            if ((second === first + 1 && third === second + 1) || (second === first - 1 && third === second - 1)) {
+                return false;
+            }
+        }
+      }
+      return true;
+    }, { message: "La cédula no puede contener números secuenciales (ej: 123, 765)." })
+    .refine(id => {
+        // Rule 2: Disallow repeating digit pairs
+        if (id.length >= 6) {
+            let pairCount = 0;
+            for (let i = 0; i < id.length - 1; i += 2) {
+                if (id[i] === id[i+1]) {
+                    pairCount++;
+                }
+            }
+            // If more than half the pairs are repeating, it's likely invalid
+            if (pairCount >= Math.floor(id.length / 2) / 2) {
+                const repeatingPairsRegex = /(.)\1(.)\2(.)\3/;
+                if(repeatingPairsRegex.test(id)) return false;
+            }
+        }
+        return true;
+    }, { message: "La cédula parece inválida (ej: 112233)." }),
   firstName: z.string().min(3, "El primer nombre es obligatorio."),
   secondName: z.string().optional(),
   firstLastName: z.string().min(3, "El primer apellido es obligatorio."),
@@ -198,3 +229,4 @@ const formatCurrency = (value: number) => {
     if (isNaN(value)) return "$0";
     return `$${value.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 };
+
