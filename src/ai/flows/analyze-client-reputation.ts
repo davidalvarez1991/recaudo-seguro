@@ -79,17 +79,20 @@ const analyzeClientReputationFlow = ai.defineFlow(
     inputSchema: ClientReputationInputSchema,
     outputSchema: ClientReputationOutputSchema,
   },
-  async (input) => {
+  async (input): Promise<ClientReputationOutput> => {
     // Si no hay historial, devuelve un resultado por defecto de riesgo medio.
     if (input.creditHistory.length === 0) {
       return {
         riskScore: 50,
         summary: "El cliente no tiene historial crediticio en la plataforma. Se recomienda proceder con precaución y solicitar garantías adicionales.",
-        recommendation: "Regular",
+        recommendation: "Regular" as const,
       };
     }
     
     const { output } = await prompt(input);
-    return output!;
+    if (!output) {
+      throw new Error('La IA no pudo generar un análisis.');
+    }
+    return output;
   }
 );
